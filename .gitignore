@@ -1,0 +1,7 @@
+*.o
+*~
+.*~
+mnt
+*.swp
+*.pyc
+kernel
