@@ -14,7 +14,7 @@ kernel: $(objs) kernel.ld
 .s.o:
 	nasm -f elf32 -o $@ $<
 
-%.o: %.cc
+%.o: %.cc %.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 			
 .PHONY: clean

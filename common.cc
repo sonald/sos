@@ -8,18 +8,16 @@ static const u8 CURSOR_LOCATION_LOW_IND = 0x0F;
 
 static volatile u16* vbase = (u16*)0xB8000;
 static int cx = 0, cy = 0;
+static u8 _attrib = 0x0F;
 
-int max(int a, int b)
+inline int max(int a, int b)
 {
-    /*return ((a>b)?a:b);*/ // this'll crash, why?
-    if (a > b) return a;
-    return b;
+    return ((a>b)?a:b); // this'll crash, why?
 }
 
-int min(int a, int b)
+inline int min(int a, int b)
 {
-    if (a > b) return b;
-    return a;
+    return ((a>b)?b:a);
 }
 
 void outb(u16 port, u8 val)
@@ -85,6 +83,8 @@ void kprintf(const char* fmt, ...)
 
 char* itoa(u32 d, int base)
 {
+    if (base < 2 || base > 16) return NULL;
+
     static char _early_buf[128];
     static char map[] = "0123456789ABCDEF";
     char* p = _early_buf + sizeof(_early_buf) - 1;
@@ -138,7 +138,7 @@ void kvprintf(const char* fmt, va_list args)
 
                 case 's':
                     s = va_arg(args, char*);
-                    kputs(s);
+                    kputs(s?s:"(NULL)");
                     break;
 
                 default:
@@ -153,9 +153,8 @@ void kvprintf(const char* fmt, va_list args)
 
 void kputchar(char c)
 {
-    u8 attrib = (0 << 4) | (0xF & 0x0F); // white in black
-    u16 ch = c | (attrib << 8);
-    u16 blank = ' ' | (attrib << 8);
+    u16 ch = c | (_attrib << 8);
+    u16 blank = ' ' | (_attrib << 8);
     int stride = 80;
 
     if (c == 0x08) { // backspace
@@ -190,6 +189,11 @@ void kputs(const char* msg)
         kputchar(*p);
         p++;
     }
+}
+
+void set_text_color(u8 fg, u8 bg)
+{
+    _attrib = ((fg & 0x0f) | (bg & 0xf0)) & 0xff;
 }
 
 void set_cursor(u16 cur)
@@ -235,6 +239,7 @@ void* memset(void *dst, int c, int len)
     for (int i = 0; i < len; i++) {
         *(p+i) = (u8)c;
     }
+    return dst;
 }
 
 int strlen(const char* s)
