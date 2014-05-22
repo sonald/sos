@@ -5,6 +5,10 @@
 [BITS 32]
 global start
 extern kernel_main
+extern kernel_init
+extern __cxa_finalize
+extern _init
+extern _fini
 
 [section .mboot]
 ; This part MUST be 4byte aligned, so we solve that issue using 'ALIGN 4'
@@ -26,9 +30,15 @@ mboot:
 start:
     cli ; clear interrupt now
     mov esp, kern_stack_top
+    
+    call kernel_init 
+
+    call _init
     push ebx
     call kernel_main
+    call _fini
 
+    call __cxa_finalize
     cli
     hlt
     jmp $
