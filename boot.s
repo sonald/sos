@@ -38,6 +38,8 @@ start:
     call kernel_main
     call _fini
 
+    sub esp, $4
+    push $0
     call __cxa_finalize
     cli
     hlt

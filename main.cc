@@ -11,7 +11,7 @@ struct Manager
         kprintf("Manager %d\n", count++);
     }
     ~Manager() {
-        kputs("done!");
+        kputs("destroy!");
     }
 };
 
@@ -29,6 +29,8 @@ extern "C" void kernel_init()
 
 extern "C" int kernel_main(struct multiboot_info *mb)
 {
+    // need guard to use this
+    static Manager man3;
     set_text_color(LIGHT_GREEN, BLACK);
     const char* msg = "Welcome to SOS....\n";
     kputs(msg);

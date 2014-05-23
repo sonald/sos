@@ -22,9 +22,6 @@ struct cxa_ref_s
 cxa_ref_s refs[MAX_ATEXIT_ENTRIES];
 int refs_len = 0;
 
-/**
- * dummy, no need to do anything
- */
 extern "C" int __cxa_atexit(void (*func) (void *), void * arg, void * dso_handle)
 {
     if (refs_len >= MAX_ATEXIT_ENTRIES) return -1;
@@ -37,8 +34,6 @@ extern "C" int __cxa_atexit(void (*func) (void *), void * arg, void * dso_handle
 
 extern "C" void __cxa_finalize(void * d)
 {
-    kprintf("__cxa_finalize: 0x%x\n", (u32)d);
-
     if (!d) {
         for (int i = refs_len-1; i >= 0; --i) {
             if (refs[i].f)
@@ -58,4 +53,28 @@ extern "C" void __cxa_finalize(void * d)
     }
 }
 
+// not thread safe
+// should add a mutex-like guard with a test-and-set primitive.
+namespace __cxxabiv1 
+{
+    /* guard variables */
+
+    /* The ABI requires a 64-bit type.  */
+    __extension__ typedef int __guard __attribute__((mode(__DI__)));
+
+    extern "C" int __cxa_guard_acquire (__guard *g) 
+    {
+        return !*(char *)(g);
+    }
+
+    extern "C" void __cxa_guard_release (__guard *g)
+    {
+        *(char *)g = 1;
+    }
+
+    extern "C" void __cxa_guard_abort (__guard *)
+    {
+
+    }
+}
 

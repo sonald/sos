@@ -5,7 +5,7 @@ crtbegin_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtbegin.o)
 crtend_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtend.o)
 
 # order is important, boot.o must be first here
-kernel_objs=boot.o main.o common.o runtime.o 
+kernel_objs=boot.o main.o common.o cxx_rt.o 
 
 objs=crti.o $(crtbegin_o) $(kernel_objs) $(crtend_o) crtn.o
 
