@@ -72,43 +72,27 @@ mboot:
 %endmacro
 
 [section .text]
-start equ (_start - KERNEL_VIRTUAL_BASE)
+; physical address for _start, need it before paing enabled.
+start equ (_start - KERNEL_VIRTUAL_BASE) 
+
 _start:
+    push ebx ; save mbinfo 
+
     ; we really should check cpuid for PSE support, when support, use 4MB page
-    ;mov eax, 01
-    ;cpuid
-    ;and edx, 0x00000004 ; check PSE
-    ;jz _panic
+    mov eax, 01
+    cpuid
+    and edx, 0x00000004 ; check PSE
+    jz _no_pse
+
+    ; enable PSE
+    mov ecx, cr4
+    or ecx, 0x00000010 
+    mov cr4, ecx
+_no_pse:
 
     ; populate table001, table768
     fill_page_table table001, 0
     fill_page_table table768, 768<<2
-
-    ;mov eax, boot_kernel_pagetable - KERNEL_VIRTUAL_BASE
-    ;or dword [eax], table001 - KERNEL_VIRTUAL_BASE
-    ;mov ecx, 1024
-    ;mov eax, 0x03 ; RW, P
-    ;mov edi, (table001 - KERNEL_VIRTUAL_BASE)
-;.1:
-    ;stosd
-    ;add eax, 4096
-    ;loop .1
-
-    ;mov eax, boot_kernel_pagetable - KERNEL_VIRTUAL_BASE
-    ;add eax, 768<<2
-    ;or dword [eax], table768 - KERNEL_VIRTUAL_BASE
-    ;mov ecx, 1024
-    ;mov eax, 0x03 ; RW, P
-    ;mov edi, (table768 - KERNEL_VIRTUAL_BASE)
-;.2:
-    ;stosd
-    ;add eax, 4096
-    ;loop .2
-
-    ; enable PSE
-    ;mov ecx, cr4
-    ;or ecx, 0x00000010 
-    ;mov cr4, ecx
 
     mov ecx, (boot_kernel_pagetable - KERNEL_VIRTUAL_BASE)
     mov cr3, ecx
@@ -122,16 +106,33 @@ _start:
     jmp ecx
 
 higher_half_entry:
-    ; invalidate pde 0
-    ;mov dword [boot_kernel_pagetable], 0x0
-    ;invlpg [0]
+    pop ebx ; restore mbinfo, must before invalidating first PDE, 
+            ; cause after invalidation, esp point to invalid low-end mem vaddr
+
+    ; invalidate all PTEs for PDE 0
+    mov ecx, 1024
+    mov eax, 0x0 ; Not Present
+    mov edi, table001
+.flush:
+    stosd
+    add eax, 0x1000
+    invlpg [eax]  ; will crash
+    loop .flush
+
+    ;; invalidate PDE 0
+    mov dword [boot_kernel_pagetable], 0
+    mov ecx, (boot_kernel_pagetable - KERNEL_VIRTUAL_BASE)
+    mov cr3, ecx
 
     mov esp, kern_stack_top
+    push ebx
     
     call kernel_init 
     call _init
 
     ; cdecl, ebx will keep as it was
+    pop ebx
+    add ebx, KERNEL_VIRTUAL_BASE
     push ebx
 
     call kernel_main

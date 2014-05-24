@@ -45,6 +45,13 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     set_text_color(LIGHT_GREEN, BLACK);
     const char* msg = "Welcome to SOS....\n";
+
+    // check if paging is working correctly
+    u32 kernel_base = 0xC0000000;
+    for (u32 i = 0; i < 1024; ++i) {
+        kprintf("%x", *(u32*)(kernel_base + i*4096 + 4));
+    }
+
     kputs(msg);
     if (mb->flags & 0x1) {
         //u32 memsize = mb->low_mem + mb->high_mem;
