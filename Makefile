@@ -11,8 +11,11 @@ objs=crti.o $(crtbegin_o) $(kernel_objs) $(crtend_o) crtn.o
 
 all: run
 
+debug: kernel
+	qemu-system-i386 -kernel kernel -m 32 -s -S
+
 run: kernel
-	qemu-system-i386 -kernel kernel
+	qemu-system-i386 -kernel kernel -m 32 -s
 
 kernel: $(objs) kernel.ld
 	$(CXX) -T kernel.ld -O2 -nostdlib -o $@ $^ -lgcc

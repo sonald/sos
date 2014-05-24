@@ -6,7 +6,7 @@ static const u16 CRTC_ADDR_DATA = 0x3D5;
 static const u8 CURSOR_LOCATION_HIGH_IND = 0x0E;
 static const u8 CURSOR_LOCATION_LOW_IND = 0x0F;
 
-static volatile u16* vbase = (u16*)0xB8000;
+static volatile u16* vbase = (u16*)0xC00B8000;
 static int cx = 0, cy = 0;
 static u8 _attrib = 0x0F;
 

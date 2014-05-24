@@ -1,20 +1,21 @@
 ENTRY(start)
 SECTIONS
 {
-    . = 1M;
-    .text BLOCK(4K) : ALIGN(4K)
+    . = 0xC0100000;
+
+    .text 0xC0100000: AT(ADDR(.text) - 0xC0000000)
     {
         *(.mboot)
         *(.text)
         *(.rodata)
     }
         
-    .data BLOCK(4K) : ALIGN(4K)
+    .data ALIGN(0x1000): AT(ADDR(.data) - 0xC0000000)
     { 
         *(.data)
     }
         
-    .bss BLOCK(4K) : ALIGN(4K)
+    .bss : AT(ADDR(.bss) - 0xC0000000)
     {
         *(COMMON)
         *(.bss)
