@@ -1,5 +1,7 @@
 #include "common.h"
 #include "boot.h"
+#include "isr.h"
+#include "timer.h"
 
 struct Manager 
 {
@@ -40,10 +42,25 @@ static inline bool is_support_4m_page()
     return (edx & 0x00000004) == 1;
 }
 
+static void test_irqs()
+{
+    //DIV 0
+    int a = 0;
+    kprintf("%x\n", 100/a);
+    //Page Fault
+    int b = *(u32*)(0x01000000);
+    kprintf("%x\n", b);
+}
+
 extern "C" int kernel_main(struct multiboot_info *mb)
 {
     // need guard to use this
     static Manager man2;
+    init_gdt();
+    init_idt();
+    init_timer();
+
+    __asm__ __volatile__ ("sti");
 
     set_text_color(LIGHT_GREEN, BLACK);
     const char* msg = "Welcome to SOS....\n";
@@ -64,9 +81,15 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     if (is_cpuid_capable()) {
         kprintf("4M Page is %ssupported.\n", (is_support_4m_page()?"":"not "));
     }
+
     kputs(man2.name);
+    for (;;) {
+        busy_wait(1000);
+        kputs("loop\n");
+    }
 
-    __asm__ __volatile__ ("sti");
-
+    //test_irqs();
+    
+    for(;;);
     return 0x1BADFEED;
 }

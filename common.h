@@ -6,10 +6,22 @@
 #endif
 
 #include <stddef.h>
-#if !defined __cplusplus__
+#if !defined __cplusplus
 #include <stdbool.h>
 #endif
 #include <stdint.h>
+
+#if defined __cplusplus
+
+#define BEGIN_CDECL extern "C" {
+#define END_CDECL }
+
+#else
+
+#define BEGIN_CDECL 
+#define END_CDECL
+
+#endif
 
 #if !defined uint32_t
 typedef unsigned int u32;

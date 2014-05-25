@@ -151,7 +151,6 @@ higher_half_entry:
 
     cli
     hlt
-_panic:
     jmp $
 
 is_cpuid_capable:
