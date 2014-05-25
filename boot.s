@@ -4,6 +4,8 @@
 ; are disabled at this point: More on interrupts later!
 [BITS 32]
 global start
+global is_cpuid_capable
+
 extern kernel_main
 extern kernel_init
 extern __cxa_finalize
@@ -78,6 +80,10 @@ start equ (_start - KERNEL_VIRTUAL_BASE)
 _start:
     push ebx ; save mbinfo 
 
+    call is_cpuid_capable
+    test eax, eax
+    jz _no_pse
+
     ; we really should check cpuid for PSE support, when support, use 4MB page
     mov eax, 01
     cpuid
@@ -91,6 +97,7 @@ _start:
 _no_pse:
 
     ; populate table001, table768
+    cld
     fill_page_table table001, 0
     fill_page_table table768, 768<<2
 
@@ -121,17 +128,17 @@ higher_half_entry:
 
     ;; invalidate PDE 0
     mov dword [boot_kernel_pagetable], 0
-    mov ecx, (boot_kernel_pagetable - KERNEL_VIRTUAL_BASE)
-    mov cr3, ecx
+
+    ; not necessary
+    ;mov ecx, (boot_kernel_pagetable - KERNEL_VIRTUAL_BASE)
+    ;mov cr3, ecx
 
     mov esp, kern_stack_top
-    push ebx
     
     call kernel_init 
     call _init
 
     ; cdecl, ebx will keep as it was
-    pop ebx
     add ebx, KERNEL_VIRTUAL_BASE
     push ebx
 
@@ -146,6 +153,26 @@ higher_half_entry:
     hlt
 _panic:
     jmp $
+
+is_cpuid_capable:
+    ; try to modify ID flag
+    pushfd
+    pop eax
+    mov ecx, eax
+    xor eax, 0x200000 ; flip ID 
+    push eax
+    popfd
+
+    ; test if modify success
+    pushfd
+    pop eax
+    xor eax, ecx 
+    shr eax, 21
+    and eax, 1
+    push ecx
+    popfd
+    ret
+
 
 [section .bootstrap_stack nobits]
 _kern_stack:

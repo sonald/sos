@@ -17,6 +17,8 @@ struct Manager
 
 Manager man1;
 
+extern "C" int is_cpuid_capable();
+
 /*
  * gets called before Global constructor 
  */
@@ -58,7 +60,10 @@ extern "C" int kernel_main(struct multiboot_info *mb)
         set_text_color(LIGHT_RED, BLACK);
         kprintf("detected mem: low: %dKB, hi: %dKB\n", mb->low_mem, mb->high_mem);
     }
-    kprintf("4M Page is %ssupported.\n", (is_support_4m_page()?"":"not "));
+
+    if (is_cpuid_capable()) {
+        kprintf("4M Page is %ssupported.\n", (is_support_4m_page()?"":"not "));
+    }
     kputs(man2.name);
 
     __asm__ __volatile__ ("sti");
