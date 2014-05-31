@@ -56,8 +56,8 @@ void outb(u16 port, u8 val);
 u8 inb(u16 port);
 u16 inw(u16 port);
 
-// use internal static buf, not thread-safe, do no free it
-char* itoa(u32 d, int base);
+char* itoa(int d, char* buf, int base);
+char* utoa(u32 u, char* buf, int base);
 
 /*
  * early vga access

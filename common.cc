@@ -81,20 +81,58 @@ void kprintf(const char* fmt, ...)
     va_end(args);
 }
 
-char* itoa(u32 d, int base)
+char* itoa(int d, char* buf, int base)
 {
-    if (base < 2 || base > 16) return NULL;
+    if (base < 2 || base > 36) {
+        *buf = '\0';
+        return buf;
+    }
+    
+    const char map[] = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz";
+    char* p = buf, *dp = buf;
+    if (d < 0 && base == 10) {
+        *buf++ = '-';
+        dp = buf;
+    }   
+    
+     do {
+         *buf++ = map[35 + d % base];
+         d /= base;
+     } while (d);
+     *buf-- = '\0';
+     
+     while (dp < buf) {
+         char c = *dp;
+         *dp++ = *buf;
+         *buf-- = c;
+     }
+     
+     return p;
+}
 
-    static char _early_buf[128];
-    static char map[] = "0123456789ABCDEF";
-    char* p = _early_buf + sizeof(_early_buf) - 1;
-    *p-- = '\0';
-    do {
-        int r = d % base;
-        *p-- = map[r];
-        d /= base;
-    }while (d);
-    return ++p;
+char* utoa(u32 u, char* buf, int base) 
+{
+    if (base < 2 || base > 36) {
+        *buf = '\0';
+        return buf;
+    }
+    
+    const char map[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    char* p = buf, *dp = buf;
+    
+     do {
+         *buf++ = map[u % base];
+         u /= base;
+     } while (u);
+     *buf-- = '\0';
+     
+     while (dp < buf) {
+         char c = *dp;
+         *dp++ = *buf;
+         *buf-- = c;
+     }
+     
+     return p;        
 }
 
 void kvprintf(const char* fmt, va_list args)
@@ -103,30 +141,32 @@ void kvprintf(const char* fmt, va_list args)
     u32 u = 0;
     char* s = NULL;
     char c = ' ';
+    char buf[32];
 
     while (*fmt) {
         char ch = *fmt;
         if (ch == '%') {
             switch(*++fmt) {
-                case 'b': 
-                    u = va_arg(args, u32);
-                    kputs(itoa(u, 2));
+                case 'b': case 'B':
+                    d = va_arg(args, int);
+                    kputs(itoa(d, buf, 2));
                     break;
 
-                case 'x': 
+                case 'x': case 'X':
                     u = va_arg(args, u32);
-                    kputs(itoa(u, 16));
+                    kputs(utoa(u, buf, 16));
                     break;
 
                 case 'd': 
                     d = va_arg(args, int);
-                    if (d < 0) {
-                        kputchar('-');
-                        d = -d;
-                    }
-                    kputs(itoa(d, 10));
+                    kputs(itoa(d, buf, 10));
                     break;
 
+                case 'u':
+                    u = va_arg(args, u32);
+                    kputs(utoa(u, buf, 10));
+                    break;
+                    
                 case '%':
                     kputchar('%');
                     break;

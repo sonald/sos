@@ -52,6 +52,15 @@ static void test_irqs()
     kprintf("%x\n", b);
 }
 
+static void check_paging()
+{
+    // check if paging is working correctly
+    u32 kernel_base = 0xC0000000;
+    for (u32 i = 0; i < 1024; ++i) {
+        kprintf("%x", *(u32*)(kernel_base + i*4096 + 4));
+    }
+}
+
 extern "C" int kernel_main(struct multiboot_info *mb)
 {
     // need guard to use this
@@ -62,15 +71,10 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     __asm__ __volatile__ ("sti");
 
+    // check_paging();
+    
     set_text_color(LIGHT_GREEN, BLACK);
     const char* msg = "Welcome to SOS....\n";
-
-    // check if paging is working correctly
-    u32 kernel_base = 0xC0000000;
-    for (u32 i = 0; i < 1024; ++i) {
-        kprintf("%x", *(u32*)(kernel_base + i*4096 + 4));
-    }
-
     kputs(msg);
     if (mb->flags & 0x1) {
         //u32 memsize = mb->low_mem + mb->high_mem;
@@ -83,9 +87,11 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     }
 
     kputs(man2.name);
+    kprintf("0b%b, 0b%b, %d, %u, 0x%x\n", (int)-2, 24+2, -1892, 0xf0000001, 0xfff00000);
+    int i = 0;
     for (;;) {
         busy_wait(1000);
-        kputs("loop\n");
+        kprintf("loop %d\r", i++);
     }
 
     //test_irqs();
