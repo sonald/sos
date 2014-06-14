@@ -43,6 +43,8 @@ typedef int8_t s8;
 #define NULL (void*)0
 #endif
 
+extern u32 kernel_virtual_base;
+
 int max(int a, int b);
 int min(int a, int b);
 

@@ -1,4 +1,5 @@
 ENTRY(start)
+KERNEL_VIRTUAL_BASE = 0xC0000000;
 SECTIONS
 {
     . = 0xC0100000;
@@ -22,4 +23,5 @@ SECTIONS
         *(.bootstrap_stack)
     }
             
+    _end = .;
 }

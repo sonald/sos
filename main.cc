@@ -2,6 +2,7 @@
 #include "boot.h"
 #include "isr.h"
 #include "timer.h"
+#include "mm.h"
 
 struct Manager 
 {
@@ -54,37 +55,63 @@ static void test_irqs()
 
 static void check_paging()
 {
+    kprintf("base: 0x%x\n", kernel_virtual_base);
+
     // check if paging is working correctly
-    u32 kernel_base = 0xC0000000;
     for (u32 i = 0; i < 1024; ++i) {
-        kprintf("%x", *(u32*)(kernel_base + i*4096 + 4));
+        kprintf("%x", *(u32*)(kernel_virtual_base + i*4096 + 4));
     }
 }
+
+static void test_pmm(PhysicalMemoryManager& pmm)
+{
+    void* p = pmm.alloc_frame();
+    if (p == NULL) kputs("alloc failed\n");
+    pmm.free_frame(p);
+    void* p2 = pmm.alloc_frame();
+    if (p != p2) kputs("p != p2\n");
+
+    u32 size = pmm.frame_size * 10;
+    p = pmm.alloc_region(size);
+    if (p == NULL) kputs("alloc region failed\n");
+    pmm.free_region(p, size);
+    p2 = pmm.alloc_frame();
+    if (p != p2) kputs("p != p2\n");
+}
+
+extern u32* _end;
 
 extern "C" int kernel_main(struct multiboot_info *mb)
 {
     // need guard to use this
     static Manager man2;
+
     init_gdt();
     init_idt();
     init_timer();
 
-    __asm__ __volatile__ ("sti");
-
-    // check_paging();
+     //check_paging();
     
     set_text_color(LIGHT_GREEN, BLACK);
     const char* msg = "Welcome to SOS....\n";
     kputs(msg);
+    u32 memsize = 0;
     if (mb->flags & 0x1) {
-        //u32 memsize = mb->low_mem + mb->high_mem;
+        memsize = mb->low_mem + mb->high_mem;
         set_text_color(LIGHT_RED, BLACK);
-        kprintf("detected mem: low: %dKB, hi: %dKB\n", mb->low_mem, mb->high_mem);
+        kprintf("detected mem(%dKB): low: %dKB, hi: %dKB\n",
+                memsize, mb->low_mem, mb->high_mem);
     }
 
     if (is_cpuid_capable()) {
         kprintf("4M Page is %ssupported.\n", (is_support_4m_page()?"":"not "));
     }
+
+    u32 mmap_addr = (u32)&_end;
+    PhysicalMemoryManager pmm(memsize, mmap_addr);
+    test_pmm(pmm);
+
+    __asm__ __volatile__ ("sti");
 
     kputs(man2.name);
     kprintf("0b%b, 0b%b, %d, %u, 0x%x\n", (int)-2, 24+2, -1892, 0xf0000001, 0xfff00000);
