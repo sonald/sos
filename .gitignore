@@ -5,3 +5,5 @@ mnt
 *.swp
 *.pyc
 kernel
+.zcache
+objs

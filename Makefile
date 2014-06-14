@@ -1,13 +1,24 @@
-CXX=i686-elf-g++
+CROSS_PATH=/Users/sonald/crossgcc/bin
+CXX=$(CROSS_PATH)/i686-elf-g++
 CXXFLAGS=-std=c++11 -I./include -ffreestanding  -O2 -Wall -Wextra -fno-exceptions -fno-rtti -g
+
+OBJS_DIR=objs
 
 crtbegin_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtbegin.o)
 crtend_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtend.o)
 
 # order is important, boot.o must be first here
-kernel_objs=boot.o main.o common.o cxx_rt.o irq_stubs.o gdt.o isr.o timer.o
+kernel_srcs=boot.s main.cc common.cc cxx_rt.cc irq_stubs.s gdt.cc isr.cc timer.cc 
 
-objs=crti.o $(crtbegin_o) $(kernel_objs) $(crtend_o) crtn.o
+kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))
+kernel_objs := $(patsubst %.s, $(OBJS_DIR)/%.o, $(kernel_objs))
+
+objs := $(OBJS_DIR)/crti.o $(crtbegin_o) $(kernel_objs) $(crtend_o) $(OBJS_DIR)/crtn.o
+
+DEPFILES := $(patsubst %.cc, %.d, $(kernel_srcs))
+DEPFILES := $(patsubst %.s, %.d, $(DEPFILES))
+
+-include $(DEPFILES)
 
 all: run
 
@@ -15,19 +26,21 @@ debug: kernel
 	qemu-system-i386 -kernel kernel -m 32 -s -S
 
 run: kernel
-	qemu-system-i386 -kernel kernel -m 32 -s
+	qemu-system-i386 -kernel kernel -m 32 
 
 kernel: $(objs) kernel.ld
 	$(CXX) -T kernel.ld -O2 -nostdlib -o $@ $^ -lgcc
 
-.s.o:
+$(OBJS_DIR)/%.o: %.cc Makefile
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
+			
+$(OBJS_DIR)/%.o: %.s
+	@mkdir -p $(@D)
 	nasm -f elf32 -o $@ $<
 
-%.o: %.cc %.h
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-			
 .PHONY: clean
 
 clean:
-	-rm *.o 
+	-rm $(OBJS_DIR)/*.o 
 	-rm kernel
