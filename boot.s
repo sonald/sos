@@ -5,6 +5,9 @@
 [BITS 32]
 global start
 global is_cpuid_capable
+global _kernel_page_directory
+global table001
+global table768
 
 extern kernel_main
 extern kernel_init
@@ -19,7 +22,7 @@ KERNEL_PDE_INDEX equ (KERNEL_VIRTUAL_BASE >> 22)
 [section .data]
 ALIGN 0x1000
 KERNEL_PAGE_ATTR equ  0x03 ; P, RW, 4K page
-boot_kernel_pagetable:
+_kernel_page_directory:
     dd (0 | KERNEL_PAGE_ATTR)
     times (KERNEL_PDE_INDEX - 1) dd 0
     dd (0 | KERNEL_PAGE_ATTR)
@@ -30,7 +33,7 @@ boot_kernel_pagetable:
 [section .data]
 ALIGN 0x1000
 KERNEL_4M_PAGE_ATTR equ  0x83 ; P, RW, PSE(4M Page)
-boot_kernel_pagetable_4m:
+_kernel_page_directory_4m:
     dd (0 | KERNEL_4M_PAGE_ATTR)
     times (KERNEL_PDE_INDEX - 1) dd 0
     dd (0 | KERNEL_4M_PAGE_ATTR)
@@ -59,8 +62,9 @@ mboot:
     dd MULTIBOOT_HEADER_FLAGS
     dd MULTIBOOT_CHECKSUM
     
+;; fill identity mapping for a page table
 %macro fill_page_table 2
-    mov eax, boot_kernel_pagetable - KERNEL_VIRTUAL_BASE
+    mov eax, _kernel_page_directory - KERNEL_VIRTUAL_BASE
     add eax, %2
 
     or dword [eax], %1 - KERNEL_VIRTUAL_BASE
@@ -101,7 +105,7 @@ _no_pse:
     fill_page_table table001, 0
     fill_page_table table768, 768<<2
 
-    mov ecx, (boot_kernel_pagetable - KERNEL_VIRTUAL_BASE)
+    mov ecx, (_kernel_page_directory - KERNEL_VIRTUAL_BASE)
     mov cr3, ecx
 
     mov ecx, cr0
@@ -127,10 +131,10 @@ higher_half_entry:
     loop .flush
 
     ;; invalidate PDE 0
-    mov dword [boot_kernel_pagetable], 0
+    mov dword [_kernel_page_directory], 0
 
     ; not necessary
-    ;mov ecx, (boot_kernel_pagetable - KERNEL_VIRTUAL_BASE)
+    ;mov ecx, (_kernel_page_directory - KERNEL_VIRTUAL_BASE)
     ;mov cr3, ecx
 
     mov esp, kern_stack_top

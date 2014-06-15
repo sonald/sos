@@ -45,6 +45,14 @@ typedef int8_t s8;
 
 extern u32 kernel_virtual_base;
 
+void panic(const char* msg);
+#define kassert(cond) do { \
+    if (!(cond)) { \
+        kprintf("[%s:%d]: ", __func__, __LINE__); \
+        panic("assert " #cond " failed");  \
+    } \
+} while(0)
+
 int max(int a, int b);
 int min(int a, int b);
 

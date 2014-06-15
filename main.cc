@@ -3,6 +3,7 @@
 #include "isr.h"
 #include "timer.h"
 #include "mm.h"
+#include "vm.h"
 
 struct Manager 
 {
@@ -109,12 +110,13 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     u32 mmap_addr = (u32)&_end;
     PhysicalMemoryManager pmm(memsize, mmap_addr);
-    test_pmm(pmm);
+    //test_pmm(pmm);
+    VirtualMemoryManager vmm(pmm);
+    vmm.init();
+    vmm.dump_page_directory(vmm.current_directory());
 
     __asm__ __volatile__ ("sti");
 
-    kputs(man2.name);
-    kprintf("0b%b, 0b%b, %d, %u, 0x%x\n", (int)-2, 24+2, -1892, 0xf0000001, 0xfff00000);
     int i = 0;
     for (;;) {
         busy_wait(1000);

@@ -301,3 +301,13 @@ char* strcpy(char* dst, const char* src)
     return d;
 }
 
+void panic(const char* msg)
+{
+    asm ("cli");
+    kputs(msg);
+    for(;;) {
+        asm volatile ("hlt");
+    }
+}
+
+

@@ -102,13 +102,16 @@ PhysicalMemoryManager::PhysicalMemoryManager(u32 mem_size, u32 map)
     u32 expand = _frameCount / 8 + map - kernel_virtual_base;
     memset(_frames, 0, _frameCount/8);
 
-    //FIXME: note we setup 768th PDE as present for kernel, which means 
+    //NOTE: note we setup 768th PDE as present for kernel, which means 
     //the first 4MB physical memory should be marked as alloced.
-    alloc_region(expand);
+    alloc_region(this->frame_size*1024);
     debug_mm("mem_size: %dKB, map addr: 0x%x, frames: %d, expand: %d\n",
             mem_size, map, _frameCount, expand);
 }
 
+// there is a caveat: NULL is actually ambiguous, it may means the very first
+// frame or alloc failure. to keep it safe, we asure that first frame is always
+// occupied by kernel, so NULL always means failure.
 void* PhysicalMemoryManager::alloc_frame()
 {
     debug_mm("_frameUsed: %d\n", _frameUsed);
