@@ -104,6 +104,18 @@ extern "C" int kernel_main(struct multiboot_info *mb)
                 memsize, mb->low_mem, mb->high_mem);
     }
 
+    if (mb->flags & 0x40) {
+        memory_map_t* map = (memory_map_t*)(mb->mmap_addr + kernel_virtual_base);
+        int len = mb->mmap_length / sizeof(memory_map_t);
+        kprintf("mmap(%d entries) at 0x%x: \n", len, mb->mmap_addr);
+        for (int i = 0; i < len; ++i) {
+            kprintf("size: %d, base: 0x%x%x, len: 0x%x%x, type: %d\n",
+                    map[i].size, map[i].base_addr_high, 
+                    map[i].base_addr_low, map[i].length_high, map[i].length_low,
+                    map[i].type);
+        }
+    }
+
     if (is_cpuid_capable()) {
         kprintf("4M Page is %ssupported.\n", (is_support_4m_page()?"":"not "));
     }
@@ -113,6 +125,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     //test_pmm(pmm);
     VirtualMemoryManager vmm(pmm);
     vmm.init();
+
     vmm.dump_page_directory(vmm.current_directory());
 
     __asm__ __volatile__ ("sti");

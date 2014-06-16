@@ -3,7 +3,20 @@
 
 #include "common.h"
 
-struct multiboot_info {
+/* The Multiboot header. */
+typedef struct multiboot_header
+{
+    unsigned long magic;
+    unsigned long flags;
+    unsigned long checksum;
+    unsigned long header_addr;
+    unsigned long load_addr;
+    unsigned long load_end_addr;
+    unsigned long bss_end_addr;
+    unsigned long entry_addr;
+} multiboot_header_t;
+
+typedef struct multiboot_info {
     u32 flags;
     u32 low_mem;
     u32 high_mem;
@@ -30,7 +43,16 @@ struct multiboot_info {
     unsigned long vbe_interface_seg;
     unsigned long vbe_interface_off;
     unsigned long vbe_interface_len;
-};
+} multiboot_info_t;
+
+/* The module structure. */
+typedef struct module
+{
+    unsigned long mod_start;
+    unsigned long mod_end;
+    unsigned long string;
+    unsigned long reserved;
+} module_t;
 
 /* The memory map. Be careful that the offset 0 is base_addr_low
  *         but no size. */
