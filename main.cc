@@ -4,6 +4,7 @@
 #include "timer.h"
 #include "mm.h"
 #include "vm.h"
+#include "kb.h"
 
 struct Manager 
 {
@@ -127,14 +128,16 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     vmm.init();
 
     vmm.dump_page_directory(vmm.current_directory());
+    Keyboard* kb = Keyboard::get();
+    kb->init();
 
     __asm__ __volatile__ ("sti");
 
-    int i = 0;
-    for (;;) {
-        busy_wait(1000);
-        kprintf("loop %d\r", i++);
-    }
+    //int i = 0;
+    //for (;;) {
+        //busy_wait(1000);
+        //kprintf("loop %d\r", i++);
+    //}
 
     //test_irqs();
     

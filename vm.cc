@@ -37,6 +37,7 @@ VirtualMemoryManager::VirtualMemoryManager(PhysicalMemoryManager& pmm)
 {
 }
 
+//TODO: set mapping according to mmap from grub
 bool VirtualMemoryManager::init()
 {
     //trick: bind PDE in boot.s
@@ -109,7 +110,9 @@ void VirtualMemoryManager::flush_tlb_entry(u32 vaddr)
 }
 
 //FIXME: actually, I can not do this without storing vaddrs of all dynamically
-//alloced page tables
+//alloced page tables. in order for it to work properly, some rules must be
+//setuped. i.e all virtual address up from KERNEL_VIRTUAL_BASE (kernel virtual 
+//space) in all page dirs has the same mapping rule.
 page_t* VirtualMemoryManager::lookup_page(u32 vaddr)
 {
     panic("wrong implementation");

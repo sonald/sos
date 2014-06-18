@@ -53,6 +53,11 @@ void panic(const char* msg);
     } \
 } while(0)
 
+inline void *operator new(size_t, void *p)     throw() { return p; }
+inline void *operator new[](size_t, void *p)   throw() { return p; }
+inline void  operator delete  (void *, void *) throw() { };
+inline void  operator delete[](void *, void *) throw() { };
+
 int max(int a, int b);
 int min(int a, int b);
 
