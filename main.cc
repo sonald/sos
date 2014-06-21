@@ -1,26 +1,14 @@
 #include "common.h"
 #include "boot.h"
+#include "gdt.h"
 #include "isr.h"
 #include "timer.h"
 #include "mm.h"
 #include "vm.h"
 #include "kb.h"
+#include "task.h"
+#include "syscall.h"
 
-struct Manager 
-{
-    char name[20];
-    Manager() {
-        static int count = 1;
-        memcpy(name, "hello", 5);
-        name[5] = '\0';
-        kprintf("Manager %d\n", count++);
-    }
-    ~Manager() {
-        kputs("destructor!\n");
-    }
-};
-
-Manager man1;
 
 extern "C" int is_cpuid_capable();
 
@@ -83,14 +71,38 @@ static void test_pmm(PhysicalMemoryManager& pmm)
 
 extern u32* _end;
 
+extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
+
+tss_entry_t tss;
+u8 task0_sys_stack[1024];
+u8 task0_usr_stack[1024];
+static void setup_tss()
+{
+    memset(&tss, 0, sizeof(tss));
+    tss.ss0 = 0x10;
+    tss.esp0 = (u32)&task0_sys_stack + sizeof(task0_sys_stack);
+
+    setup_gdt_entry(5, (u32)&tss, sizeof(tss), GDT_TSS_PL3);
+}
+
+extern "C" void flush_tss();
+
+static void task0()
+{
+    int i = 0;
+    for(;;) {
+        if (i < 4)
+            asm volatile ( "int $0x80"::"a"(i));
+        ++i;
+    }
+}
+
 extern "C" int kernel_main(struct multiboot_info *mb)
 {
-    // need guard to use this
-    static Manager man2;
-
     init_gdt();
     init_idt();
     init_timer();
+    init_syscall();
 
      //check_paging();
     
@@ -133,14 +145,10 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     __asm__ __volatile__ ("sti");
 
-    //int i = 0;
-    //for (;;) {
-        //busy_wait(1000);
-        //kprintf("loop %d\r", i++);
-    //}
-
-    //test_irqs();
-    
+    setup_tss();
+    flush_tss();
+    switch_to_usermode((void*)(task0_usr_stack + sizeof(task0_usr_stack)), (void*)&task0);
+    panic("Never Back to Here\n");
     for(;;);
     return 0x1BADFEED;
 }

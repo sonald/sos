@@ -9,7 +9,7 @@ crtend_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtend.o)
 
 # order is important, boot.o must be first here
 kernel_srcs=boot.s main.cc common.cc cxx_rt.cc irq_stubs.s gdt.cc isr.cc \
-	timer.cc mm.cc vm.cc kb.cc
+	timer.cc mm.cc vm.cc kb.cc context.s syscall.cc
 
 kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))
 kernel_objs := $(patsubst %.s, $(OBJS_DIR)/%.o, $(kernel_objs))
@@ -27,7 +27,7 @@ debug: kernel
 	qemu-system-i386 -kernel kernel -m 32 -s -S
 
 run: kernel
-	qemu-system-i386 -kernel kernel -m 32 -usb
+	qemu-system-i386 -kernel kernel -m 32 -usb -s
 
 kernel: $(objs) kernel.ld
 	$(CXX) -T kernel.ld -O2 -nostdlib -o $@ $^ -lgcc

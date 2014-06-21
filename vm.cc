@@ -151,7 +151,7 @@ void VirtualMemoryManager::map_page(void* paddr, void* vaddr)
         pde_set_frame(pde, ptable);
         _current_pdir->tables[PAGE_DIR_IDX((u32)vaddr)] = pde;
     } else {
-        ptable = (page_table_t*)PDE_GET_TABLE_PHYSICAL(pde);
+        ptable = (page_table_t*)(PDE_GET_TABLE_PHYSICAL(pde) + kernel_virtual_base);
     }
 
     page_t* pte = &ptable->pages[PAGE_TABLE_IDX((u32)vaddr)];

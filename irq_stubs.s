@@ -111,6 +111,8 @@ isr_noerrcode 29
 isr_noerrcode 30
 isr_noerrcode 31
 
+isr_noerrcode 128
+
 handler_stub isr_stub, isr_handler
 
 ; master PIC

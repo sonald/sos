@@ -21,7 +21,7 @@ KERNEL_VIRTUAL_BASE equ 0xC0000000
 KERNEL_PDE_INDEX equ (KERNEL_VIRTUAL_BASE >> 22)
 [section .data]
 ALIGN 0x1000
-KERNEL_PAGE_ATTR equ  0x03 ; P, RW, 4K page
+KERNEL_PAGE_ATTR equ  0x07 ; P, RW, 4K page
 _kernel_page_directory:
     dd (0 | KERNEL_PAGE_ATTR)
     times (KERNEL_PDE_INDEX - 1) dd 0
@@ -70,7 +70,7 @@ mboot:
 
     or dword [eax], %1 - KERNEL_VIRTUAL_BASE
     mov ecx, 1024
-    mov eax, 0x03 ; RW, P
+    mov eax, 0x07 ; RW, P, U
     mov edi, (%1 - KERNEL_VIRTUAL_BASE)
 .%1.1:
     stosd

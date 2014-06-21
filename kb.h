@@ -183,10 +183,10 @@ class Keyboard
         bool alt_down() const { return _alt_down; }
         bool meta_down() const { return _meta_down; }
 
-        bool set_shift_down(bool on) { _shift_down = on; }
-        bool set_ctrl_down(bool on) { _ctrl_down = on; }
-        bool set_alt_down(bool on) { _alt_down = on; }
-        bool set_meta_down(bool on) { _meta_down = on; }
+        void set_shift_down(bool on) { _shift_down = on; }
+        void set_ctrl_down(bool on) { _ctrl_down = on; }
+        void set_alt_down(bool on) { _alt_down = on; }
+        void set_meta_down(bool on) { _meta_down = on; }
 
         KeyCode last_key() const { return _last_key; }
         void set_last_key(KeyCode kc) { _last_key = kc; }

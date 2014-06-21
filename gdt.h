@@ -51,6 +51,7 @@ typedef struct gdt_ptr_ gdt_ptr_t;
 #define SEG_CODE_ERC      0x0E // Execute/Read, conforming
 #define SEG_CODE_ERCA     0x0F // Execute/Read, conforming, accessed
  
+#define SEG_386TSS        0x09 //386 TSS
 
 #define GDT_CODE_PL0 GDTE_DT_CD | GDTE_PRESENT(1) | GDTE_SIZE(1) | GDTE_G(1) | \
     SEG_CODE_ER | GDTE_DPL(0) 
@@ -64,6 +65,8 @@ typedef struct gdt_ptr_ gdt_ptr_t;
 #define GDT_DATA_PL3 GDTE_DT_CD | GDTE_PRESENT(1) | GDTE_SIZE(1) | GDTE_G(1) | \
     SEG_DATA_RW | GDTE_DPL(3) 
 
+#define GDT_TSS_PL3 GDTE_DT_GATE | GDTE_PRESENT(1) | GDTE_SIZE(0) | GDTE_G(0) | \
+    SEG_386TSS | GDTE_DPL(3) 
 
 // A struct describing an interrupt gate.
 struct idt_entry_s
@@ -88,6 +91,9 @@ typedef struct idt_ptr_s idt_ptr_t;
 //int gate will reset IF flag, trap gate will not
 #define IDTE_INT_GATE  0x0E
 #define IDTE_TRAP_GATE 0x0F
+
+void setup_gdt_entry(int idx, u32 base, u32 limit, u16 mode);
+void setup_idt_entry(int idx, u32 base, u16 selector, u8 flags);
 
 void init_gdt();
 void init_idt();

@@ -1,5 +1,6 @@
 #include "gdt.h"
 #include "common.h"
+#include "task.h"
 
 BEGIN_CDECL
 
@@ -40,6 +41,8 @@ void isr29();
 void isr30();
 void isr31();
 
+void isr128();
+
 void irq0();
 void irq1();
 void irq2();
@@ -59,11 +62,9 @@ void irq15();
 
 END_CDECL
 
-static void setup_gdt_entry(int idx, u32 base, u32 limit, u16 mode);
-static void setup_idt_entry(int idx, u32 base, u16 selector, u8 flags);
-
 // may need TSS entry later
-gdt_entry_t gdt_entries[5];
+gdt_entry_t gdt_entries[6];
+
 gdt_ptr_t   gdt_ptr;
 idt_entry_t idt_entries[256];
 idt_ptr_t   idt_ptr;
@@ -139,6 +140,10 @@ void init_idt()
     SETUP_GATE(29);
     SETUP_GATE(30);
     SETUP_GATE(31);
+
+    // 0x80 for syscall
+    setup_idt_entry(0x80, (u32)isr128, 0x08,
+            GDTE_PRESENT(1) | GDTE_DPL(3) | IDTE_INT_GATE);
 
     SETUP_IRQ(0, 32);
     SETUP_IRQ(1, 33);
