@@ -39,9 +39,9 @@ typedef struct page_directory_s {
     u32 tables[1024];
 } page_directory_t;
 
-#define PAGE_DIR_IDX(vaddr) (((vaddr) >> 22) & 0x3ff)
-#define PAGE_TABLE_IDX(vaddr) (((vaddr) >> 12) & 0x3ff)
-#define PAGE_ENTRY_OFFSET(vaddr) ((vaddr) & 0x00000fff)
+#define PAGE_DIR_IDX(vaddr) ((((u32)vaddr) >> 22) & 0x3ff)
+#define PAGE_TABLE_IDX(vaddr) ((((u32)vaddr) >> 12) & 0x3ff)
+#define PAGE_ENTRY_OFFSET(vaddr) (((u32)vaddr) & 0x00000fff)
 
 #define PDE_GET_TABLE_PHYSICAL(pde) ((pde & 0xfffff000))
 #define PTE_GET_PAGE_PHYSICAL(pte) ((pte & 0xfffff000))
@@ -61,7 +61,8 @@ class VirtualMemoryManager
         u32* pdirectory_lookup_entry(page_directory_t* p, u32 vaddr);
 
         // setup a page for vaddr <-> paddr mapping
-        void map_page(void* paddr, void* vaddr);
+        void map_page(void* paddr, void* vaddr, u32 flags);
+
 
         /**
          * Causes the specified page directory to be loaded into the
@@ -76,8 +77,12 @@ class VirtualMemoryManager
     private:
         PhysicalMemoryManager& _pmm;
         page_directory_t* _current_pdir;
+        void* _kernel_tables_start;
 
         u32 vadd_to_phy(page_directory_t* pgdir, u32 vaddr);
+        void* alloc_vaddr_for_user_table();
+        page_table_t* map_ptable_temporary(u32 table_paddr);
+        void unmap_ptable_temporary(u32 table_paddr);
 };
 
 #endif

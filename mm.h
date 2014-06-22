@@ -2,6 +2,7 @@
 #define _MM_H 
 
 #include "common.h"
+
 class PhysicalMemoryManager {
     public:
         static constexpr int frame_size = 4096; //4k
@@ -38,7 +39,8 @@ class PhysicalMemoryManager {
         u32 _frameCount;
         u32 _frameUsed;
         u32 _memSize; // in KB
-
+        void* _kernel_tables_start;
+        u32 _kernel_tables_size;
 };
 
 

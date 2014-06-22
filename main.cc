@@ -87,13 +87,14 @@ static void setup_tss()
 
 extern "C" void flush_tss();
 
-static void task0()
+void task0()
 {
-    int i = 0;
+    u8 i = 0;
     for(;;) {
-        if (i < 4)
-            asm volatile ( "int $0x80"::"a"(i));
-        ++i;
+        if (i < 4) {
+            asm ( "int $0x80"::"a"(i));
+            ++i;
+        }
     }
 }
 
@@ -139,15 +140,33 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     VirtualMemoryManager vmm(pmm);
     vmm.init();
 
-    vmm.dump_page_directory(vmm.current_directory());
     Keyboard* kb = Keyboard::get();
     kb->init();
 
     __asm__ __volatile__ ("sti");
 
+    // copy task0 to user-space addr
+    void* vaddr = (void*)0x08000000; 
+    void* paddr = pmm.alloc_frame();
+    vmm.map_page(paddr, vaddr, PDE_USER|PDE_WRITABLE);
+    memcpy(vaddr, (void*)&task0, pmm.frame_size);
+
+    void* task0_usr_stack0 = (void*)0x08100000; 
+    void* paddr_stack0 = pmm.alloc_frame();
+    vmm.map_page(paddr_stack0, task0_usr_stack0, PDE_USER|PDE_WRITABLE);
+    kprintf("alloc task0: eip 0x%x, stack: 0x%x\n", paddr, paddr_stack0);
+
+    // map kernel page
+    //vaddr = (void*)0xC8000000;
+    //paddr = pmm.alloc_frame();
+    //vmm.map_page(paddr, vaddr, PDE_WRITABLE);
+
+    vmm.dump_page_directory(vmm.current_directory());
+
     setup_tss();
     flush_tss();
-    switch_to_usermode((void*)(task0_usr_stack + sizeof(task0_usr_stack)), (void*)&task0);
+    switch_to_usermode((void*)((u32)task0_usr_stack0 + 1024), vaddr);
+
     panic("Never Back to Here\n");
     for(;;);
     return 0x1BADFEED;
