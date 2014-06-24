@@ -173,7 +173,7 @@ static KeyCode _xtkb_scancode_std[] = {
 Keyboard* Keyboard::_instance = NULL;
 
 //FIXME: this is a *HACK*: operator new is not implement yet
-static u32 _kb_base[sizeof(Keyboard)];
+static u8 _kb_base[sizeof(Keyboard)];
 
 static void debug_print(Keyboard* kb)
 {
@@ -186,8 +186,16 @@ static void debug_print(Keyboard* kb)
             kputchar(key - 0x20);
         } else if (key >= KEY_0 && key <= KEY_9){
         }
-    } else 
-        kputchar(key);
+    } else {
+        if (key == KEY_RETURN)
+            kputchar('\n');
+        else if (key == KEY_TAB)
+            kputchar('\t');
+        else if (key == KEY_BACKSPACE)
+            kputchar('\b');
+        else
+            kputchar(key);
+    }
 }
 
 static void keyboard_irq(registers_t* regs)
@@ -222,6 +230,8 @@ static void keyboard_irq(registers_t* regs)
                 case KEY_LALT:
                 case KEY_RALT:
                     kb->set_alt_down(false); break;
+
+                default: break;
             }
         } else {
             //Make Code
@@ -238,6 +248,8 @@ static void keyboard_irq(registers_t* regs)
                 case KEY_LALT:
                 case KEY_RALT:
                     kb->set_alt_down(true); break;
+
+                default: break;
             }
 
             debug_print(kb);

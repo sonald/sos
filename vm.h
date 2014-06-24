@@ -49,8 +49,9 @@ typedef struct page_directory_s {
 class VirtualMemoryManager 
 {
     public:
-        VirtualMemoryManager(PhysicalMemoryManager& pmm);
-        bool init();
+        static VirtualMemoryManager* get();
+
+        bool init(PhysicalMemoryManager* pmm);
 
         bool alloc_page(page_t* pte);
         bool free_page(page_t* pte);
@@ -73,16 +74,23 @@ class VirtualMemoryManager
         void flush_tlb_entry(u32 vaddr); 
 
         void dump_page_directory(page_directory_t* pgdir);
+        page_directory_t* create_address_space();
+
+        void* kmalloc(int size, int flags);
+        void kfree(void* ptr);
 
     private:
-        PhysicalMemoryManager& _pmm;
+        static VirtualMemoryManager* _instance;
+        PhysicalMemoryManager* _pmm;
         page_directory_t* _current_pdir;
-        void* _kernel_tables_start;
+        void* _temp_page_frame_vaddr;
+        void* _kernel_heap_start;
 
         u32 vadd_to_phy(page_directory_t* pgdir, u32 vaddr);
-        void* alloc_vaddr_for_user_table();
         page_table_t* map_ptable_temporary(u32 table_paddr);
         void unmap_ptable_temporary(u32 table_paddr);
+
+        VirtualMemoryManager();
 };
 
 #endif

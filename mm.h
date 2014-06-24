@@ -9,7 +9,8 @@ class PhysicalMemoryManager {
         static constexpr int frame_mask = 0xfffff000;
         static constexpr u32 invalid = (u32)-1; // invalid frame number
 
-        PhysicalMemoryManager(u32 mem_size, u32 map);
+        PhysicalMemoryManager();
+        void init(u32 mem_size);
 
         u32 memSize() const { return _memSize; }
 
@@ -39,8 +40,6 @@ class PhysicalMemoryManager {
         u32 _frameCount;
         u32 _frameUsed;
         u32 _memSize; // in KB
-        void* _kernel_tables_start;
-        u32 _kernel_tables_size;
 };
 
 

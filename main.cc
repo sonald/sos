@@ -57,6 +57,7 @@ static void test_pmm(PhysicalMemoryManager& pmm)
 {
     void* p = pmm.alloc_frame();
     if (p == NULL) kputs("alloc failed\n");
+    kputs("alloc finish  ");
     pmm.free_frame(p);
     void* p2 = pmm.alloc_frame();
     if (p != p2) kputs("p != p2\n");
@@ -69,13 +70,10 @@ static void test_pmm(PhysicalMemoryManager& pmm)
     if (p != p2) kputs("p != p2\n");
 }
 
-extern u32* _end;
-
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 
 tss_entry_t tss;
 u8 task0_sys_stack[1024];
-u8 task0_usr_stack[1024];
 static void setup_tss()
 {
     memset(&tss, 0, sizeof(tss));
@@ -97,6 +95,7 @@ void task0()
         }
     }
 }
+
 
 extern "C" int kernel_main(struct multiboot_info *mb)
 {
@@ -134,34 +133,39 @@ extern "C" int kernel_main(struct multiboot_info *mb)
         kprintf("4M Page is %ssupported.\n", (is_support_4m_page()?"":"not "));
     }
 
-    u32 mmap_addr = (u32)&_end;
-    PhysicalMemoryManager pmm(memsize, mmap_addr);
-    //test_pmm(pmm);
-    VirtualMemoryManager vmm(pmm);
-    vmm.init();
+    PhysicalMemoryManager pmm;
+    VirtualMemoryManager* vmm = VirtualMemoryManager::get();
+
+    pmm.init(memsize);
+    vmm->init(&pmm);
 
     Keyboard* kb = Keyboard::get();
     kb->init();
 
     __asm__ __volatile__ ("sti");
 
+    page_directory_t* prev_pdir = vmm->current_directory();
+    page_directory_t* pdir = vmm->create_address_space();
+    vmm->switch_page_directory(pdir);
+
     // copy task0 to user-space addr
     void* vaddr = (void*)0x08000000; 
     void* paddr = pmm.alloc_frame();
-    vmm.map_page(paddr, vaddr, PDE_USER|PDE_WRITABLE);
+    vmm->map_page(paddr, vaddr, PDE_USER|PDE_WRITABLE);
     memcpy(vaddr, (void*)&task0, pmm.frame_size);
 
     void* task0_usr_stack0 = (void*)0x08100000; 
     void* paddr_stack0 = pmm.alloc_frame();
-    vmm.map_page(paddr_stack0, task0_usr_stack0, PDE_USER|PDE_WRITABLE);
+    vmm->map_page(paddr_stack0, task0_usr_stack0, PDE_USER|PDE_WRITABLE);
     kprintf("alloc task0: eip 0x%x, stack: 0x%x\n", paddr, paddr_stack0);
 
     // map kernel page
     //vaddr = (void*)0xC8000000;
     //paddr = pmm.alloc_frame();
-    //vmm.map_page(paddr, vaddr, PDE_WRITABLE);
+    //vmm->map_page(paddr, vaddr, PDE_WRITABLE);
 
-    vmm.dump_page_directory(vmm.current_directory());
+    vmm->dump_page_directory(vmm->current_directory());
+    //vmm->dump_page_directory(prev_pdir);
 
     setup_tss();
     flush_tss();

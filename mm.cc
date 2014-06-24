@@ -7,6 +7,8 @@
 #define debug_mm(fmt, ...)
 #endif
 
+extern u32* _end;
+
 static inline u32 aligned(u32 size, u32 frame_size)
 {
     return size / frame_size + ((size % frame_size) ? 1 : 0);
@@ -94,19 +96,23 @@ void PhysicalMemoryManager::clear_region(u32 frame_addr, u32 size)
     }
 }
 
-PhysicalMemoryManager::PhysicalMemoryManager(u32 mem_size, u32 map)
-    :_frames((u32*)map), _frameCount(0), _frameUsed(0), _memSize(mem_size)
+PhysicalMemoryManager::PhysicalMemoryManager()
+    :_frames((u32*)&_end), _frameCount(0), _frameUsed(0)
 {
+    kputs("new PhysicalMemoryManager\n");
+}
+
+void PhysicalMemoryManager::init(u32 mem_size)
+{
+    _memSize = mem_size;
     _frameCount = aligned(_memSize * 1024, this->frame_size);
-    //mark all frames starting from 0 to _end plus space used by _frames map
-    u32 expand = _frameCount / 8 + map - kernel_virtual_base;
     memset(_frames, 0, _frameCount/8);
 
     //NOTE: note we setup 768th PDE as present for kernel, which means 
     //the first 4MB physical memory should be marked as alloced.
     alloc_region(this->frame_size*1024);
-    debug_mm("mem_size: %dKB, map addr: 0x%x, frames: %d, expand: %d\n",
-            mem_size, map, _frameCount, expand);
+    debug_mm("mem_size: %dKB, map addr: 0x%x, frames: %d\n",
+            mem_size, _frames, _frameCount);
 }
 
 // there is a caveat: NULL is actually ambiguous, it may means the very first
@@ -136,7 +142,10 @@ void* PhysicalMemoryManager::alloc_region(u32 size)
     }
 
     u32 id = get_first_free_region(size);
-    if (id == this->invalid) return NULL;
+    if (id == this->invalid) {
+        debug_mm("get_first_free_region failed\n");
+        return NULL;
+    }
 
     u32 paddr = id * this->frame_size;
     set_region(paddr, size);

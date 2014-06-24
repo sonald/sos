@@ -7,23 +7,6 @@
 extern page_directory_t _kernel_page_directory;
 extern page_table_t table001, table768;
 
-//FIXME: can not use kernel_virtual_base if the current pgdir is not 
-//kernel page dir
-u32 VirtualMemoryManager::vadd_to_phy(page_directory_t* pgdir, u32 vaddr)
-{
-    if (addr_in_kernel_space(vaddr)) {
-        u32 pde = pgdir->tables[PAGE_DIR_IDX(vaddr)];
-        kassert(pde & PDE_PRESENT);
-        page_table_t* ptable =
-            (page_table_t*)(PDE_GET_TABLE_PHYSICAL(pde) + kernel_virtual_base);
-        page_t* pte = &ptable->pages[PAGE_TABLE_IDX(vaddr)];
-        return pte->frame * _pmm.frame_size;
-    }
-
-    panic("can not determine physical of none kernel space address");
-    return 0;
-}
-
 static void page_fault(registers_t* regs)
 {
     // read cr2
@@ -46,14 +29,41 @@ static void page_fault(registers_t* regs)
     panic("page_fault");
 }
 
-VirtualMemoryManager::VirtualMemoryManager(PhysicalMemoryManager& pmm)
-    :_pmm(pmm), _current_pdir(NULL)
+
+static u8 _vmm_base[sizeof(VirtualMemoryManager)];
+VirtualMemoryManager* VirtualMemoryManager::_instance = NULL;
+VirtualMemoryManager* VirtualMemoryManager::get()
+{
+    if (!_instance) _instance = new((void*)&_vmm_base) VirtualMemoryManager;
+    return _instance;
+}
+
+//FIXME: can not use kernel_virtual_base if the current pgdir is not 
+//kernel page dir
+u32 VirtualMemoryManager::vadd_to_phy(page_directory_t* pgdir, u32 vaddr)
+{
+    if (addr_in_kernel_space(vaddr)) {
+        u32 pde = pgdir->tables[PAGE_DIR_IDX(vaddr)];
+        kassert(pde & PDE_PRESENT);
+        page_table_t* ptable =
+            (page_table_t*)(PDE_GET_TABLE_PHYSICAL(pde) + kernel_virtual_base);
+        page_t* pte = &ptable->pages[PAGE_TABLE_IDX(vaddr)];
+        return pte->frame * _pmm->frame_size;
+    }
+
+    panic("can not determine physical of none kernel space address");
+    return 0;
+}
+
+VirtualMemoryManager::VirtualMemoryManager()
+    :_pmm(0), _current_pdir(NULL)
 {
 }
 
 //TODO: set mapping according to mmap from grub
-bool VirtualMemoryManager::init()
+bool VirtualMemoryManager::init(PhysicalMemoryManager* pmm)
 {
+    _pmm = pmm;
     //trick: bind PDE in boot.s
     kprintf("_kernel_page_directory(0x%x): table1(0x%x), table768(0x%x)\n",
             &_kernel_page_directory, &table001, &table768);
@@ -65,18 +75,17 @@ bool VirtualMemoryManager::init()
     for (int i = 769; i < 1024; ++i) {
         u32* pde = &_kernel_page_directory.tables[i];
         pde_set_flag(*pde, (PDE_PRESENT|PDE_WRITABLE));
-        paddr += _pmm.frame_size;
+        paddr += _pmm->frame_size;
         pde_set_frame(*pde, paddr);
         //if ( i < 800)
             //kprintf("pdir(%d) -> 0x%x  ", i, paddr);
     }
 
     //see map_ptable_temporary
-    _kernel_tables_start = (void*)(0xFFFFF000);
+    _temp_page_frame_vaddr = (void*)(0xFFFFF000);
+    _kernel_heap_start = (void*)(kernel_virtual_base + 0x400000);
 
-    //this switch is not necessary and not efficient (invalidates TLB), 
-    //just for test, may use _current_pdir = &_kernel_page_directory;
-    switch_page_directory(&_kernel_page_directory);
+    _current_pdir = &_kernel_page_directory;
     register_isr_handler(PAGE_FAULT, page_fault);
     return true;
 }
@@ -85,7 +94,7 @@ void VirtualMemoryManager::dump_page_directory(page_directory_t* pgdir)
 {
     if (!pgdir) return;
     kputs("DIRS: \n");
-    for (int i = 768; i < 1024; ++i) {
+    for (int i = 0; i < 1024; ++i) {
         // show only non-empty 
         u32 pde = pgdir->tables[i];
         if (pde & PDE_PRESENT) {
@@ -110,20 +119,20 @@ void VirtualMemoryManager::dump_page_directory(page_directory_t* pgdir)
 
 bool VirtualMemoryManager::alloc_page(page_t* pte)
 {
-    void* paddr = _pmm.alloc_frame();
+    void* paddr = _pmm->alloc_frame();
     if (!paddr) return false;
 
     pte->present = 1;
-    pte->frame = (u32)paddr / _pmm.frame_size;
+    pte->frame = (u32)paddr / _pmm->frame_size;
     return true;
 }
 
 bool VirtualMemoryManager::free_page(page_t* pte)
 {
-    void* paddr = (void*)(pte->frame * _pmm.frame_size);
+    void* paddr = (void*)(pte->frame * _pmm->frame_size);
     if (paddr) return false;
 
-    _pmm.free_frame(paddr);
+    _pmm->free_frame(paddr);
     pte->present = 0;
     return true;
 }
@@ -131,7 +140,9 @@ bool VirtualMemoryManager::free_page(page_t* pte)
 void VirtualMemoryManager::switch_page_directory(page_directory_t *pgdir)
 {
     if (_current_pdir != pgdir) {
-        asm ("mov %0, %%cr3" :: "r"((u32)pgdir - kernel_virtual_base));
+        u32 paddr = vadd_to_phy(_current_pdir, (u32)pgdir);
+        kprintf("switch pdir at 0x%x\n", paddr);
+        asm ("mov %0, %%cr3" :: "r"(paddr));
         _current_pdir = pgdir;
     }
 }
@@ -168,11 +179,6 @@ u32* VirtualMemoryManager::pdirectory_lookup_entry(page_directory_t* pd, u32 vad
     return NULL;
 }
 
-void* VirtualMemoryManager::alloc_vaddr_for_user_table()
-{
-    return _kernel_tables_start;
-}
-
 page_table_t* VirtualMemoryManager::map_ptable_temporary(u32 table_paddr)
 {
     page_directory_t* pgdir = _current_pdir;
@@ -184,7 +190,7 @@ page_table_t* VirtualMemoryManager::map_ptable_temporary(u32 table_paddr)
 
     //map table's page frame into kernel virtual space, so 
     //we can access and modify it.
-    table_vaddr = alloc_vaddr_for_user_table();
+    table_vaddr = _temp_page_frame_vaddr;
     u32 pde = pgdir->tables[PAGE_DIR_IDX(table_vaddr)];
     kassert(pde & PDE_PRESENT);
     pde_ptable =
@@ -192,7 +198,7 @@ page_table_t* VirtualMemoryManager::map_ptable_temporary(u32 table_paddr)
     page_t* pte = &pde_ptable->pages[PAGE_TABLE_IDX(table_vaddr)];
     pte->rw = 1;
     pte->present = 1;
-    pte->frame = (u32)user_table_frame / _pmm.frame_size;
+    pte->frame = (u32)user_table_frame / _pmm->frame_size;
     flush_tlb_entry((u32)table_vaddr);
 
     return (page_table_t*)table_vaddr;
@@ -212,22 +218,26 @@ void VirtualMemoryManager::unmap_ptable_temporary(u32 table_vaddr)
 
 void VirtualMemoryManager::map_page(void* paddr, void* vaddr, u32 flags)
 {
-    if (vaddr >= _kernel_tables_start) {
+    if (vaddr >= _temp_page_frame_vaddr) {
         panic("reserved page, cannot mapped\n");
         return;
     }
 
     if (addr_in_kernel_space(vaddr)) {
+        kprintf("mapping paddr 0x%x to kernel vaddr 0x%x, did: %d\n", 
+                paddr, vaddr, PAGE_DIR_IDX(vaddr));
         u32 pde = _current_pdir->tables[PAGE_DIR_IDX(vaddr)];
         kassert (pde & PDE_PRESENT);
         page_table_t* ptable = 
             (page_table_t*)(PDE_GET_TABLE_PHYSICAL(pde) + kernel_virtual_base);
 
+        kprintf("ptable: 0x%x, tid: %d\n", ptable, PAGE_TABLE_IDX(vaddr));
         page_t* pte = &ptable->pages[PAGE_TABLE_IDX(vaddr)];
-        pte->rw = (flags & 0x1 ? 1: 0);
         pte->present = 1;
-        pte->user = (flags & 0x4 ? 1 : 0);
-        pte->frame = (u32)paddr / _pmm.frame_size;
+        pte->rw = ((flags & 0x2) ? 1: 0);
+        pte->user = ((flags & 0x4) ? 1 : 0);
+        pte->frame = (u32)paddr / _pmm->frame_size;
+        flush_tlb_entry((u32)vaddr);
         return;
     }
 
@@ -241,7 +251,7 @@ void VirtualMemoryManager::map_page(void* paddr, void* vaddr, u32 flags)
     if (user_pde & PDE_PRESENT) {
         user_table_frame = (void*)(PDE_GET_TABLE_PHYSICAL(user_pde));
     } else {
-        user_table_frame = _pmm.alloc_frame();
+        user_table_frame = _pmm->alloc_frame();
         if (!user_table_frame) panic("no free memory");
 
         pde_set_flag(user_pde, flags|PDE_PRESENT);
@@ -251,15 +261,42 @@ void VirtualMemoryManager::map_page(void* paddr, void* vaddr, u32 flags)
 
     page_table_t* user_ptable = map_ptable_temporary((u32)user_table_frame);
     if (!(user_pde & PDE_PRESENT)) {
-        memset(user_ptable, 0x0, _pmm.frame_size);
+        memset(user_ptable, 0x0, _pmm->frame_size);
     }
 
     page_t* user_pte = &user_ptable->pages[PAGE_TABLE_IDX(vaddr)];
-    user_pte->rw = (flags & 0x1 ? 1: 0);
     user_pte->present = 1;
-    user_pte->user = (flags & 0x4 ? 1 : 0);
-    user_pte->frame = (u32)paddr / _pmm.frame_size;
+    user_pte->rw = ((flags & 0x2) ? 1: 0);
+    user_pte->user = ((flags & 0x4) ? 1 : 0);
+    user_pte->frame = (u32)paddr / _pmm->frame_size;
 
     unmap_ptable_temporary((u32)user_ptable);
+}
+
+page_directory_t* VirtualMemoryManager::create_address_space()
+{
+    page_directory_t* pdir = (page_directory_t*)kmalloc(
+            _pmm->frame_size, PDE_WRITABLE);
+    if (!pdir) panic("oom");
+
+    memset(pdir, 0x0, sizeof(page_directory_t));
+    for (int i = 768; i < 1024; ++i) {
+        pdir->tables[i] = _kernel_page_directory.tables[i];
+    }
+
+    return pdir;
+}
+
+void* VirtualMemoryManager::kmalloc(int size, int flags)
+{
+    void* ptr = _kernel_heap_start;
+    _kernel_heap_start = (void*)((u32)_kernel_heap_start + size);
+    map_page(_pmm->alloc_frame(), ptr, flags);
+    return ptr;
+}
+
+void VirtualMemoryManager::kfree(void* ptr)
+{
+    //nothing
 }
 
