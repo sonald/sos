@@ -4,6 +4,7 @@
 ; are disabled at this point: More on interrupts later!
 [BITS 32]
 global start
+global _start
 global is_cpuid_capable
 global _kernel_page_directory
 global table001
