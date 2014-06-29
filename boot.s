@@ -86,7 +86,7 @@ _start:
     ; we really should check cpuid for PSE support, when support, use 4MB page
     mov eax, 01
     cpuid
-    and edx, 0x00000004 ; check PSE
+    and edx, 0x00000008 ; check PSE
     jz _no_pse
 
     ; enable PSE

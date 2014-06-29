@@ -19,34 +19,16 @@ extern "C" void kernel_init()
     set_text_color(LIGHT_CYAN, BLACK);
 }
 
-static inline bool is_support_4m_page()
+static bool is_support_4m_page()
 {
     u32 edx;
     __asm__ (
-        "mov %%eax, $1 \n"
+        "mov $1, %%eax \n"
         "cpuid \n"
-        :"=r"(edx)
+        :"=d"(edx)
         :: "eax"
     );
-    return (edx & 0x00000004) == 1;
-}
-
-static void test_irqs()
-{
-    //DIV 0
-    int a = 0;
-    kprintf("%x\n", 100/a);
-    //Page Fault
-    int b = *(u32*)(0x01000000);
-    kprintf("%x\n", b);
-}
-
-static void check_paging()
-{
-    // check if paging is working correctly
-    for (u32 i = 0; i < 1024; ++i) {
-        kprintf("%x", *(u32*)(KERNEL_VIRTUAL_BASE + i*4096 + 4));
-    }
+    return (edx & (1<<4)) > 0;
 }
 
 static void test_pmm(PhysicalMemoryManager& pmm)
@@ -70,11 +52,12 @@ extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 
 tss_entry_t tss;
 u8 task0_sys_stack[1024];
-static void setup_tss()
+static void setup_tss(u32 stack)
 {
     memset(&tss, 0, sizeof(tss));
     tss.ss0 = 0x10;
-    tss.esp0 = (u32)&task0_sys_stack + sizeof(task0_sys_stack);
+    //tss.esp0 = (u32)&task0_sys_stack + sizeof(task0_sys_stack);
+    tss.esp0 = (u32)stack;
 
     setup_gdt_entry(SEG_TSS, (u32)&tss, sizeof(tss), GDT_TSS_PL3);
 }
@@ -83,16 +66,29 @@ extern "C" void flush_tss();
 
 void task0()
 {
-    u8 i = 0;
     for(;;) {
-        if (i < 4) {
-            asm ( "int $0x80"::"a"(i));
-            ++i;
+        asm ( "int $0x80"::"a"(SYS_write), "b"('A'));
+        volatile int r = 0;
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 0x7fffff; ++j) {
+                r += j;
+            }
         }
     }
 }
 
-
+void task1()
+{
+    for(;;) {
+        asm ( "int $0x80"::"a"(SYS_write), "b"('B'));
+        volatile int r = 0;
+        for (int i = 0; i < 1; i++) {
+            for (int j = 0; j < 0x7fffff; ++j) {
+                r += j;
+            }
+        }
+    }
+}
 extern "C" int kernel_main(struct multiboot_info *mb)
 {
     init_gdt();
@@ -100,8 +96,6 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     init_timer();
     init_syscall();
 
-     //check_paging();
-    
     set_text_color(LIGHT_GREEN, BLACK);
     const char* msg = "Welcome to SOS....\n";
     kputs(msg);
@@ -137,28 +131,13 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     Keyboard* kb = Keyboard::get();
     kb->init();
 
-    __asm__ __volatile__ ("sti");
+    proc_t* proc = create_proc((void*)&task0, "task0");
+    proc_t* proc1 = create_proc((void*)&task1, "task1");
 
-    page_directory_t* pdir = vmm->create_address_space();
-    vmm->switch_page_directory(pdir);
-
-     //copy task0 to user-space addr
-    void* vaddr = (void*)0x08000000; 
-    u32 paddr = v2p(vmm->alloc_page());
-    vmm->map_pages(pdir, vaddr, PGSIZE, paddr, PDE_USER|PDE_WRITABLE);
-    memcpy(vaddr, (void*)&task0, pmm.frame_size);
-
-    void* task0_usr_stack0 = (void*)0x08100000; 
-    u32 paddr_stack0 = v2p(vmm->alloc_page());
-    vmm->map_pages(pdir, task0_usr_stack0, PGSIZE, paddr_stack0, PDE_USER|PDE_WRITABLE);
-    kprintf("alloc task0: eip 0x%x, stack: 0x%x\n", paddr, paddr_stack0);
-
-
-    //vmm->dump_page_directory(vmm->current_directory());
-
-    setup_tss();
+    vmm->switch_page_directory(proc->pgdir);
+    setup_tss(proc->regs.esp);
     flush_tss();
-    switch_to_usermode((void*)((u32)task0_usr_stack0 + 1024), vaddr);
+    switch_to_usermode((void*)proc->regs.useresp, proc->entry);
 
     panic("Never Back to Here\n");
 

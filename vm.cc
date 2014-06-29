@@ -121,7 +121,7 @@ void VirtualMemoryManager::switch_page_directory(page_directory_t *pgdir)
 {
     if (_current_pdir != pgdir) {
         u32 paddr = v2p(pgdir);
-        kprintf("switch pdir at 0x%x\n", paddr);
+        //kprintf("switch pdir at 0x%x\n", paddr);
         asm ("mov %0, %%cr3" :: "r"(paddr));
         _current_pdir = pgdir;
     }
@@ -160,8 +160,8 @@ void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr,
     char* v = (char*)PGROUNDDOWN(vaddr);
     char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
 
-    kprintf("mapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr, 
-            size / _pmm->frame_size);
+    //kprintf("mapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr, 
+            //size / _pmm->frame_size);
     while (v <= end) {
         page_t* pte = walk(pgdir, v, true);
         if (pte == NULL) return;

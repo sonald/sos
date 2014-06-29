@@ -15,6 +15,8 @@ void panic(const char* fmt, ...);
     } \
 } while(0)
 
+#define ARRAYLEN(arr) (sizeof(arr)/sizeof(arr[0]))
+
 inline void *operator new(size_t, void *p)     throw() { return p; }
 inline void *operator new[](size_t, void *p)   throw() { return p; }
 inline void  operator delete  (void *, void *) throw() { };

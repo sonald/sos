@@ -9,7 +9,7 @@ crtend_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtend.o)
 
 # order is important, boot.o must be first here
 kernel_srcs=boot.s main.cc common.cc cxx_rt.cc irq_stubs.s gdt.cc isr.cc \
-	timer.cc mm.cc vm.cc kb.cc context.s syscall.cc
+	timer.cc mm.cc vm.cc kb.cc context.s syscall.cc task.cc
 
 kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))
 kernel_objs := $(patsubst %.s, $(OBJS_DIR)/%.o, $(kernel_objs))
