@@ -2,7 +2,7 @@
 #include "isr.h"
 #include "vm.h"
 
-#define addr_in_kernel_space(vaddr) (((u32)vaddr) > KERNEL_VIRTUAL_BASE)
+#define addr_in_kernel_space(vaddr) ((u32)(vaddr) > KERNEL_VIRTUAL_BASE)
 
 page_directory_t* _kernel_page_directory = NULL;
 
@@ -79,7 +79,6 @@ VirtualMemoryManager::VirtualMemoryManager()
 bool VirtualMemoryManager::init(PhysicalMemoryManager* pmm)
 {
     _pmm = pmm;
-    _next_free_page = _pmm->_freeStart;
 
     //kmap is kernel side mapping for VAS, and is big enough for kernel usage,
     //and won't consume more than 4MB memories (which is setupped by 
@@ -195,14 +194,14 @@ page_directory_t* VirtualMemoryManager::create_address_space()
 
 void* VirtualMemoryManager::alloc_page()
 {
-    void* vaddr = _pmm->alloc_kernel_frame(_next_free_page);
-    _next_free_page = ((char*)_next_free_page + _pmm->frame_size);
-    return vaddr;
+    u32 paddr = _pmm->alloc_frame();
+    return p2v(paddr);
 }
 
 void VirtualMemoryManager::free_page(void* vaddr)
 {
-    _pmm->free_kernel_frame(vaddr);
+    kassert(addr_in_kernel_space(vaddr));
+    _pmm->free_frame(v2p(vaddr));
 }
 
 void* VirtualMemoryManager::kmalloc(int size, int flags)

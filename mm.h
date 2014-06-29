@@ -22,12 +22,6 @@ class PhysicalMemoryManager {
         void free_frame(u32 paddr);
 
         /**
-         * special allocator for kernel pages, alloc/free frames mapped at vaddr
-         */
-        void* alloc_kernel_frame(void* vaddr);
-        void free_kernel_frame(void* vaddr);
-
-        /**
          * alloc first consective size/frame_size of free frames and 
          * return physical address
          */

@@ -123,7 +123,7 @@ void PhysicalMemoryManager::init(u32 mem_size)
 // occupied by kernel, so NULL always means failure.
 u32 PhysicalMemoryManager::alloc_frame()
 {
-    debug_mm("_frameUsed: %d\n", _frameUsed);
+    //debug_mm("_frameUsed: %d\n", _frameUsed);
     if (_frameUsed >= _frameCount) return 0;
     u32 id = get_first_free_frame();
     if (id == this->invalid) return 0;
@@ -167,26 +167,5 @@ void PhysicalMemoryManager::free_region(u32 paddr, u32 size)
 {
     clear_region(paddr, size);
     _frameUsed -= aligned(size, frame_size);
-}
-
-void* PhysicalMemoryManager::alloc_kernel_frame(void* vaddr)
-{
-    if (_frameUsed >= _frameCount) return NULL;
-
-    u32 paddr = v2p(vaddr);
-    if (test_frame(paddr)) panic("frame has been used\n");
-    
-    set_frame(paddr);
-    _frameUsed++;
-    return vaddr;
-
-}
-
-void PhysicalMemoryManager::free_kernel_frame(void* vaddr)
-{
-    kassert(vaddr != NULL);
-    u32 paddr = v2p(vaddr);
-    clear_frame(paddr);
-    _frameUsed--;
 }
 

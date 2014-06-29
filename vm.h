@@ -39,8 +39,6 @@ class VirtualMemoryManager
         PhysicalMemoryManager* _pmm;
         page_directory_t* _current_pdir;
 
-        void* _next_free_page;
-
         VirtualMemoryManager();
 };
 

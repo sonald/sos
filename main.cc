@@ -154,7 +154,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     kprintf("alloc task0: eip 0x%x, stack: 0x%x\n", paddr, paddr_stack0);
 
 
-    vmm->dump_page_directory(vmm->current_directory());
+    //vmm->dump_page_directory(vmm->current_directory());
 
     setup_tss();
     flush_tss();
