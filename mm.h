@@ -1,30 +1,38 @@
 #ifndef _MM_H
 #define _MM_H 
 
-#include "common.h"
+#include "memlayout.h"
 
 class PhysicalMemoryManager {
     public:
+        friend class VirtualMemoryManager;
+
         static constexpr int frame_size = 4096; //4k
-        static constexpr int frame_mask = 0xfffff000;
         static constexpr u32 invalid = (u32)-1; // invalid frame number
 
         PhysicalMemoryManager();
         void init(u32 mem_size);
 
-        u32 memSize() const { return _memSize; }
+        u32 mem_size() const { return _memSize; }
 
         /**
          * alloc first free frame and return physical address
          */
-        void* alloc_frame();
-        void free_frame(void* paddr);
+        u32 alloc_frame();
+        void free_frame(u32 paddr);
+
+        /**
+         * special allocator for kernel pages, alloc/free frames mapped at vaddr
+         */
+        void* alloc_kernel_frame(void* vaddr);
+        void free_kernel_frame(void* vaddr);
+
         /**
          * alloc first consective size/frame_size of free frames and 
          * return physical address
          */
-        void* alloc_region(u32 size);
-        void free_region(void* paddr, u32 size);
+        u32 alloc_region(u32 size);
+        void free_region(u32 paddr, u32 size);
         
     private:
         void set_frame(u32 frame_addr);
@@ -40,6 +48,8 @@ class PhysicalMemoryManager {
         u32 _frameCount;
         u32 _frameUsed;
         u32 _memSize; // in KB
+        u32* _freeStart;
+        u32* _freeEnd;
 };
 
 

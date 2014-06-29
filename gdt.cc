@@ -74,11 +74,11 @@ void init_gdt()
     gdt_ptr.limit = sizeof(gdt_entries) - 1;
     gdt_ptr.base = (u32)&gdt_entries; // linear base of GDT
 
-    setup_gdt_entry(0, 0, 0, 0);
-    setup_gdt_entry(1, 0, 0xffffffff, GDT_CODE_PL0);
-    setup_gdt_entry(2, 0, 0xffffffff, GDT_DATA_PL0);
-    setup_gdt_entry(3, 0, 0xffffffff, GDT_CODE_PL3);
-    setup_gdt_entry(4, 0, 0xffffffff, GDT_DATA_PL3);
+    setup_gdt_entry(SEG_NULL, 0, 0, 0);
+    setup_gdt_entry(SEG_KCODE, 0, 0xffffffff, GDT_CODE_PL0);
+    setup_gdt_entry(SEG_KDATA, 0, 0xffffffff, GDT_DATA_PL0);
+    setup_gdt_entry(SEG_UCODE, 0, 0xffffffff, GDT_CODE_PL3);
+    setup_gdt_entry(SEG_UDATA, 0, 0xffffffff, GDT_DATA_PL3);
 
     gdt_flush((u32)&gdt_ptr);
 }

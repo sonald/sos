@@ -1,51 +1,13 @@
 #ifndef _COMMON_H
 #define _COMMON_H 
 
+#include "types.h"
+
 #if !defined __i386__
 #error "target error, need a cross-compiler with ix86-elf as target"
 #endif
 
-#include <stddef.h>
-#if !defined __cplusplus
-#include <stdbool.h>
-#endif
-#include <stdint.h>
-
-#if defined __cplusplus
-
-#define BEGIN_CDECL extern "C" {
-#define END_CDECL }
-
-#else
-
-#define BEGIN_CDECL 
-#define END_CDECL
-
-#endif
-
-#if !defined uint32_t
-typedef unsigned int u32;
-typedef int s32;
-typedef unsigned short u16;
-typedef short s16;
-typedef unsigned char u8;
-typedef char s8;
-#else
-typedef uint32_t u32;
-typedef int32_t s32;
-typedef uint16_t u16;
-typedef int16_t s16;
-typedef uint8_t u8;
-typedef int8_t s8;
-#endif
-
-#ifndef NULL
-#define NULL (void*)0
-#endif
-
-extern u32 kernel_virtual_base;
-
-void panic(const char* msg);
+void panic(const char* fmt, ...);
 #define kassert(cond) do { \
     if (!(cond)) { \
         kprintf("[%s:%d]: ", __func__, __LINE__); \

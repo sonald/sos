@@ -3,12 +3,10 @@
 #include "gdt.h"
 #include "isr.h"
 #include "timer.h"
-#include "mm.h"
 #include "vm.h"
 #include "kb.h"
 #include "task.h"
 #include "syscall.h"
-
 
 extern "C" int is_cpuid_capable();
 
@@ -45,26 +43,24 @@ static void test_irqs()
 
 static void check_paging()
 {
-    kprintf("base: 0x%x\n", kernel_virtual_base);
-
     // check if paging is working correctly
     for (u32 i = 0; i < 1024; ++i) {
-        kprintf("%x", *(u32*)(kernel_virtual_base + i*4096 + 4));
+        kprintf("%x", *(u32*)(KERNEL_VIRTUAL_BASE + i*4096 + 4));
     }
 }
 
 static void test_pmm(PhysicalMemoryManager& pmm)
 {
-    void* p = pmm.alloc_frame();
-    if (p == NULL) kputs("alloc failed\n");
+    u32 p = pmm.alloc_frame();
+    if (p == 0) kputs("alloc failed\n");
     kputs("alloc finish  ");
     pmm.free_frame(p);
-    void* p2 = pmm.alloc_frame();
+    u32 p2 = pmm.alloc_frame();
     if (p != p2) kputs("p != p2\n");
 
     u32 size = pmm.frame_size * 10;
     p = pmm.alloc_region(size);
-    if (p == NULL) kputs("alloc region failed\n");
+    if (p == 0) kputs("alloc region failed\n");
     pmm.free_region(p, size);
     p2 = pmm.alloc_frame();
     if (p != p2) kputs("p != p2\n");
@@ -80,7 +76,7 @@ static void setup_tss()
     tss.ss0 = 0x10;
     tss.esp0 = (u32)&task0_sys_stack + sizeof(task0_sys_stack);
 
-    setup_gdt_entry(5, (u32)&tss, sizeof(tss), GDT_TSS_PL3);
+    setup_gdt_entry(SEG_TSS, (u32)&tss, sizeof(tss), GDT_TSS_PL3);
 }
 
 extern "C" void flush_tss();
@@ -118,7 +114,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     }
 
     if (mb->flags & 0x40) {
-        memory_map_t* map = (memory_map_t*)(mb->mmap_addr + kernel_virtual_base);
+        memory_map_t* map = (memory_map_t*)p2v(mb->mmap_addr);
         int len = mb->mmap_length / sizeof(memory_map_t);
         kprintf("mmap(%d entries) at 0x%x: \n", len, mb->mmap_addr);
         for (int i = 0; i < len; ++i) {
@@ -138,40 +134,33 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     pmm.init(memsize);
     vmm->init(&pmm);
-
     Keyboard* kb = Keyboard::get();
     kb->init();
 
     __asm__ __volatile__ ("sti");
 
-    page_directory_t* prev_pdir = vmm->current_directory();
     page_directory_t* pdir = vmm->create_address_space();
     vmm->switch_page_directory(pdir);
 
-    // copy task0 to user-space addr
+     //copy task0 to user-space addr
     void* vaddr = (void*)0x08000000; 
-    void* paddr = pmm.alloc_frame();
-    vmm->map_page(paddr, vaddr, PDE_USER|PDE_WRITABLE);
+    u32 paddr = v2p(vmm->alloc_page());
+    vmm->map_pages(pdir, vaddr, PGSIZE, paddr, PDE_USER|PDE_WRITABLE);
     memcpy(vaddr, (void*)&task0, pmm.frame_size);
 
     void* task0_usr_stack0 = (void*)0x08100000; 
-    void* paddr_stack0 = pmm.alloc_frame();
-    vmm->map_page(paddr_stack0, task0_usr_stack0, PDE_USER|PDE_WRITABLE);
+    u32 paddr_stack0 = v2p(vmm->alloc_page());
+    vmm->map_pages(pdir, task0_usr_stack0, PGSIZE, paddr_stack0, PDE_USER|PDE_WRITABLE);
     kprintf("alloc task0: eip 0x%x, stack: 0x%x\n", paddr, paddr_stack0);
 
-    // map kernel page
-    //vaddr = (void*)0xC8000000;
-    //paddr = pmm.alloc_frame();
-    //vmm->map_page(paddr, vaddr, PDE_WRITABLE);
 
     vmm->dump_page_directory(vmm->current_directory());
-    //vmm->dump_page_directory(prev_pdir);
 
     setup_tss();
     flush_tss();
     switch_to_usermode((void*)((u32)task0_usr_stack0 + 1024), vaddr);
 
     panic("Never Back to Here\n");
-    for(;;);
+
     return 0x1BADFEED;
 }

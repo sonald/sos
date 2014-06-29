@@ -1,8 +1,5 @@
 #include "common.h"
 
-extern u32 KERNEL_VIRTUAL_BASE;
-u32 kernel_virtual_base = (u32)&KERNEL_VIRTUAL_BASE;
-
 static const u16 CRTC_ADDR_REG = 0x3D4;
 static const u16 CRTC_ADDR_DATA = 0x3D5;
 
@@ -301,10 +298,13 @@ char* strcpy(char* dst, const char* src)
     return d;
 }
 
-void panic(const char* msg)
+void panic(const char* fmt, ...)
 {
     asm ("cli");
-    kputs(msg);
+    va_list args;
+    va_start(args, fmt);
+    kvprintf(fmt, args);
+    va_end(args);
     for(;;) {
         asm volatile ("hlt");
     }

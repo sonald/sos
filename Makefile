@@ -16,10 +16,9 @@ kernel_objs := $(patsubst %.s, $(OBJS_DIR)/%.o, $(kernel_objs))
 
 objs := $(OBJS_DIR)/crti.o $(crtbegin_o) $(kernel_objs) $(crtend_o) $(OBJS_DIR)/crtn.o
 
-DEPFILES := $(patsubst %.cc, %.d, $(kernel_srcs))
-DEPFILES := $(patsubst %.s, %.d, $(DEPFILES))
+DEPFILES := $(patsubst %.cc, objs/%.d, $(kernel_srcs))
+DEPFILES := $(patsubst %.s, objs/%.d, $(DEPFILES))
 
--include $(DEPFILES)
 
 all: run
 
@@ -27,7 +26,7 @@ debug: kernel
 	qemu-system-i386 -kernel kernel -m 32 -s -S
 
 run: kernel
-	qemu-system-i386 -kernel kernel -m 32 -usb -s
+	qemu-system-i386 -kernel kernel -m 32 -s -monitor stdio
 
 kernel: $(objs) kernel.ld
 	$(CXX) -T kernel.ld -O2 -nostdlib -o $@ $^ -lgcc
@@ -39,6 +38,8 @@ $(OBJS_DIR)/%.o: %.cc Makefile
 $(OBJS_DIR)/%.o: %.s
 	@mkdir -p $(@D)
 	nasm -f elf32 -o $@ $<
+
+-include $(DEPFILES)
 
 .PHONY: clean
 

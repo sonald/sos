@@ -6,9 +6,6 @@
 global start
 global _start
 global is_cpuid_capable
-global _kernel_page_directory
-global table001
-global table768
 
 extern kernel_main
 extern kernel_init
@@ -23,7 +20,7 @@ KERNEL_PDE_INDEX equ (KERNEL_VIRTUAL_BASE >> 22)
 [section .data]
 ALIGN 0x1000
 KERNEL_PAGE_ATTR equ  0x03 ; P, RW, 4K page
-_kernel_page_directory:
+_boot_page_directory:
     dd (0 | KERNEL_PAGE_ATTR)
     times (KERNEL_PDE_INDEX - 1) dd 0
     dd (0 | KERNEL_PAGE_ATTR)
@@ -34,20 +31,15 @@ _kernel_page_directory:
 [section .data]
 ALIGN 0x1000
 KERNEL_4M_PAGE_ATTR equ  0x83 ; P, RW, PSE(4M Page)
-_kernel_page_directory_4m:
+_boot_page_directory_4m:
     dd (0 | KERNEL_4M_PAGE_ATTR)
     times (KERNEL_PDE_INDEX - 1) dd 0
     dd (0 | KERNEL_4M_PAGE_ATTR)
     times (1024 - KERNEL_PDE_INDEX - 1) dd 0
-
-[section .data]
-ALIGN 0x1000
 table001:
     times 1024 dd 0
 table768:
     times 1024 dd 0
-_others:
-    times 1024 * 255 dd 0x0
 
 [section .mboot]
 ; This part MUST be 4byte aligned, so we solve that issue using 'ALIGN 4'
@@ -56,7 +48,6 @@ mboot:
     ; Multiboot macros to make a few lines later more readable
     MULTIBOOT_PAGE_ALIGN    equ 1<<0
     MULTIBOOT_MEMORY_INFO   equ 1<<1
-    ;MULTIBOOT_MEMORY_MAP    equ 1<<6
     MULTIBOOT_HEADER_MAGIC  equ 0x1BADB002
     MULTIBOOT_HEADER_FLAGS  equ MULTIBOOT_PAGE_ALIGN | MULTIBOOT_MEMORY_INFO  
     MULTIBOOT_CHECKSUM  equ -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
@@ -68,7 +59,7 @@ mboot:
     
 ;; fill identity mapping for a page table
 %macro fill_page_table 2
-    mov eax, _kernel_page_directory - KERNEL_VIRTUAL_BASE
+    mov eax, _boot_page_directory - KERNEL_VIRTUAL_BASE
     add eax, %2
 
     or dword [eax], %1 - KERNEL_VIRTUAL_BASE
@@ -109,7 +100,7 @@ _no_pse:
     fill_page_table table001, 0
     fill_page_table table768, 768<<2
 
-    mov ecx, (_kernel_page_directory - KERNEL_VIRTUAL_BASE)
+    mov ecx, (_boot_page_directory - KERNEL_VIRTUAL_BASE)
     mov cr3, ecx
 
     mov ecx, cr0
@@ -135,10 +126,10 @@ higher_half_entry:
     loop .flush
 
     ;; invalidate PDE 0
-    mov dword [_kernel_page_directory], 0
+    mov dword [_boot_page_directory], 0
 
     ; not necessary
-    ;mov ecx, (_kernel_page_directory - KERNEL_VIRTUAL_BASE)
+    ;mov ecx, (_boot_page_directory - KERNEL_VIRTUAL_BASE)
     ;mov cr3, ecx
 
     mov esp, kern_stack_top
@@ -183,6 +174,6 @@ is_cpuid_capable:
 
 [section .bootstrap_stack nobits]
 _kern_stack:
-    resb 8192
+    resb 4096
 kern_stack_top:
 

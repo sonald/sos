@@ -1,5 +1,6 @@
 #include "common.h"
 #include "mm.h"
+#include "mmu.h"
 
 #ifdef DEBUG
 #define debug_mm(fmt, ...) kprintf("[%s]: " fmt, __func__, ##__VA_ARGS__)
@@ -108,61 +109,84 @@ void PhysicalMemoryManager::init(u32 mem_size)
     _frameCount = aligned(_memSize * 1024, this->frame_size);
     memset(_frames, 0, _frameCount/8);
 
-    //NOTE: note we setup 768th PDE as present for kernel, which means 
-    //the first 4MB physical memory should be marked as alloced.
-    alloc_region(this->frame_size*1024);
-    debug_mm("mem_size: %dKB, map addr: 0x%x, frames: %d\n",
-            mem_size, _frames, _frameCount);
+    // from there, we can alloc memory for kernel
+    _freeStart = (u32*)PGROUNDUP(_frames + _frameCount/32);
+    alloc_region(PGROUNDUP(v2p(_freeStart)));
+
+    //alloc_region(this->frame_size*1024);
+    debug_mm("mem_size: %dKB, pmap addr: 0x%x, frames: %d, used: %d, freestart: 0x%x\n",
+            mem_size, _frames, _frameCount, _frameUsed, _freeStart);
 }
 
 // there is a caveat: NULL is actually ambiguous, it may means the very first
 // frame or alloc failure. to keep it safe, we asure that first frame is always
 // occupied by kernel, so NULL always means failure.
-void* PhysicalMemoryManager::alloc_frame()
+u32 PhysicalMemoryManager::alloc_frame()
 {
     debug_mm("_frameUsed: %d\n", _frameUsed);
-    if (_frameUsed >= _frameCount) return NULL;
+    if (_frameUsed >= _frameCount) return 0;
     u32 id = get_first_free_frame();
-    if (id == this->invalid) return NULL;
+    if (id == this->invalid) return 0;
     
     u32 paddr = id * this->frame_size;
     set_frame(paddr);
     _frameUsed++;
-    return (void*)paddr;
+    return paddr;
 }
 
-void* PhysicalMemoryManager::alloc_region(u32 size)
+u32 PhysicalMemoryManager::alloc_region(u32 size)
 {
-    if (size == 0) return NULL;
+    if (size == 0) return 0;
 
     int nframes = aligned(size, frame_size);
     if (_frameUsed + nframes > _frameCount) {
         debug_mm("nframes %d is too large\n", nframes);
-        return NULL;
+        return 0;
     }
 
     u32 id = get_first_free_region(size);
     if (id == this->invalid) {
         debug_mm("get_first_free_region failed\n");
-        return NULL;
+        return 0;
     }
 
     u32 paddr = id * this->frame_size;
     set_region(paddr, size);
     _frameUsed += nframes;
 
-    return (void*)paddr;
+    return paddr;
 }
 
-void PhysicalMemoryManager::free_frame(void* paddr)
+void PhysicalMemoryManager::free_frame(u32 paddr)
 {
-    clear_frame((u32)paddr);
+    clear_frame(paddr);
     _frameUsed--;
 }
 
-void PhysicalMemoryManager::free_region(void* paddr, u32 size)
+void PhysicalMemoryManager::free_region(u32 paddr, u32 size)
 {
-    clear_region((u32)paddr, size);
+    clear_region(paddr, size);
     _frameUsed -= aligned(size, frame_size);
+}
+
+void* PhysicalMemoryManager::alloc_kernel_frame(void* vaddr)
+{
+    if (_frameUsed >= _frameCount) return NULL;
+
+    u32 paddr = v2p(vaddr);
+    if (test_frame(paddr)) panic("frame has been used\n");
+    
+    set_frame(paddr);
+    _frameUsed++;
+    return vaddr;
+
+}
+
+void PhysicalMemoryManager::free_kernel_frame(void* vaddr)
+{
+    kassert(vaddr != NULL);
+    u32 paddr = v2p(vaddr);
+    clear_frame(paddr);
+    _frameUsed--;
 }
 
