@@ -62,13 +62,15 @@ irq%1:
     mov gs, ax
     mov fs, ax
 
-    mov eax, esp
-    push eax
+    push esp
+    call %2
+    add esp, 4
+    ;mov eax, esp
+    ;push eax
+    ;mov eax, %2
+    ;call eax
+    ;pop eax
 
-    mov eax, %2
-    call eax
-
-    pop eax
     pop fs
     pop gs
     pop es

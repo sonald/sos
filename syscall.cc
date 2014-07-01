@@ -2,34 +2,91 @@
 #include "isr.h"
 #include "task.h"
 
-int sys_write(registers_t* regs)
+typedef int (*syscall0_t)();
+typedef int (*syscall1_t)(u32);
+typedef int (*syscall2_t)(u32, u32);
+typedef int (*syscall3_t)(u32, u32, u32);
+typedef int (*syscall4_t)(u32, u32, u32, u32);
+typedef int (*syscall5_t)(u32, u32, u32, u32, u32);
+
+
+int sys_write(int ch)
 {
-    kputchar(regs->ebx);
-    return 1;
+    kputchar(ch);
+    return current_proc->pid;
 }
 
-typedef int (*syscall_cb)(registers_t*);
-static syscall_cb syscalls[NR_SYSCALL]; 
+static struct syscall_info_s {
+    void* call;
+    int nr_args;
+
+} syscalls[NR_SYSCALL]; 
 
 static void syscall_handler(registers_t* regs)
 {
-    int n = ARRAYLEN(syscalls);
-    if (regs->eax >= (u32)n) {
+    if (regs->eax >= NR_SYSCALL) {
         kprintf("invalid syscall number: %d\n", regs->eax);
-        current_proc->regs.eax = -1;
+        regs->eax = -1;
         return;
     }
     
-    syscall_cb f = syscalls[regs->eax];
-    if (f) {
-        current_proc->regs.eax = f(regs);
+    struct syscall_info_s info = syscalls[regs->eax];
+    if (!info.call) return;
+
+    switch(info.nr_args) {
+        case 0:
+            {
+                syscall0_t fn = (syscall0_t)info.call;
+                regs->eax = do_syscall0(fn);
+                break;
+            }
+
+        case 1: 
+            {
+                syscall1_t fn = (syscall1_t)info.call;
+                regs->eax = do_syscall1(fn, regs->ebx);
+                break;
+            }
+
+        case 2:
+            {
+                syscall2_t fn = (syscall2_t)info.call;
+                regs->eax = do_syscall2(fn, regs->ebx, regs->ecx);
+                break;
+            }
+
+        case 3:
+            {
+                syscall3_t fn = (syscall3_t)info.call;
+                regs->eax = do_syscall3(fn, regs->ebx, regs->ecx, 
+                        regs->edx);
+                break;
+            }
+
+        case 4:
+            {
+                syscall4_t fn = (syscall4_t)info.call;
+                regs->eax = do_syscall4(fn, regs->ebx, regs->ecx,
+                        regs->edx, regs->esi);
+                break;
+            }
+
+        case 5:
+            {
+                syscall5_t fn = (syscall5_t)info.call;
+                regs->eax = do_syscall5(fn, regs->ebx, regs->ecx,
+                        regs->edx, regs->esi, regs->edi);
+                break;
+            }
+
+        default: panic("SYSCALL crash\n");
     }
 }
 
 void init_syscall()
 {
     memset(syscalls, 0, sizeof(syscalls));
-    syscalls[SYS_write] = sys_write;
+    syscalls[SYS_write] = { (void*)sys_write, 1 };
     register_isr_handler(ISR_SYSCALL, syscall_handler);
 }
 

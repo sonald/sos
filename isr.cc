@@ -64,6 +64,7 @@ void isr_handler(registers_t* regs)
     for(;;);
 }
 
+extern void scheduler(registers_t* regs);
 void irq_handler(registers_t* regs)
 {
     if (isr_handlers[regs->isrno]) {
@@ -79,6 +80,8 @@ void irq_handler(registers_t* regs)
     }
     // Send reset signal to master. (As well as slave, if necessary).
     outb(0x20, 0x20);
+
+    scheduler(regs);
 }
 
 void register_isr_handler(int isr, interrupt_handler cb)

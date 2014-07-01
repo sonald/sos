@@ -27,24 +27,28 @@ proc_t* create_proc(void* entry, const char* name)
     vmm->map_pages(pdir, vaddr, PGSIZE, paddr, PDE_USER|PDE_WRITABLE);
     memcpy(vaddr, entry, PGSIZE);
 
-    void* task_usr_stack0 = (void*)0x08100000; 
+    void* task_usr_stack0 = (void*)0xB0000000; 
     u32 paddr_stack0 = v2p(vmm->alloc_page());
     vmm->map_pages(pdir, task_usr_stack0, PGSIZE, paddr_stack0, PDE_USER|PDE_WRITABLE);
 
     void* task_kern_stack = vmm->alloc_page();
 
     proc->entry = vaddr;
-    proc->regs.useresp = (u32)task_usr_stack0 + PGSIZE;
-    proc->regs.esp = (u32)task_kern_stack;
-    registers_t& regs = proc->regs;
-    regs.ss = regs.ds = regs.fs = regs.gs = 0x23;
-    regs.cs = 0x1b;
-    regs.eip = (u32)vaddr;
-    regs.eflags = 0x1200;
+    proc->kern_esp = A2I(task_kern_stack) + PGSIZE;
+    proc->user_esp = A2I(task_usr_stack0) + PGSIZE;
+    
+    registers_t* regs = (registers_t*)((char*)proc->kern_esp - sizeof(registers_t));
+    regs->useresp = proc->user_esp;
+    regs->esp = proc->kern_esp;
+    regs->ss = regs->es = regs->ds = regs->fs = regs->gs = 0x23;
+    regs->cs = 0x1b;
+    regs->eip = A2I(vaddr);
+    regs->eflags = 0x202;
+    proc->regs = regs;
+
     proc->pid = proc_count;
-    kprintf("alloc task: pid %d, eip 0x%x, stack: 0x%x\n", 
-            proc->pid, paddr, paddr_stack0);
-    //vmm->dump_page_directory(vmm->current_directory());
+    kprintf("alloc task(%d) @0x%x, ustack: 0x%x, kesp: 0x%x\n", 
+            proc->pid, paddr, paddr_stack0, proc->kern_esp);
 
     return proc;
 }

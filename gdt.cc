@@ -64,6 +64,7 @@ END_CDECL
 
 // may need TSS entry later
 gdt_entry_t gdt_entries[6];
+tss_entry_t shared_tss;
 
 gdt_ptr_t   gdt_ptr;
 idt_entry_t idt_entries[256];
@@ -188,3 +189,13 @@ void setup_idt_entry(int idx, u32 base, u16 selector, u8 flags)
     p->sel = selector;
     p->base_hi = (base >> 16) & 0xffff;
 }
+
+void setup_tss(u32 stack)
+{
+    memset(&shared_tss, 0, sizeof(shared_tss));
+    shared_tss.ss0 = SEG_KDATA<<3;
+    shared_tss.esp0 = (u32)stack;
+
+    setup_gdt_entry(SEG_TSS, (u32)&shared_tss, sizeof(shared_tss), GDT_TSS_PL3);
+}
+

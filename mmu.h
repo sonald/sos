@@ -116,6 +116,8 @@ typedef struct page_directory_s {
 // construct virtual address from indexes and offset
 #define PGADDR(d, t, o) ((uint)((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
 
+#define A2I(addr) ((u32)(long)(addr))
+
 struct tss_entry_
 {
     u32 prev_tss;   // The previous TSS - if we used hardware task switching this would form a linked list.

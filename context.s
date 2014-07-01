@@ -1,6 +1,7 @@
 [BITS 32]
 global switch_to_usermode
 global flush_tss
+global sched
 
 [section .text]
 ; parameters: esp, eip
@@ -41,3 +42,16 @@ flush_tss:
     mov ax, 0x28
     ltr ax
     ret
+
+sched:
+    mov eax, [esp+4]
+    mov esp, eax
+
+    pop fs
+    pop gs
+    pop es
+    pop ds
+    popa
+    add esp, 8
+
+    iret

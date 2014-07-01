@@ -24,6 +24,8 @@
 #define IRQ14 46 // ATA HD1
 #define IRQ15 47 // ATA HD2
 
+#define ISR_SYSCALL 0x80 
+
 typedef struct registers_s {
     u32 fs, gs, es, ds;
     u32 edi, esi, ebp, esp, ebx, edx, ecx, eax;

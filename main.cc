@@ -9,6 +9,11 @@
 #include "syscall.h"
 
 extern "C" int is_cpuid_capable();
+extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
+extern "C" void flush_tss();
+extern void setup_tss(u32);
+extern void init_syscall();
+
 
 /*
  * gets called before Global constructor 
@@ -31,62 +36,59 @@ static bool is_support_4m_page()
     return (edx & (1<<4)) > 0;
 }
 
-static void test_pmm(PhysicalMemoryManager& pmm)
-{
-    u32 p = pmm.alloc_frame();
-    if (p == 0) kputs("alloc failed\n");
-    kputs("alloc finish  ");
-    pmm.free_frame(p);
-    u32 p2 = pmm.alloc_frame();
-    if (p != p2) kputs("p != p2\n");
-
-    u32 size = pmm.frame_size * 10;
-    p = pmm.alloc_region(size);
-    if (p == 0) kputs("alloc region failed\n");
-    pmm.free_region(p, size);
-    p2 = pmm.alloc_frame();
-    if (p != p2) kputs("p != p2\n");
-}
-
-extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
-
-tss_entry_t tss;
-u8 task0_sys_stack[1024];
-static void setup_tss(u32 stack)
-{
-    memset(&tss, 0, sizeof(tss));
-    tss.ss0 = 0x10;
-    //tss.esp0 = (u32)&task0_sys_stack + sizeof(task0_sys_stack);
-    tss.esp0 = (u32)stack;
-
-    setup_gdt_entry(SEG_TSS, (u32)&tss, sizeof(tss), GDT_TSS_PL3);
-}
-
-extern "C" void flush_tss();
-
 void task0()
 {
+    u8 step = 0;
     for(;;) {
-        asm ( "int $0x80"::"a"(SYS_write), "b"('A'));
+        int ret = 0;
+        asm volatile ( "int $0x80 \n"
+                :"=a"(ret)
+                :"a"(SYS_write), "b"('A')
+                :"cc", "memory");
+        ret = ret % 10;
+        asm volatile ( "int $0x80"::"a"(SYS_write), "b"('0'+ret));
+
+        asm volatile ( "int $0x80 \n"
+                :"=a"(ret)
+                :"a"(SYS_write), "b"('0'+ (step%10))
+                :"cc", "memory");
+
+        volatile int r = 0;
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 0x7fffff; ++j) {
+                r += j;
+            }
+        }
+
+        step++;
+    }
+}
+
+void task1()
+{
+    u8 step = 0;
+    for(;;) {
+        int ret = 0;
+        asm volatile ( "int $0x80 \n"
+                :"=a"(ret)
+                :"a"(SYS_write), "b"('B')
+                :"cc", "memory");
+        ret = ret % 10;
+        asm volatile ( "int $0x80"::"a"(SYS_write), "b"('0'+ret));
+
+        asm volatile ( "int $0x80 \n"
+                :"=a"(ret)
+                :"a"(SYS_write), "b"('0'+ (step%10))
+                :"cc", "memory");
+
         volatile int r = 0;
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 0x7fffff; ++j) {
                 r += j;
             }
         }
-    }
-}
 
-void task1()
-{
-    for(;;) {
-        asm ( "int $0x80"::"a"(SYS_write), "b"('B'));
-        volatile int r = 0;
-        for (int i = 0; i < 1; i++) {
-            for (int j = 0; j < 0x7fffff; ++j) {
-                r += j;
-            }
-        }
+        step++;
     }
 }
 extern "C" int kernel_main(struct multiboot_info *mb)
@@ -135,9 +137,9 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     proc_t* proc1 = create_proc((void*)&task1, "task1");
 
     vmm->switch_page_directory(proc->pgdir);
-    setup_tss(proc->regs.esp);
+    setup_tss(proc->kern_esp);
     flush_tss();
-    switch_to_usermode((void*)proc->regs.useresp, proc->entry);
+    switch_to_usermode((void*)proc->user_esp, proc->entry);
 
     panic("Never Back to Here\n");
 

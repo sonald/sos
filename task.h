@@ -15,11 +15,16 @@ typedef struct task_s {
 } task_t;
 
 typedef struct proc_s {
-    registers_t regs;
+    registers_t* regs;
+
     pid_t pid;
     char name[32];
-    page_directory_t* pgdir;
+
+    u32 kern_esp;
+    u32 user_esp;
     void* entry;
+
+    page_directory_t* pgdir;
     struct proc_s* next;
 } proc_t;
 
