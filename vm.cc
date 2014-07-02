@@ -39,7 +39,7 @@ static struct {
     {(void*)_data, V2P(_data), PHYSTOP, PDE_WRITABLE} // kern max usable mem
 };
 
-static void page_fault(registers_t* regs)
+static void page_fault(trapframe_t* regs)
 {
     // read cr2
     u32 fault_addr;

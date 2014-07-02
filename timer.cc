@@ -8,7 +8,7 @@ volatile u32 timer_ticks = 0;
 extern tss_entry_t shared_tss;
 extern "C" void sched(u32 new_context);
 
-void scheduler(registers_t* regs)
+void scheduler(trapframe_t* regs)
 {
     if (current_proc) {
         if (timer_ticks % 100 != 0) {
@@ -31,7 +31,7 @@ void scheduler(registers_t* regs)
     }
 }
 
-static void timer_interrupt(registers_t* regs)
+static void timer_interrupt(trapframe_t* regs)
 {
     (void)regs;
     u16 cur = get_cursor();

@@ -26,23 +26,23 @@
 
 #define ISR_SYSCALL 0x80 
 
-typedef struct registers_s {
+typedef struct trapframe_s {
     u32 fs, gs, es, ds;
     u32 edi, esi, ebp, esp, ebx, edx, ecx, eax;
     u32 isrno, errcode;
     // Pushed by the processor automatically.
     u32 eip, cs, eflags;
     u32 useresp, ss;  // exists only when PL switched
-} __attribute__((packed)) registers_t;
+} __attribute__((packed)) trapframe_t;
 
 BEGIN_CDECL
 
-void isr_handler(registers_t* regs);
-void irq_handler(registers_t* regs);
+void isr_handler(trapframe_t* regs);
+void irq_handler(trapframe_t* regs);
 
 END_CDECL
 
-typedef void (*interrupt_handler)(registers_t* regs);
+typedef void (*interrupt_handler)(trapframe_t* regs);
 void register_isr_handler(int isr, interrupt_handler cb);
 
 #endif

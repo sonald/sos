@@ -110,12 +110,24 @@ void PhysicalMemoryManager::init(u32 mem_size)
     memset(_frames, 0, _frameCount/8);
 
     // from there, we can alloc memory for kernel
-    _freeStart = (u32*)PGROUNDUP(_frames + _frameCount/32);
-    alloc_region(PGROUNDUP(v2p(_freeStart)));
+    _freeStart = (u32*)PGROUNDUP(A2I(_frames) + _frameCount/32);
+
+    u32 used_mem = PGROUNDUP(v2p(_freeStart)), // in Bytes
+        free_mem = mem_size * 1024 - used_mem; // in Bytes
+
+    if (free_mem < PHYSTOP) {
+        _freeEnd = _freeStart + free_mem/4;
+    } else {
+        _freeEnd = _freeStart + PHYSTOP/4;
+    }
+
+    alloc_region(used_mem);
 
     //alloc_region(this->frame_size*1024);
-    debug_mm("mem_size: %dKB, pmap addr: 0x%x, frames: %d, used: %d, freestart: 0x%x\n",
-            mem_size, _frames, _frameCount, _frameUsed, _freeStart);
+    debug_mm("mem_size: %dKB, used: %dKB, pmap addr: 0x%x, frames: %d,"
+            " used: %d, freestart: 0x%x, freeend: 0x%x\n",
+            mem_size, used_mem/1024, _frames, _frameCount, 
+            _frameUsed, _freeStart, _freeEnd);
 }
 
 // there is a caveat: NULL is actually ambiguous, it may means the very first

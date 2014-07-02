@@ -9,13 +9,8 @@
 
 typedef s32 pid_t;
 
-typedef struct task_s {
-    void (*entry)();
-    char name[32];
-} task_t;
-
 typedef struct proc_s {
-    registers_t* regs;
+    trapframe_t* regs;
 
     pid_t pid;
     char name[32];

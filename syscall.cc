@@ -22,7 +22,7 @@ static struct syscall_info_s {
 
 } syscalls[NR_SYSCALL]; 
 
-static void syscall_handler(registers_t* regs)
+static void syscall_handler(trapframe_t* regs)
 {
     if (regs->eax >= NR_SYSCALL) {
         kprintf("invalid syscall number: %d\n", regs->eax);

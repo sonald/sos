@@ -1,6 +1,5 @@
 #include "task.h"
 
-task_t tasks[MAXPROCS];
 proc_t proctable[MAXPROCS];
 
 int proc_count = 0; // allocated procs
@@ -15,7 +14,10 @@ proc_t* create_proc(void* entry, const char* name)
     strcpy(proc->name, name);
 
     if (!current_proc) current_proc = proc;
-    else current_proc->next = proc;
+    else { 
+        proc->next = current_proc->next;
+        current_proc->next = proc;
+    }
 
     VirtualMemoryManager* vmm = VirtualMemoryManager::get();
     page_directory_t* pdir = vmm->create_address_space();
@@ -37,7 +39,7 @@ proc_t* create_proc(void* entry, const char* name)
     proc->kern_esp = A2I(task_kern_stack) + PGSIZE;
     proc->user_esp = A2I(task_usr_stack0) + PGSIZE;
     
-    registers_t* regs = (registers_t*)((char*)proc->kern_esp - sizeof(registers_t));
+    trapframe_t* regs = (trapframe_t*)((char*)proc->kern_esp - sizeof(trapframe_t));
     regs->useresp = proc->user_esp;
     regs->esp = proc->kern_esp;
     regs->ss = regs->es = regs->ds = regs->fs = regs->gs = 0x23;

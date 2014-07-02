@@ -45,7 +45,7 @@ const char* exception_messages[] =
 
 static interrupt_handler isr_handlers[256];
 
-void isr_handler(registers_t* regs)
+void isr_handler(trapframe_t* regs)
 {
     if (regs->isrno < 32) kputs(exception_messages[regs->isrno]);
     if (isr_handlers[regs->isrno]) {
@@ -64,8 +64,8 @@ void isr_handler(registers_t* regs)
     for(;;);
 }
 
-extern void scheduler(registers_t* regs);
-void irq_handler(registers_t* regs)
+extern void scheduler(trapframe_t* regs);
+void irq_handler(trapframe_t* regs)
 {
     if (isr_handlers[regs->isrno]) {
         interrupt_handler cb = isr_handlers[regs->isrno];

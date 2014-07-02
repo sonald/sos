@@ -116,7 +116,8 @@ typedef struct page_directory_s {
 // construct virtual address from indexes and offset
 #define PGADDR(d, t, o) ((uint)((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
 
-#define A2I(addr) ((u32)(long)(addr))
+#define A2I(addr) ((u32)(unsigned long)(addr))
+#define I2A(paddr) ((void*)(unsigned long)(paddr))
 
 struct tss_entry_
 {

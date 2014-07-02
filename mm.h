@@ -1,13 +1,14 @@
 #ifndef _MM_H
 #define _MM_H 
 
+#include "mmu.h"
 #include "memlayout.h"
 
 class PhysicalMemoryManager {
     public:
         friend class VirtualMemoryManager;
 
-        static constexpr int frame_size = 4096; //4k
+        static constexpr int frame_size = PGSIZE; //4k
         static constexpr u32 invalid = (u32)-1; // invalid frame number
 
         PhysicalMemoryManager();

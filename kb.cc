@@ -198,7 +198,7 @@ static void debug_print(Keyboard* kb)
     }
 }
 
-static void keyboard_irq(registers_t* regs)
+static void keyboard_irq(trapframe_t* regs)
 {
     static bool _is_extended = false;
     (void)regs;
