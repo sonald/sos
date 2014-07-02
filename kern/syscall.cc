@@ -9,6 +9,13 @@ typedef int (*syscall3_t)(u32, u32, u32);
 typedef int (*syscall4_t)(u32, u32, u32, u32);
 typedef int (*syscall5_t)(u32, u32, u32, u32, u32);
 
+#define do_syscall0(fn) fn()
+#define do_syscall1(fn, arg0) fn(arg0)
+#define do_syscall2(fn, arg0, arg1) fn(arg0, arg1)
+#define do_syscall3(fn, arg0, arg1, arg2) fn(arg0, arg1, arg2)
+#define do_syscall4(fn, arg0, arg1, arg2, arg3) fn(arg0, arg1, arg2, arg3)
+#define do_syscall5(fn, arg0, arg1, arg2, arg3, arg4) fn(arg0, arg1, arg2, arg3, arg4)
+
 
 int sys_write(int ch)
 {

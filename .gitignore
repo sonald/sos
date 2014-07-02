@@ -4,6 +4,8 @@
 mnt
 *.swp
 *.pyc
-kernel
 .zcache
 objs
+kernel
+initramfs.img
+ramfs_gen

@@ -8,19 +8,22 @@ crtbegin_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtbegin.o)
 crtend_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtend.o)
 
 # order is important, boot.o must be first here
-kernel_srcs=boot.s main.cc common.cc cxx_rt.cc irq_stubs.s gdt.cc isr.cc \
-	timer.cc mm.cc vm.cc kb.cc context.s syscall.cc task.cc
+kernel_srcs=kern/boot.s kern/main.cc kern/common.cc kern/cxx_rt.cc \
+			kern/irq_stubs.s kern/gdt.cc kern/isr.cc kern/timer.cc \
+			kern/mm.cc kern/vm.cc kern/kb.cc kern/context.s \
+			kern/syscall.cc kern/task.cc
 
 kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))
 kernel_objs := $(patsubst %.s, $(OBJS_DIR)/%.o, $(kernel_objs))
 
-objs := $(OBJS_DIR)/crti.o $(crtbegin_o) $(kernel_objs) $(crtend_o) $(OBJS_DIR)/crtn.o
+objs := $(OBJS_DIR)/kern/crti.o $(crtbegin_o) $(kernel_objs) $(crtend_o) $(OBJS_DIR)/kern/crtn.o
 
 DEPFILES := $(patsubst %.cc, objs/%.d, $(kernel_srcs))
 DEPFILES := $(patsubst %.s, objs/%.d, $(DEPFILES))
 
+# tools
 
-all: run
+all: run ramfs_gen
 
 debug: kernel
 	qemu-system-i386 -kernel kernel -m 32 -s -S
@@ -28,21 +31,25 @@ debug: kernel
 run: kernel
 	qemu-system-i386 -kernel kernel -m 32 -s -monitor stdio
 
-kernel: $(objs) kernel.ld
-	$(CXX) -T kernel.ld -O2 -nostdlib -o $@ $^ -lgcc
+kernel: $(objs) kern/kernel.ld
+	$(CXX) -T kern/kernel.ld -O2 -nostdlib -o $@ $^ -lgcc
 
-$(OBJS_DIR)/%.o: %.cc Makefile
+$(OBJS_DIR)/kern/%.o: kern/%.cc Makefile
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
 			
-$(OBJS_DIR)/%.o: %.s
+$(OBJS_DIR)/kern/%.o: kern/%.s
 	@mkdir -p $(@D)
 	nasm -f elf32 -o $@ $<
 
 -include $(DEPFILES)
 
+ramfs_gen: tools/ramfs_gen.c
+	gcc -o $@ $^
+
 .PHONY: clean
 
 clean:
-	-rm $(OBJS_DIR)/*.o 
+	-rm $(OBJS_DIR)/kern/*.o 
+	-rm $(OBJS_DIR)/kern/*.d
 	-rm kernel

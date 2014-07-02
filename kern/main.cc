@@ -96,36 +96,6 @@ void task1()
     }
 }
 
-void task2()
-{
-    u8 step = 0;
-    for(;;) {
-        int ret = 0;
-        asm volatile ( "int $0x80 \n"
-                :"=a"(ret)
-                :"a"(SYS_write), "b"('C')
-                :"cc", "memory");
-        ret = ret % 10;
-        asm volatile ( "int $0x80"::"a"(SYS_write), "b"('0'+ret));
-
-        asm volatile ( "int $0x80 \n"
-                :"=a"(ret)
-                :"a"(SYS_write), "b"('0'+ (step%10))
-                :"cc", "memory");
-
-        asm volatile ( "int $0x80" ::"a"(SYS_write), "b"(' ') :"cc", "memory");
-
-        volatile int r = 0;
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 0x7fffff; ++j) {
-                r += j;
-            }
-        }
-
-        step++;
-    }
-}
-
 extern "C" int kernel_main(struct multiboot_info *mb)
 {
     init_gdt();
@@ -170,7 +140,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     proc_t* proc = create_proc((void*)&task0, "task0");
     create_proc((void*)&task1, "task1");
-    create_proc((void*)&task2, "task2");
+    //create_proc((void*)&task2, "task2");
 
     vmm->switch_page_directory(proc->pgdir);
     setup_tss(proc->kern_esp);
