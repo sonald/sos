@@ -31,13 +31,39 @@ class VirtualMemoryManager
         void* alloc_page();
         void free_page(void* vaddr);
 
-        void* kmalloc(int size, int flags);
+        // kernel heap allocation
+        void* kmalloc(size_t size, int align);
         void kfree(void* ptr);
+        //for debug
+        void dump_heap();
 
     private:
+        struct kheap_block_head
+        {
+            u32 size;
+            struct kheap_block_head* prev;
+            struct kheap_block_head* next;
+            void* ptr;
+            u32 used;
+            char data[1];
+        };
+
         static VirtualMemoryManager* _instance;
         PhysicalMemoryManager* _pmm;
         page_directory_t* _current_pdir;
+
+        kheap_block_head* _kheap_ptr;
+        u32* _kern_heap_start;
+        u32* _kern_heap_limit;
+
+        kheap_block_head* find_block(kheap_block_head** last, size_t size);
+        void split_block(kheap_block_head* h, size_t size);
+        kheap_block_head* merge_block(kheap_block_head* h);
+        kheap_block_head* align_block(kheap_block_head* h, int align);
+        bool aligned(void* ptr, int align);
+        void* ksbrk(size_t size);
+
+        void test_malloc();
 
         VirtualMemoryManager();
 };

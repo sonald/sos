@@ -20,6 +20,8 @@ class PhysicalMemoryManager {
          * alloc first free frame and return physical address
          */
         u32 alloc_frame();
+        // alloc first free frame from the end of memory
+        u32 alloc_frame_tail();
         void free_frame(u32 paddr);
 
         /**
@@ -35,14 +37,18 @@ class PhysicalMemoryManager {
         void set_region(u32 frame_addr, u32 size);
         void clear_region(u32 frame_addr, u32 size);
         int test_frame(u32 frame_addr);
+
         u32 get_first_free_frame();
+        u32 get_last_free_frame();
         u32 get_first_free_region(u32 size);
 
     private:
         u32* _frames;
+        u32* _framesEnd;
         u32 _frameCount;
         u32 _frameUsed;
         u32 _memSize; // in KB
+
         u32* _freeStart;
         u32* _freeEnd;
 };

@@ -1,5 +1,9 @@
 #include "vfs.h"
 
+bool Initramfs::load()
+{
+}
+
 u32 Initramfs::read(inode_t* node, u32 offset, u32 size, u8* buffer)
 {
 }

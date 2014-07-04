@@ -14,19 +14,9 @@ extern _init
 extern _fini
 
 ; setup higher-half kernel
-; temporary Page Dir (4KB pages)
 KERNEL_VIRTUAL_BASE equ 0xC0000000
 KERNEL_PDE_INDEX equ (KERNEL_VIRTUAL_BASE >> 22)
-[section .data]
-ALIGN 0x1000
-KERNEL_PAGE_ATTR equ  0x03 ; P, RW, 4K page
-_boot_page_directory:
-    dd (0 | KERNEL_PAGE_ATTR)
-    times (KERNEL_PDE_INDEX - 1) dd 0
-    dd (0 | KERNEL_PAGE_ATTR)
-    times (1024 - KERNEL_PDE_INDEX - 1) dd 0
 
-; seems qemu does not support PSE
 ; temporary Page Dir (4MB pages)
 [section .data]
 ALIGN 0x1000
@@ -36,10 +26,6 @@ _boot_page_directory_4m:
     times (KERNEL_PDE_INDEX - 1) dd 0
     dd (0 | KERNEL_4M_PAGE_ATTR)
     times (1024 - KERNEL_PDE_INDEX - 1) dd 0
-table001:
-    times 1024 dd 0
-table768:
-    times 1024 dd 0
 
 [section .mboot]
 ; This part MUST be 4byte aligned, so we solve that issue using 'ALIGN 4'
@@ -57,21 +43,6 @@ mboot:
     dd MULTIBOOT_HEADER_FLAGS
     dd MULTIBOOT_CHECKSUM
     
-;; fill identity mapping for a page table
-%macro fill_page_table 2
-    mov eax, _boot_page_directory - KERNEL_VIRTUAL_BASE
-    add eax, %2
-
-    or dword [eax], %1 - KERNEL_VIRTUAL_BASE
-    mov ecx, 1024
-    mov eax, 0x03 ; RW, P, U
-    mov edi, (%1 - KERNEL_VIRTUAL_BASE)
-.%1.1:
-    stosd
-    add eax, 4096
-    loop .%1.1
-%endmacro
-
 [section .text]
 ; physical address for _start, need it before paing enabled.
 start equ (_start - KERNEL_VIRTUAL_BASE) 
@@ -83,24 +54,23 @@ _start:
     test eax, eax
     jz _no_pse
 
-    ; we really should check cpuid for PSE support, when support, use 4MB page
     mov eax, 01
     cpuid
-    and edx, 0x00000008 ; check PSE
+    and edx, 0x00000010 ; check PSE
     jz _no_pse
 
     ; enable PSE
     mov ecx, cr4
     or ecx, 0x00000010 
     mov cr4, ecx
+
+    mov ecx, (_boot_page_directory_4m - KERNEL_VIRTUAL_BASE)
+    jmp _pse
+
 _no_pse:
+    hlt
 
-    ; populate table001, table768
-    cld
-    fill_page_table table001, 0
-    fill_page_table table768, 768<<2
-
-    mov ecx, (_boot_page_directory - KERNEL_VIRTUAL_BASE)
+_pse:
     mov cr3, ecx
 
     mov ecx, cr0
@@ -118,19 +88,14 @@ higher_half_entry:
     ; invalidate all PTEs for PDE 0
     mov ecx, 1024
     mov eax, 0x0 ; Not Present
-    mov edi, table001
 .flush:
-    stosd
+    ;; invalidate PDE 0
+    mov dword [_boot_page_directory_4m], 0
+
+    invlpg [eax]
     add eax, 0x1000
-    invlpg [eax]  ; will crash
     loop .flush
 
-    ;; invalidate PDE 0
-    mov dword [_boot_page_directory], 0
-
-    ; not necessary
-    ;mov ecx, (_boot_page_directory - KERNEL_VIRTUAL_BASE)
-    ;mov cr3, ecx
 
     mov esp, kern_stack_top
     

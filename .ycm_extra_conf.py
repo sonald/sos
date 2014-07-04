@@ -4,6 +4,7 @@ import ycm_core
 flags = [
 '-Wall',
 '-std=c++11',
+'-m32',
 '-x',
 'c++',
 '-ffreestanding', 
@@ -14,6 +15,8 @@ flags = [
 '-fno-rtti', 
 '-I',
 '.',
+'-I',
+'./include'
 ]
 
 

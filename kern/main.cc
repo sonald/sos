@@ -8,7 +8,6 @@
 #include "task.h"
 #include "syscall.h"
 
-extern "C" int is_cpuid_capable();
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
 extern void setup_tss(u32);
@@ -22,18 +21,6 @@ extern "C" void kernel_init()
 {
     clear();
     set_text_color(LIGHT_CYAN, BLACK);
-}
-
-static bool is_support_4m_page()
-{
-    u32 edx;
-    __asm__ (
-        "mov $1, %%eax \n"
-        "cpuid \n"
-        :"=d"(edx)
-        :: "eax"
-    );
-    return (edx & (1<<4)) > 0;
 }
 
 void task0()
@@ -126,10 +113,6 @@ extern "C" int kernel_main(struct multiboot_info *mb)
         }
     }
 
-    if (is_cpuid_capable()) {
-        kprintf("4M Page is %ssupported.\n", (is_support_4m_page()?"":"not "));
-    }
-
     PhysicalMemoryManager pmm;
     VirtualMemoryManager* vmm = VirtualMemoryManager::get();
 
@@ -140,7 +123,6 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     proc_t* proc = create_proc((void*)&task0, "task0");
     create_proc((void*)&task1, "task1");
-    //create_proc((void*)&task2, "task2");
 
     vmm->switch_page_directory(proc->pgdir);
     setup_tss(proc->kern_esp);

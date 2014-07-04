@@ -34,6 +34,21 @@ int PhysicalMemoryManager::test_frame(u32 frame_addr)
     return _frames[fid/32] & (1<<(fid%32));
 }
 
+u32 PhysicalMemoryManager::get_last_free_frame()
+{
+    for (int i = _frameCount/32-1; i >= 0; --i) {
+        if (_frames[i] != 0xffffffff) {
+            for (int j = 31; j >= 0; --j) {
+                if (!(_frames[i] & (1<<j))) {
+                    return i*32+j;
+                }
+            }
+        }
+    }
+
+    return invalid;
+}
+
 u32 PhysicalMemoryManager::get_first_free_frame()
 {
     for (u32 i = 0; i < _frameCount / 32; ++i) {
@@ -46,7 +61,6 @@ u32 PhysicalMemoryManager::get_first_free_frame()
         }
     }
 
-    debug_mm("failed\n");
     return invalid;
 }
 
@@ -123,7 +137,6 @@ void PhysicalMemoryManager::init(u32 mem_size)
 
     alloc_region(used_mem);
 
-    //alloc_region(this->frame_size*1024);
     debug_mm("mem_size: %dKB, used: %dKB, pmap addr: 0x%x, frames: %d,"
             " used: %d, freestart: 0x%x, freeend: 0x%x\n",
             mem_size, used_mem/1024, _frames, _frameCount, 
@@ -138,6 +151,19 @@ u32 PhysicalMemoryManager::alloc_frame()
     //debug_mm("_frameUsed: %d\n", _frameUsed);
     if (_frameUsed >= _frameCount) return 0;
     u32 id = get_first_free_frame();
+    if (id == this->invalid) return 0;
+    
+    u32 paddr = id * this->frame_size;
+    set_frame(paddr);
+    _frameUsed++;
+    return paddr;
+}
+
+u32 PhysicalMemoryManager::alloc_frame_tail()
+{
+    //debug_mm("_frameUsed: %d\n", _frameUsed);
+    if (_frameUsed >= _frameCount) return 0;
+    u32 id = get_last_free_frame();
     if (id == this->invalid) return 0;
     
     u32 paddr = id * this->frame_size;

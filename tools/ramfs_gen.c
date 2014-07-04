@@ -6,7 +6,7 @@
 #define NAMELEN 64
 #define MAXFILES 64
 
-struct initrd_header
+struct initrd_entry_header
 {
    unsigned char magic; // The magic number is there to check for consistency.
    char name[NAMELEN];
@@ -17,11 +17,11 @@ struct initrd_header
 int main(int argc, char **argv)
 {
     int nheaders = (argc-1);
-    struct initrd_header headers[MAXFILES];
+    struct initrd_entry_header headers[MAXFILES];
     if (nheaders > MAXFILES) nheaders = MAXFILES;
 
-    printf("size of header: %lu\n", sizeof(struct initrd_header));
-    unsigned int off = sizeof(struct initrd_header) * MAXFILES + sizeof(int);
+    printf("size of header: %lu\n", sizeof(struct initrd_entry_header));
+    unsigned int off = sizeof(struct initrd_entry_header) * MAXFILES + sizeof(int);
     int i;
     for(i = 1; i <= nheaders; i++) {
         printf("writing file %s at 0x%x\n", argv[i], off);
@@ -43,7 +43,7 @@ int main(int argc, char **argv)
     FILE *wstream = fopen("./initramfs.img", "w");
     unsigned char *data = (unsigned char *)malloc(off);
     fwrite(&nheaders, sizeof(int), 1, wstream);
-    fwrite(headers, sizeof(struct initrd_header), MAXFILES, wstream);
+    fwrite(headers, sizeof(struct initrd_entry_header), MAXFILES, wstream);
 
     for(i = 1; i <= nheaders; i++) {
         FILE *stream = fopen(argv[i], "r");

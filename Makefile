@@ -11,17 +11,17 @@ crtend_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtend.o)
 kernel_srcs=kern/boot.s kern/main.cc kern/common.cc kern/cxx_rt.cc \
 			kern/irq_stubs.s kern/gdt.cc kern/isr.cc kern/timer.cc \
 			kern/mm.cc kern/vm.cc kern/kb.cc kern/context.s \
-			kern/syscall.cc kern/task.cc
+			kern/syscall.cc kern/task.cc kern/vfs.cc
 
 kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))
 kernel_objs := $(patsubst %.s, $(OBJS_DIR)/%.o, $(kernel_objs))
 
-objs := $(OBJS_DIR)/kern/crti.o $(crtbegin_o) $(kernel_objs) $(crtend_o) $(OBJS_DIR)/kern/crtn.o
+kern_objs := $(OBJS_DIR)/kern/crti.o $(crtbegin_o) \
+	$(kernel_objs) \
+	$(crtend_o) $(OBJS_DIR)/kern/crtn.o
 
-DEPFILES := $(patsubst %.cc, objs/%.d, $(kernel_srcs))
-DEPFILES := $(patsubst %.s, objs/%.d, $(DEPFILES))
-
-# tools
+DEPFILES := $(patsubst %.cc, kern_objs/%.d, $(kernel_srcs))
+DEPFILES := $(patsubst %.s, kern_objs/%.d, $(DEPFILES))
 
 all: run ramfs_gen
 
@@ -31,7 +31,7 @@ debug: kernel
 run: kernel
 	qemu-system-i386 -kernel kernel -m 32 -s -monitor stdio
 
-kernel: $(objs) kern/kernel.ld
+kernel: $(kern_objs) kern/kernel.ld
 	$(CXX) -T kern/kernel.ld -O2 -nostdlib -o $@ $^ -lgcc
 
 $(OBJS_DIR)/kern/%.o: kern/%.cc Makefile
@@ -44,9 +44,14 @@ $(OBJS_DIR)/kern/%.o: kern/%.s
 
 -include $(DEPFILES)
 
+# tools
 ramfs_gen: tools/ramfs_gen.c
-	gcc -o $@ $^
+	$(CXX) -o $@ $^
 
+# user prog
+echo: user/echo.c user/user.ld
+	$(CXX) $(CXXFLAGS) -T user/user.ld -O2 -nostdlib -o $@ $^ -lgcc
+	
 .PHONY: clean
 
 clean:

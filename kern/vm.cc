@@ -17,10 +17,11 @@ extern char _data[];
 // setupkvm() and exec() set up every page table like this:
 //
 //   0..KERNEL_VIRTUAL_BASE: user memory (text+data+stack+heap), mapped to
-//                phys memory allocated by the kernel
-//   KERNEL_VIRTUAL_BASE..KERNEL_VIRTUAL_BASE+EXTMEM: mapped to 0..EXTMEM (for I/O space)
+//                  phys memory allocated by the kernel
+//   KERNEL_VIRTUAL_BASE..KERNEL_VIRTUAL_BASE+EXTMEM: 
+//                  mapped to 0..EXTMEM (for I/O space)
 //   KERNEL_VIRTUAL_BASE+EXTMEM..data: mapped to EXTMEM..V2P(data)
-//                for the kernel's instructions and r/o data
+//                  for the kernel's instructions and r/o data
 //   data..KERNEL_VIRTUAL_BASE+PHYSTOP: mapped to V2P(data)..PHYSTOP, 
 //                                  rw data + free physical memory
 //   0xfe000000..0: mapped direct (devices such as ioapic)
@@ -43,18 +44,17 @@ static void page_fault(trapframe_t* regs)
 {
     // read cr2
     u32 fault_addr;
-    kprintf("regs: ds: 0x%x, edi: 0x%x, esi: 0x%x, ebp: 0x%x, esp: 0x%x\n"
-            "ebx: 0x%x, edx: 0x%x, ecx: 0x%x, eax: 0x%x, isr: %d, errno: %d\n"
-            "eip: 0x%x, cs: 0x%x, eflags: 0b%b, useresp: 0x%x, ss: 0x%x\n",
-            regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, 
-            regs->ebx, regs->edx, regs->ecx, regs->eax, regs->isrno, regs->errcode,
-            regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
 
     __asm__ __volatile__ ("movl %%cr2, %0":"=r"(fault_addr));
     int present = !(regs->errcode & 0x1); // Page not present
     int rw = regs->errcode & 0x2;           // Write operation?
     int us = regs->errcode & 0x4;           // Processor was in user-mode?
     int rsvd = regs->errcode & 0x8; // reserved bit in pd set
+
+    kprintf("regs: ds: 0x%x, edi: 0x%x, esi: 0x%x, ebp: 0x%x, esp: 0x%x\n"
+            "eip: 0x%x, cs: 0x%x, eflags: 0b%b, useresp: 0x%x, ss: 0x%x\n",
+            regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, 
+            regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
 
     kprintf("PF: addr 0x%x, %s, %c, %c, %s\n", fault_addr,
             (present?"P":"NP"), (rw?'W':'R'), (us?'U':'S'), (rsvd?"RSVD":""));
@@ -75,20 +75,45 @@ VirtualMemoryManager::VirtualMemoryManager()
 {
 }
 
+#define KHEAD_SIZE  20  // ignore data field
+#define ALIGN(sz, align) ((((u32)(sz)-1)/align)*align+align)
+
+void VirtualMemoryManager::test_malloc()
+{
+    set_text_color(LIGHT_GREEN, BLACK);
+    void* p1 = kmalloc(0x80-3, 4);
+    void* p2 = kmalloc(0x100, 8);
+    void* p3 = kmalloc(0x400, PGSIZE/2);
+    kprintf("p1 = 0x%x, p2 = 0x%x, p3 = 0x%x\n", p1, p2, p3);
+
+    void* p4 = kmalloc(PGSIZE-1, PGSIZE);
+    kprintf("p4 = 0x%x\n", p4);
+    kfree(p3);
+    kfree(p2);
+    kfree(p4);
+    kfree(p1);
+
+    dump_heap();
+    for(;;);
+}
+
 //TODO: set mapping according to mmap from grub
 bool VirtualMemoryManager::init(PhysicalMemoryManager* pmm)
 {
     _pmm = pmm;
+
+    _kern_heap_limit = _pmm->_freeStart;
+    _kheap_ptr = (kheap_block_head*)ksbrk(PGSIZE);
+
 
     //kmap is kernel side mapping for VAS, and is big enough for kernel usage,
     //and won't consume more than 4MB memories (which is setupped by 
     //boot_kernel_directory).
     _kernel_page_directory = create_address_space();
     switch_page_directory(_kernel_page_directory);
-    kprintf("_kernel_page_directory(0x%x)  ", _kernel_page_directory);
-    //dump_page_directory(_kernel_page_directory);
 
     register_isr_handler(PAGE_FAULT, page_fault);
+    //test_malloc();
     return true;
 }
 
@@ -189,28 +214,171 @@ page_directory_t* VirtualMemoryManager::create_address_space()
                 kmap[i].phys_start, kmap[i].perm);
     }
 
+    //TODO: copy KHEAP entries instead of mapping
     return pdir;
 }
 
 void* VirtualMemoryManager::alloc_page()
 {
-    u32 paddr = _pmm->alloc_frame();
-    return p2v(paddr);
+    return kmalloc(PGSIZE, PGSIZE);
 }
 
 void VirtualMemoryManager::free_page(void* vaddr)
 {
-    kassert(addr_in_kernel_space(vaddr));
-    _pmm->free_frame(v2p(vaddr));
+    kfree(vaddr);
 }
 
-void* VirtualMemoryManager::kmalloc(int size, int flags)
+void* VirtualMemoryManager::ksbrk(size_t size)
 {
-    return NULL;
+    u32 paddr = _pmm->alloc_region(size);
+    kassert(paddr != 0);
+    void* ptr = p2v(paddr);
+    kassert(ptr < (void*)KERNTOP);
+
+    kheap_block_head* newh = (kheap_block_head*)ptr;
+    newh->used = 0;
+    newh->next = newh->prev = NULL;
+    newh->size = size - KHEAD_SIZE;
+    newh->ptr = newh->data;
+
+    //kprintf("[VMM]: ksbrk 0x%x: size 0x%x, ptr 0x%x\n", ptr, size, newh->ptr);
+    _kern_heap_limit += size/4;
+    return ptr;
+}
+
+void* VirtualMemoryManager::kmalloc(size_t size, int align)
+{
+    size_t realsize = ALIGN(size, align);
+    //kprintf("kmalloc: size = %d, realsize = %d\n", size, realsize);
+
+    kheap_block_head* last = NULL;
+    kheap_block_head* h = find_block(&last, realsize);
+    if (!h) {
+        h = (kheap_block_head*)ksbrk(PGROUNDUP(realsize+KHEAD_SIZE));
+        if (!h) panic("[VMM] kmalloc: no free memory\n");
+
+        kassert(last->next == NULL);
+        last->next = h;
+        h->prev = last;
+    }
+
+    if (!aligned(h->data, align)) {
+        h = align_block(h, align);
+    }
+
+    if (h->size - realsize >= KHEAD_SIZE + 4) {
+        split_block(h, realsize);
+    }
+
+    h->used = 1;
+    kassert(aligned(h->data, align));
+    return h->data;
+}
+
+VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::align_block(
+        VirtualMemoryManager::kheap_block_head* h, int align)
+{
+    auto newh = (kheap_block_head*)(ALIGN(&h->data, align)-KHEAD_SIZE);
+    int gap = (char*)newh - (char*)h;
+    //kprintf("aligned to 0x%x, gap = %d\n", newh, gap);
+    if (gap >= KHEAD_SIZE+4) {
+        split_block(h, gap-KHEAD_SIZE);
+        h = h->next;
+        kassert(newh == h);
+
+    } else {
+        kassert(gap);
+        //drop little memory, which cause frag that never can be regain
+        if (h == _kheap_ptr) _kheap_ptr = newh;
+        else if (h->prev) {
+            auto prev = h->prev;
+            prev->size += gap;
+            prev->next = newh;
+        }
+        if (h->next) h->next->prev = newh;
+        // h and newh may overlay, so copy aside
+        kheap_block_head tmp = *h;
+        *newh = tmp;
+        newh->size -= gap;
+        newh->ptr = newh->data;
+    }
+    return newh;
+}
+
+void VirtualMemoryManager::split_block(VirtualMemoryManager::kheap_block_head* h, 
+        size_t size)
+{
+    kheap_block_head *b = (kheap_block_head*)(h->data + size);
+    b->used = 0;
+    b->size = h->size - size - KHEAD_SIZE;
+    b->ptr = b->data;
+
+    b->next = h->next;
+    h->next = b;
+    b->prev = h;
+
+    if (b->next) b->next->prev = b;
+    h->size = size;
 }
 
 void VirtualMemoryManager::kfree(void* ptr)
 {
-    //nothing
+    kprintf("[VMM] kfree 0x%x\n", ptr);
+    kheap_block_head* h = (kheap_block_head*)((char*)ptr - KHEAD_SIZE); 
+    kassert(h->used);
+    kassert(h->ptr == h->data);
+
+    h->used = 0;
+    if (h->prev && h->prev->used == 0) {
+        h = merge_block(h->prev);
+    }
+
+    if (h->next) {
+        h = merge_block(h);
+    }
+}
+
+VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::merge_block(
+        VirtualMemoryManager::kheap_block_head* h)
+{
+    kassert(h->next);
+    if (h->next->used) return h;
+
+    auto next = h->next;
+    kprintf("merge 0x%x with 0x%x\n", h, h->next);
+    h->size += KHEAD_SIZE + next->size;
+    h->next = next->next;
+    if (h->next) h->next->prev = h;
+    return h;
+}
+
+VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::find_block(
+        VirtualMemoryManager::kheap_block_head** last, size_t size)
+{
+    kheap_block_head* p = _kheap_ptr;
+    while (p && !(p->used == 0 && p->size >= size)) {
+        *last = p;
+        p = p->next;
+    }
+
+    return p;
+}
+
+bool VirtualMemoryManager::aligned(void* ptr, int align)
+{
+    return ((u32)ptr & (align-1)) == 0;
+}
+
+void VirtualMemoryManager::dump_heap()
+{
+    kprintf("HEAP: ");
+    kheap_block_head* h = _kheap_ptr;
+    while (h) {
+        kprintf("[@0x%x(U: %d): S: 0x%x, N: 0x%x, P: 0x%x]\n", 
+                h, h->used, h->size, h->next, h->prev);
+        kassert(h->next != _kheap_ptr);
+        h = h->next;
+    }
+    kputchar('\n');
 }
 
