@@ -70,7 +70,7 @@ u32 PhysicalMemoryManager::get_first_free_region(u32 size)
 
     u32 count = aligned(size, this->frame_size);
     if (count == 1) return get_first_free_frame();
-    debug_mm("find %d frame\n", count);
+    //debug_mm("find %d frame\n", count);
 
     for (u32 i = 0; i < _frameCount / 32; ++i) {
         if (_frames[i] != 0xffffffff) {
@@ -117,9 +117,12 @@ PhysicalMemoryManager::PhysicalMemoryManager()
     kputs("new PhysicalMemoryManager\n");
 }
 
-void PhysicalMemoryManager::init(u32 mem_size)
+void PhysicalMemoryManager::init(u32 mem_size, void* last_used)
 {
     _memSize = mem_size;
+    if (last_used) {
+        _frames = (u32*)last_used;
+    }
     _frameCount = aligned(_memSize * 1024, this->frame_size);
     memset(_frames, 0, _frameCount/8);
 

@@ -65,6 +65,7 @@ void isr_handler(trapframe_t* regs)
 }
 
 extern void scheduler(trapframe_t* regs);
+
 void irq_handler(trapframe_t* regs)
 {
     if (isr_handlers[regs->isrno]) {

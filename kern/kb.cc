@@ -170,10 +170,6 @@ static KeyCode _xtkb_scancode_std[] = {
     KEY_F12         //0x58
 };
 
-Keyboard* Keyboard::_instance = NULL;
-
-//FIXME: this is a *HACK*: operator new is not implement yet
-static u8 _kb_base[sizeof(Keyboard)];
 
 static void debug_print(Keyboard* kb)
 {
@@ -198,15 +194,16 @@ static void debug_print(Keyboard* kb)
     }
 }
 
+Keyboard kbd; 
+
 static void keyboard_irq(trapframe_t* regs)
 {
     static bool _is_extended = false;
     (void)regs;
 
-    Keyboard* kb = Keyboard::get();
-    if (!kb->can_read()) return;
+    if (!kbd.can_read()) return;
 
-    u8 data = kb->kbe_read();
+    u8 data = kbd.kbe_read();
     if (data == 0xE0) {
         _is_extended = true;
         return;
@@ -221,47 +218,40 @@ static void keyboard_irq(trapframe_t* regs)
             switch(_xtkb_scancode_std[data & 0x7f]) {
                 case KEY_LSHIFT:
                 case KEY_RSHIFT:
-                    kb->set_shift_down(false); break;
+                    kbd.set_shift_down(false); break;
 
                 case KEY_LCTRL:
                 case KEY_RCTRL:
-                    kb->set_ctrl_down(false); break;
+                    kbd.set_ctrl_down(false); break;
 
                 case KEY_LALT:
                 case KEY_RALT:
-                    kb->set_alt_down(false); break;
+                    kbd.set_alt_down(false); break;
 
                 default: break;
             }
         } else {
             //Make Code
-            kb->set_last_key(_xtkb_scancode_std[data]);
-            switch(kb->last_key()) {
+            kbd.set_last_key(_xtkb_scancode_std[data]);
+            switch(kbd.last_key()) {
                 case KEY_LSHIFT:
                 case KEY_RSHIFT:
-                    kb->set_shift_down(true); break;
+                    kbd.set_shift_down(true); break;
 
                 case KEY_LCTRL:
                 case KEY_RCTRL:
-                    kb->set_ctrl_down(true); break;
+                    kbd.set_ctrl_down(true); break;
 
                 case KEY_LALT:
                 case KEY_RALT:
-                    kb->set_alt_down(true); break;
+                    kbd.set_alt_down(true); break;
 
                 default: break;
             }
 
-            debug_print(kb);
+            debug_print(&kbd);
         }
     }
-}
-
-Keyboard* Keyboard::get()
-{
-    if (!_instance) 
-        _instance = new((void*)&_kb_base) Keyboard;
-    return _instance;
 }
 
 void Keyboard::init()

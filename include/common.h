@@ -17,11 +17,6 @@ void panic(const char* fmt, ...);
 
 #define ARRAYLEN(arr) (sizeof(arr)/sizeof(arr[0]))
 
-inline void *operator new(size_t, void *p)     throw() { return p; }
-inline void *operator new[](size_t, void *p)   throw() { return p; }
-inline void  operator delete  (void *, void *) throw() { };
-inline void  operator delete[](void *, void *) throw() { };
-
 int max(int a, int b);
 int min(int a, int b);
 
@@ -29,6 +24,13 @@ void* memcpy(void* dst, const void* src, int n);
 void* memset(void *b, int c, int len);
 int strlen(const char* s);
 char* strcpy(char* dst, const char* src);
+int strcmp(const char *s1, const char *s2);
+int strncmp(const char *s1, const char *s2, size_t n);
+
+void operator delete(void *ptr);
+void* operator new(size_t len);
+void operator delete[](void *ptr);
+void* operator new[](size_t len);
 
 // port io
 void outb(u16 port, u8 val);

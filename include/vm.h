@@ -8,7 +8,7 @@
 class VirtualMemoryManager 
 {
     public:
-        static VirtualMemoryManager* get();
+        VirtualMemoryManager();
 
         bool init(PhysicalMemoryManager* pmm);
 
@@ -48,7 +48,6 @@ class VirtualMemoryManager
             char data[1];
         };
 
-        static VirtualMemoryManager* _instance;
         PhysicalMemoryManager* _pmm;
         page_directory_t* _current_pdir;
 
@@ -65,7 +64,8 @@ class VirtualMemoryManager
 
         void test_malloc();
 
-        VirtualMemoryManager();
 };
+
+extern VirtualMemoryManager vmm;
 
 #endif

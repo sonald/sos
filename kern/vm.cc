@@ -61,14 +61,7 @@ static void page_fault(trapframe_t* regs)
     panic("page_fault");
 }
 
-
-static u8 _vmm_base[sizeof(VirtualMemoryManager)];
-VirtualMemoryManager* VirtualMemoryManager::_instance = NULL;
-VirtualMemoryManager* VirtualMemoryManager::get()
-{
-    if (!_instance) _instance = new((void*)&_vmm_base) VirtualMemoryManager;
-    return _instance;
-}
+VirtualMemoryManager vmm;
 
 VirtualMemoryManager::VirtualMemoryManager()
     :_pmm(0), _current_pdir(NULL)

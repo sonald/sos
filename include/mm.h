@@ -12,7 +12,10 @@ class PhysicalMemoryManager {
         static constexpr u32 invalid = (u32)-1; // invalid frame number
 
         PhysicalMemoryManager();
-        void init(u32 mem_size);
+
+        // if mods loaded, last_used will right after them. else it is NULL,
+        // which indicated using _end as default
+        void init(u32 mem_size, void* last_used);
 
         u32 mem_size() const { return _memSize; }
 

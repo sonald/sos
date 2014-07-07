@@ -1,29 +1,111 @@
 #include "vfs.h"
+#include "common.h"
+#include "task.h"
+#include "errno.h"
 
-bool Initramfs::load()
+File cached_files[NR_FILE];
+inode_t* rooti = NULL;
+FileSystem* devices[NDEV] = {NULL, };
+
+static File* get_free_file()
 {
+    File* fp = &cached_files[0];
+    int i;
+    for (i = 0; i < NR_FILE; i++, fp++) {
+        if (fp->ref() == 0) 
+            break;
+    }
+
+    if (i >= NR_FILE) return NULL;
+    return fp;
 }
 
-u32 Initramfs::read(inode_t* node, u32 offset, u32 size, u8* buffer)
+// return inode from dev driver layer and i number
+static inode_t* iget(u32 dev, int ino)
 {
+    FileSystem* fs = devices[MAJOR(dev)];
+    if (!fs) {
+        return NULL;
+    }
+
 }
 
-u32 Initramfs::write(inode_t* node, u32 offset, u32 size, u8* buffer)
+static inode_t* namei(const char* path)
 {
+    //FIXME: hardcoded for ramfs
+
+    FileSystem* fs = devices[RAMFS_MAJOR];
+    if (!fs) {
+        return NULL;
+    }
+
 }
 
-void Initramfs::open(inode_t* node, u8 read, u8 write)
+// no real mountpoints now, hardcoded for testing
+int sys_open(const char *path, int flags, int mode)
 {
+    (void)flags;
+    (void)mode;
+
+    int fd = 0;
+    for (fd = 0; fd < FILES_PER_PROC; fd++) {
+        if (!current_proc->files[fd])
+            break;
+    }
+
+    if (fd >= FILES_PER_PROC) return -EINVAL;
+
+    inode_t* ip = namei(path);
+    if (!ip) return -ENOENT;
+    
+    File* f = get_free_file();
+    if (!f) return -EINVAL;
+
+    f->set_inode(ip);
 }
 
-void Initramfs::close(inode_t* node)
+int sys_close(int fildes)
 {
+    return 0;
 }
 
-struct dirent* Initramfs::readdir(inode_t* node, u32 index)
+int sys_write(int fildes, const void *buf, size_t nbyte)
 {
+    if (fildes == 0) {
+        kputs((const char*)buf);
+    }
+    return 0;
 }
 
-inode_t* Initramfs::finddir(inode_t* node, char* name)
+int sys_read(int fildes, void *buf, size_t nbyte)
 {
+    return 0;
 }
+
+
+int File::read(void* buf, size_t nbyte)
+{
+    (void)buf;
+    (void)nbyte;
+    return -EBADF;
+}
+
+int File::write(void* buf, size_t nbyte)
+{
+    (void)buf;
+    (void)nbyte;
+    return -EBADF;
+}
+
+int File::open(int flags, int mode)
+{
+    (void)flags;
+    (void)mode;
+    return -EBADF;
+}
+
+int File::close()
+{
+    return -EBADF;
+}
+

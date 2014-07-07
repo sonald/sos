@@ -4,6 +4,7 @@
  */
 
 #include "common.h"
+#include "vm.h"
 
 #define MAX_ATEXIT_ENTRIES 128
 
@@ -78,4 +79,24 @@ namespace __cxxabiv1
     }
 }
 
+
+void operator delete(void *ptr)
+{
+    vmm.kfree(ptr);
+}
+
+void* operator new(size_t len)
+{
+    return vmm.kmalloc(len, 1);
+}
+
+void operator delete[](void *ptr)
+{
+    ::operator delete(ptr);
+}
+
+void* operator new[](size_t len)
+{
+    return ::operator new(len);
+}
 

@@ -162,7 +162,7 @@ enum KeyCode {
 class Keyboard
 {
     public:
-        static Keyboard* get();
+        Keyboard();
 
         void init();
 
@@ -192,8 +192,6 @@ class Keyboard
         void set_last_key(KeyCode kc) { _last_key = kc; }
 
     private:
-        static Keyboard* _instance;
-
         bool _scroll_lock_on;
         bool _num_lock_on;
         bool _caps_lock_on;
@@ -205,7 +203,7 @@ class Keyboard
 
         KeyCode _last_key;
 
-        Keyboard();
 };
 
+extern Keyboard kbd; 
 #endif

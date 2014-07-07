@@ -22,8 +22,7 @@ void scheduler(trapframe_t* regs)
         else current_proc = &proctable[0];
 
         //very tricky!
-        VirtualMemoryManager* vmm = VirtualMemoryManager::get();
-        vmm->switch_page_directory(current_proc->pgdir);
+        vmm.switch_page_directory(current_proc->pgdir);
         
         shared_tss.esp0 = current_proc->regs->esp;
         //kprintf(" load %s at 0x%x; ", current_proc->name, current_proc->regs);
@@ -38,9 +37,6 @@ static void timer_interrupt(trapframe_t* regs)
     set_cursor(CURSOR(70, 24));
     kprintf("T: %d", timer_ticks++);
     set_cursor(cur);
-
-    // can not called here, cause EOI is not send to PIC
-    //scheduler(regs);
 }
 
 void init_timer()

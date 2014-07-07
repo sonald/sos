@@ -4,6 +4,7 @@
 #include "types.h"
 
 // System call numbers (from xv6)
+#define SYS_none    0
 #define SYS_fork    1
 #define SYS_exit    2
 #define SYS_wait    3
@@ -26,6 +27,6 @@
 #define SYS_mkdir  20
 #define SYS_close  21
 
-#define NR_SYSCALL 21
+#define NR_SYSCALL 22
 
 #endif

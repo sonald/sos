@@ -36,7 +36,23 @@ typedef int8_t s8;
 #endif
 
 #ifndef NULL
-#define NULL (void*)0
+#define NULL ((void*)0)
 #endif
+
+typedef int pid_t;
+typedef unsigned short uid_t;
+typedef unsigned char gid_t;
+typedef unsigned short dev_t;
+typedef unsigned short ino_t;
+typedef unsigned short mode_t;
+typedef unsigned short umode_t;
+typedef unsigned char nlink_t;
+typedef int daddr_t;
+typedef long off_t;
+typedef unsigned char u_char;
+typedef unsigned short ushort;
+
+typedef struct { int quot,rem; } div_t;
+typedef struct { long quot,rem; } ldiv_t;
 
 #endif

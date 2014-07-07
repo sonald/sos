@@ -289,6 +289,35 @@ int strlen(const char* s)
     return len;
 }
 
+int strcmp(const char *s1, const char *s2)
+{
+    while (*s1 && *s2) {
+        if (*s1 > *s2) return -1;
+        else if (*s1 < *s2) return 1;
+        s1++;
+        s2++;
+    }
+
+    if (!*s1 && *s2) return 1;
+    else if (*s1 && !*s2) return -1;
+    return 0;
+}
+
+int strncmp(const char *s1, const char *s2, size_t n)
+{
+    while (*s1 && *s2 && n) {
+        if (*s1 > *s2) return -1;
+        else if (*s1 < *s2) return 1;
+        s1++;
+        s2++;
+        n--;
+    }
+
+    if (!*s1 && *s2) return 1;
+    else if (*s1 && !*s2) return -1;
+    return 0;
+}
+
 char* strcpy(char* dst, const char* src)
 {
     char* d = dst;

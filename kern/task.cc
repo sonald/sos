@@ -1,4 +1,5 @@
 #include "task.h"
+#include "vm.h"
 
 proc_t proctable[MAXPROCS];
 
@@ -19,21 +20,20 @@ proc_t* create_proc(void* entry, const char* name)
         current_proc->next = proc;
     }
 
-    VirtualMemoryManager* vmm = VirtualMemoryManager::get();
-    page_directory_t* pdir = vmm->create_address_space();
-    vmm->switch_page_directory(pdir);
+    page_directory_t* pdir = vmm.create_address_space();
+    vmm.switch_page_directory(pdir);
 
     proc->pgdir = pdir;
     void* vaddr = (void*)0x08000000; 
-    u32 paddr = v2p(vmm->alloc_page());
-    vmm->map_pages(pdir, vaddr, PGSIZE, paddr, PDE_USER|PDE_WRITABLE);
+    u32 paddr = v2p(vmm.alloc_page());
+    vmm.map_pages(pdir, vaddr, PGSIZE, paddr, PDE_USER|PDE_WRITABLE);
     memcpy(vaddr, entry, PGSIZE);
 
     void* task_usr_stack0 = (void*)0xB0000000; 
-    u32 paddr_stack0 = v2p(vmm->alloc_page());
-    vmm->map_pages(pdir, task_usr_stack0, PGSIZE, paddr_stack0, PDE_USER|PDE_WRITABLE);
+    u32 paddr_stack0 = v2p(vmm.alloc_page());
+    vmm.map_pages(pdir, task_usr_stack0, PGSIZE, paddr_stack0, PDE_USER|PDE_WRITABLE);
 
-    void* task_kern_stack = vmm->alloc_page();
+    void* task_kern_stack = vmm.alloc_page();
 
     proc->entry = vaddr;
     proc->kern_esp = A2I(task_kern_stack) + PGSIZE;

@@ -11,7 +11,7 @@ crtend_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtend.o)
 kernel_srcs=kern/boot.s kern/main.cc kern/common.cc kern/cxx_rt.cc \
 			kern/irq_stubs.s kern/gdt.cc kern/isr.cc kern/timer.cc \
 			kern/mm.cc kern/vm.cc kern/kb.cc kern/context.s \
-			kern/syscall.cc kern/task.cc kern/vfs.cc
+			kern/syscall.cc kern/task.cc kern/vfs.cc kern/ramfs.cc
 
 kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))
 kernel_objs := $(patsubst %.s, $(OBJS_DIR)/%.o, $(kernel_objs))
@@ -29,7 +29,7 @@ debug: kernel
 	qemu-system-i386 -kernel kernel -m 32 -s -S
 
 run: kernel
-	qemu-system-i386 -kernel kernel -m 32 -s -monitor stdio
+	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio
 
 kernel: $(kern_objs) kern/kernel.ld
 	$(CXX) -T kern/kernel.ld -O2 -nostdlib -o $@ $^ -lgcc
@@ -46,7 +46,7 @@ $(OBJS_DIR)/kern/%.o: kern/%.s
 
 # tools
 ramfs_gen: tools/ramfs_gen.c
-	$(CXX) -o $@ $^
+	gcc -o $@ $^
 
 # user prog
 echo: user/echo.c user/user.ld
