@@ -80,10 +80,15 @@ void VirtualMemoryManager::test_malloc()
     kprintf("p1 = 0x%x, p2 = 0x%x, p3 = 0x%x\n", p1, p2, p3);
 
     void* p4 = kmalloc(PGSIZE-1, PGSIZE);
+    void* p5 = kmalloc(PGSIZE);
     kprintf("p4 = 0x%x\n", p4);
     kfree(p3);
     kfree(p2);
     kfree(p4);
+    kfree(p1);
+
+    p1 = kmalloc(PGSIZE*3, PGSIZE);
+    kfree(p5);
     kfree(p1);
 
     dump_heap();
@@ -178,8 +183,8 @@ void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr,
     char* v = (char*)PGROUNDDOWN(vaddr);
     char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
 
-    //kprintf("mapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr, 
-            //size / _pmm->frame_size);
+    kprintf("mapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr, 
+            size / _pmm->frame_size);
     while (v <= end) {
         page_t* pte = walk(pgdir, v, true);
         if (pte == NULL) return;
@@ -223,10 +228,12 @@ void VirtualMemoryManager::free_page(void* vaddr)
 
 void* VirtualMemoryManager::ksbrk(size_t size)
 {
+    kassert(_kern_heap_limit < _pmm->_freeEnd);
+    kassert(aligned((void*)size, PGSIZE));
+
     u32 paddr = _pmm->alloc_region(size);
     kassert(paddr != 0);
     void* ptr = p2v(paddr);
-    kassert(ptr < (void*)KERNTOP);
 
     kheap_block_head* newh = (kheap_block_head*)ptr;
     newh->used = 0;
@@ -242,7 +249,7 @@ void* VirtualMemoryManager::ksbrk(size_t size)
 void* VirtualMemoryManager::kmalloc(size_t size, int align)
 {
     size_t realsize = ALIGN(size, align);
-    //kprintf("kmalloc: size = %d, realsize = %d\n", size, realsize);
+    //kprintf("kmalloc: size = %d, realsize = %d, align = %d\n", size, realsize, align);
 
     kheap_block_head* last = NULL;
     kheap_block_head* h = find_block(&last, realsize);
@@ -253,6 +260,10 @@ void* VirtualMemoryManager::kmalloc(size_t size, int align)
         kassert(last->next == NULL);
         last->next = h;
         h->prev = last;
+
+        if (h->prev && h->prev->used == 0) {
+            h = merge_block(h->prev);
+        }
     }
 
     if (!aligned(h->data, align)) {
@@ -338,7 +349,7 @@ VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::merge_block(
     if (h->next->used) return h;
 
     auto next = h->next;
-    kprintf("merge 0x%x with 0x%x\n", h, h->next);
+    //kprintf("merge 0x%x with 0x%x\n", h, h->next);
     h->size += KHEAD_SIZE + next->size;
     h->next = next->next;
     if (h->next) h->next->prev = h;
@@ -362,14 +373,24 @@ bool VirtualMemoryManager::aligned(void* ptr, int align)
     return ((u32)ptr & (align-1)) == 0;
 }
 
-void VirtualMemoryManager::dump_heap()
+void VirtualMemoryManager::dump_heap(int limit)
 {
     kprintf("HEAP: ");
+    int n = 0;
     kheap_block_head* h = _kheap_ptr;
+    while (h) { n++; h = h->next; }
+    if (limit == -1) limit = n;
+    if (limit > n) limit = n;
+
+    int start = n - limit;
+    n = 0;
+    h = _kheap_ptr;
     while (h) {
-        kprintf("[@0x%x(U: %d): S: 0x%x, N: 0x%x, P: 0x%x]\n", 
-                h, h->used, h->size, h->next, h->prev);
-        kassert(h->next != _kheap_ptr);
+        if (n++ >= start) {
+            kprintf("[@0x%x(U: %d): S: 0x%x, N: 0x%x, P: 0x%x]\n", 
+                    h, h->used, h->size, h->next, h->prev);
+            kassert(h->next != _kheap_ptr);
+        }
         h = h->next;
     }
     kputchar('\n');

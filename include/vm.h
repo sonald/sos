@@ -32,10 +32,10 @@ class VirtualMemoryManager
         void free_page(void* vaddr);
 
         // kernel heap allocation
-        void* kmalloc(size_t size, int align);
+        void* kmalloc(size_t size, int align = 1);
         void kfree(void* ptr);
         //for debug
-        void dump_heap();
+        void dump_heap(int limit = -1);
 
     private:
         struct kheap_block_head

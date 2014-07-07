@@ -7,5 +7,6 @@ mnt
 .zcache
 objs
 kernel
+echo
 initramfs.img
 ramfs_gen

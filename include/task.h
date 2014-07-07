@@ -32,6 +32,6 @@ typedef struct proc_s {
 extern proc_t* current_proc;
 extern proc_t proctable[MAXPROCS];
 
-proc_t* create_proc(void* entry, const char* name);
+proc_t* create_proc(void* entry, void* proc, size_t size, const char* name);
 
 #endif

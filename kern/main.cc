@@ -9,6 +9,7 @@
 #include "syscall.h"
 #include "vfs.h"
 #include "ramfs.h"
+#include "elf.h"
 
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
@@ -27,23 +28,32 @@ extern "C" void kernel_init()
 
 void task0()
 {
-    char buf[] = "A";
     u8 step = 0;
     for(;;) {
         int ret = 0;
+        char buf[] = "A";
         asm volatile ( "int $0x80 \n"
                 :"=a"(ret)
                 :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
                 :"cc", "memory");
         ret = ret % 10;
-        asm volatile ( "int $0x80"::"a"(SYS_write), "b"('0'+ret));
-
+        buf[0] = '0'+ret;
         asm volatile ( "int $0x80 \n"
                 :"=a"(ret)
-                :"a"(SYS_write), "b"('0'+ (step%10))
+                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
                 :"cc", "memory");
 
-        asm volatile ( "int $0x80" ::"a"(SYS_write), "b"(' ') :"cc", "memory");
+        buf[0] = '0'+(step%10);
+        asm volatile ( "int $0x80 \n"
+                :"=a"(ret)
+                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
+                :"cc", "memory");
+
+        buf[0] = ' ';
+        asm volatile ( "int $0x80 \n"
+                :"=a"(ret)
+                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
+                :"cc", "memory");
 
         volatile int r = 0;
         for (int i = 0; i < 4; i++) {
@@ -58,23 +68,32 @@ void task0()
 
 void task1()
 {
-    char buf[] = "B";
     u8 step = 0;
     for(;;) {
         int ret = 0;
+        char buf[] = "B";
         asm volatile ( "int $0x80 \n"
                 :"=a"(ret)
                 :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
                 :"cc", "memory");
         ret = ret % 10;
-        asm volatile ( "int $0x80"::"a"(SYS_write), "b"('0'+ret));
-
+        buf[0] = '0'+ret;
         asm volatile ( "int $0x80 \n"
                 :"=a"(ret)
-                :"a"(SYS_write), "b"('0'+ (step%10))
+                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
                 :"cc", "memory");
 
-        asm volatile ( "int $0x80" ::"a"(SYS_write), "b"(' ') :"cc", "memory");
+        buf[0] = '0'+(step%10);
+        asm volatile ( "int $0x80 \n"
+                :"=a"(ret)
+                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
+                :"cc", "memory");
+
+        buf[0] = ' ';
+        asm volatile ( "int $0x80 \n"
+                :"=a"(ret)
+                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
+                :"cc", "memory");
 
         volatile int r = 0;
         for (int i = 0; i < 3; i++) {
@@ -122,6 +141,41 @@ static void test_ramfs()
     }
 }
 
+static void load_program(const char* progname)
+{
+    FileSystem* ramfs = devices[RAMFS_MAJOR];
+
+    inode_t* ramfs_root = ramfs->root();
+    inode_t* ip = ramfs->dir_lookup(ramfs_root, progname);
+
+    char* buf = new char[ip->size];
+    int len = ramfs->read(ip, buf, ip->size, 0);
+    if (len < 0) {
+        kprintf("load %s failed\n", progname);
+        return;
+    }
+
+    elf_header_t* elf = (elf_header_t*)buf;
+    if (elf->e_magic != ELF_MAGIC) {
+        kprintf("invalid elf file\n");
+        return;
+    }
+
+    kprintf("elf: 0x%x, entry: 0x%x, ph: %d\n", elf, elf->e_entry, elf->e_phnum);
+    elf_prog_header_t* ph = (elf_prog_header_t*)((char*)elf + elf->e_phoff);
+    for (int i = 0; i < elf->e_phnum; ++i) {
+        kprintf("off: 0x%x, pa: 0x%x, va: 0x%x, fsz: 0x%x, msz: 0x%x\n", 
+                ph[i].p_offset, ph[i].p_pa, ph[i].p_va, ph[i].p_filesz, ph[i].p_memsz);
+        if (ph[i].p_type != ELF_PROG_LOAD) {
+            continue;
+        }
+
+        char* prog = (char*)elf + ph[i].p_offset;
+        create_proc((void*)elf->e_entry, prog, ph[i].p_memsz, "echo");
+        break;
+    }
+}
+
 // only care about 1 module
 static void load_module(u32 mods_count, u32 mods_base)
 {
@@ -135,7 +189,7 @@ static void load_module(u32 mods_count, u32 mods_base)
     Ramfs* ramfs = new Ramfs;
     ramfs->init(mod_start, mod_end-mod_start, (const char*)p2v(mod->string));
     
-    test_ramfs();
+    //test_ramfs();
 }
 
 extern "C" int kernel_main(struct multiboot_info *mb)
@@ -175,8 +229,9 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     kbd.init();
 
-    proc_t* proc = create_proc((void*)&task0, "task0");
-    create_proc((void*)&task1, "task1");
+    proc_t* proc = create_proc((void*)UCODE, (void*)&task0, 1024, "task0");
+    create_proc((void*)UCODE, (void*)&task1, 1024, "task1");
+    load_program("echo");
 
     vmm.switch_page_directory(proc->pgdir);
     setup_tss(proc->kern_esp);
