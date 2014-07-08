@@ -1,5 +1,6 @@
 #include "task.h"
 #include "vm.h"
+#include "x86.h"
 
 proc_t proctable[MAXPROCS];
 
@@ -8,6 +9,7 @@ proc_t* current_proc = NULL;
 
 proc_t* create_proc(void* entry, void* prog, size_t size, const char* name)
 {
+    cli();
     kassert(proc_count < MAXPROCS);
 
     proc_t* proc = &proctable[proc_count++];
@@ -54,5 +56,6 @@ proc_t* create_proc(void* entry, void* prog, size_t size, const char* name)
     kprintf("alloc task(%d) @0x%x, ustack: 0x%x, kesp: 0x%x\n", 
             proc->pid, paddr, paddr_stack0, proc->kern_esp);
 
+    sti();
     return proc;
 }

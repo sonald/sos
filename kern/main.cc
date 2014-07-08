@@ -1,4 +1,5 @@
 #include "common.h"
+#include "x86.h"
 #include "boot.h"
 #include "gdt.h"
 #include "isr.h"
@@ -228,7 +229,9 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     load_module(mb->mods_count, mb->mods_addr);
 
     kbd.init();
+    sti();
 
+    //for(;;) asm volatile ("hlt");
     proc_t* proc = create_proc((void*)UCODE, (void*)&task0, 1024, "task0");
     create_proc((void*)UCODE, (void*)&task1, 1024, "task1");
     load_program("echo");

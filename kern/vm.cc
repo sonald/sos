@@ -183,8 +183,8 @@ void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr,
     char* v = (char*)PGROUNDDOWN(vaddr);
     char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
 
-    kprintf("mapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr, 
-            size / _pmm->frame_size);
+    //kprintf("mapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr, 
+            //size / _pmm->frame_size);
     while (v <= end) {
         page_t* pte = walk(pgdir, v, true);
         if (pte == NULL) return;
