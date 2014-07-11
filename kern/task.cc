@@ -23,7 +23,6 @@ proc_t* create_proc(void* entry, void* prog, size_t size, const char* name)
     }
 
     page_directory_t* pdir = vmm.create_address_space();
-    //vmm.switch_page_directory(pdir);
 
     proc->pgdir = pdir;
     void* vaddr = (void*)UCODE; 
@@ -56,6 +55,6 @@ proc_t* create_proc(void* entry, void* prog, size_t size, const char* name)
     kprintf("alloc task(%d) @0x%x, ustack: 0x%x, kesp: 0x%x\n", 
             proc->pid, paddr, paddr_stack0, proc->kern_esp);
 
-    sti();
+    //sti();
     return proc;
 }

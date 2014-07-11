@@ -11,10 +11,6 @@ extern "C" void sched(u32 new_context);
 void scheduler(trapframe_t* regs)
 {
     if (current_proc) {
-        if (timer_ticks % 100 != 0) {
-            return;
-        }
-
         current_proc->regs = regs;
         //kprintf(" save %s at 0x%x;  ", current_proc->name, current_proc->regs);
         if (current_proc->next)
@@ -24,7 +20,7 @@ void scheduler(trapframe_t* regs)
         //very tricky!
         vmm.switch_page_directory(current_proc->pgdir);
         
-        shared_tss.esp0 = current_proc->regs->esp;
+        shared_tss.esp0 = current_proc->kern_esp;
         //kprintf(" load %s at 0x%x; ", current_proc->name, current_proc->regs);
         sched(A2I(current_proc->regs));
     }
@@ -58,5 +54,8 @@ void init_timer()
 void busy_wait(int millisecs)
 {
     u32 end = timer_ticks + millisecs / HZ;
-    while (timer_ticks < end) ;
+    while (timer_ticks < end) {
+        asm volatile ("hlt");
+    }
+       
 }

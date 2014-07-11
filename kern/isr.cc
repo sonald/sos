@@ -1,4 +1,6 @@
 #include "isr.h"
+#include "types.h"
+#include <limits.h>
 
 /* This is a simple string array. It contains the message that
  * *  corresponds to each and every exception. We get the correct
@@ -44,6 +46,7 @@ const char* exception_messages[] =
 };
 
 static interrupt_handler isr_handlers[256];
+extern void busy_wait(int millisecs);
 
 void isr_handler(trapframe_t* regs)
 {
@@ -60,8 +63,9 @@ void isr_handler(trapframe_t* regs)
             regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, 
             regs->ebx, regs->edx, regs->ecx, regs->eax, regs->isrno, regs->errcode,
             regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
-
-    for(;;);
+    for(;;) {
+        busy_wait(INT_MAX);
+    }
 }
 
 extern void scheduler(trapframe_t* regs);

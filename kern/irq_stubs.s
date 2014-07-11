@@ -1,6 +1,8 @@
 [BITS 32]
 global gdt_flush
 global idt_flush
+global trap_return
+
 extern isr_handler
 extern irq_handler
 
@@ -65,12 +67,11 @@ irq%1:
     push esp
     call %2
     add esp, 4
-    ;mov eax, esp
-    ;push eax
-    ;mov eax, %2
-    ;call eax
-    ;pop eax
 
+    jmp trap_return
+%endmacro
+
+trap_return:
     pop fs
     pop gs
     pop es
@@ -78,7 +79,6 @@ irq%1:
     popa
     add esp, 8
     iret
-%endmacro
 
 isr_noerrcode 0
 isr_noerrcode 1

@@ -1,9 +1,12 @@
+[section .text]
 [BITS 32]
+
 global switch_to_usermode
 global flush_tss
 global sched
 
-[section .text]
+extern trap_return
+
 ; parameters: esp, eip
 switch_to_usermode:
     push ebp
@@ -47,11 +50,4 @@ sched:
     mov eax, [esp+4]
     mov esp, eax
 
-    pop fs
-    pop gs
-    pop es
-    pop ds
-    popa
-    add esp, 8
-
-    iret
+    jmp trap_return

@@ -57,7 +57,7 @@ void task0()
                 :"cc", "memory");
 
         volatile int r = 0;
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 1; i++) {
             for (int j = 0; j < 0x7fffff; ++j) {
                 r += j;
             }
@@ -97,7 +97,7 @@ void task1()
                 :"cc", "memory");
 
         volatile int r = 0;
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
             for (int j = 0; j < 0x7fffff; ++j) {
                 r += j;
             }
@@ -120,7 +120,7 @@ static void apply_mmap(u32 mmap_length, u32 mmap_addr)
     }
 }
 
-static void test_ramfs()
+static SOS_UNUSED void test_ramfs() 
 {
     FileSystem* ramfs = devices[RAMFS_MAJOR];
     
@@ -229,7 +229,6 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     load_module(mb->mods_count, mb->mods_addr);
 
     kbd.init();
-    sti();
 
     //for(;;) asm volatile ("hlt");
     proc_t* proc = create_proc((void*)UCODE, (void*)&task0, 1024, "task0");

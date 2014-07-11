@@ -1,6 +1,7 @@
 #include "common.h"
 #include "isr.h"
 #include "vm.h"
+#include "task.h"
 
 #define addr_in_kernel_space(vaddr) ((u32)(vaddr) > KERNEL_VIRTUAL_BASE)
 
@@ -58,7 +59,10 @@ static void page_fault(trapframe_t* regs)
 
     kprintf("PF: addr 0x%x, %s, %c, %c, %s\n", fault_addr,
             (present?"P":"NP"), (rw?'W':'R'), (us?'U':'S'), (rsvd?"RSVD":""));
-    panic("page_fault");
+    if (current_proc) {
+        kprintf("current: %s, regs: 0x%x\n", current_proc->name, current_proc->regs);
+    }
+    panic("");
 }
 
 VirtualMemoryManager vmm;
