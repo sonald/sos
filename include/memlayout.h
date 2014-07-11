@@ -15,6 +15,7 @@
 #define DEVSPACE 0xFE000000         // Other devices are at high addresses
 
 #define USTACK  0xB0000000
+#define USTACK_TOP (USTACK+PGSIZE)
 #define UCODE   0x08000000
 
 #ifndef __ASSEMBLER__

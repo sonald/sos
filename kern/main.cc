@@ -57,7 +57,7 @@ void task0()
                 :"cc", "memory");
 
         volatile int r = 0;
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 0x7fffff; ++j) {
                 r += j;
             }
@@ -97,7 +97,7 @@ void task1()
                 :"cc", "memory");
 
         volatile int r = 0;
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 6; i++) {
             for (int j = 0; j < 0x7fffff; ++j) {
                 r += j;
             }
@@ -225,10 +225,13 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     pmm.init(memsize, last_address);
     vmm.init(&pmm);
-
-    load_module(mb->mods_count, mb->mods_addr);
+    tasks_init();
 
     kbd.init();
+    picenable(IRQ_KBD);
+    picenable(IRQ_TIMER);
+
+    load_module(mb->mods_count, mb->mods_addr);
 
     //for(;;) asm volatile ("hlt");
     proc_t* proc = create_proc((void*)UCODE, (void*)&task0, 1024, "task0");

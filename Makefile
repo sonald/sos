@@ -28,7 +28,7 @@ all: run ramfs_gen
 debug: kernel
 	qemu-system-i386 -kernel kernel -m 32 -s -S
 
-run: kernel
+run: kernel echo
 	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio
 
 kernel: $(kern_objs) kern/kernel.ld
@@ -49,8 +49,10 @@ ramfs_gen: tools/ramfs_gen.c
 	gcc -o $@ $^
 
 # user prog
-echo: user/echo.c user/user.ld
+echo: user/echo.c user/user.ld ramfs_gen
 	$(CXX) $(CXXFLAGS) -T user/user.ld -O2 -nostdlib -o $@ $^ -lgcc
+	./ramfs_gen README.md user/echo.c echo
+
 	
 .PHONY: clean
 

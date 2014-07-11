@@ -6,8 +6,12 @@
 
 #define PAGE_FAULT 14
 
+#define IRQ_OFFSET 32 // offset off ISRs
+
 #define IRQ0 32 // PIT
+#define IRQ_TIMER 32 // PIT
 #define IRQ1 33 // KBD
+#define IRQ_KBD 33
 #define IRQ2 34 // slave
 #define IRQ3 35 // serial2
 #define IRQ4 36 // serial1
@@ -41,6 +45,8 @@ void isr_handler(trapframe_t* regs);
 void irq_handler(trapframe_t* regs);
 
 END_CDECL
+
+void picenable(int irq);
 
 typedef void (*interrupt_handler)(trapframe_t* regs);
 void register_isr_handler(int isr, interrupt_handler cb);

@@ -90,6 +90,7 @@ enum PAGE_PDE_FLAGS {
 };
 
 #define pde_set_flag(pde, flag) ((pde) |= (flag))
+#define pde_get_flags(pde) (((u32)pde) & ~PDE_FRAME)
 #define pde_set_frame(pde, frame) (pde = ((pde) & ~PDE_FRAME) | (u32)frame)
 
 typedef u32 pde_t;

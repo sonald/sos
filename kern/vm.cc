@@ -220,6 +220,31 @@ page_directory_t* VirtualMemoryManager::create_address_space()
     return pdir;
 }
 
+page_directory_t* VirtualMemoryManager::copy_page_directory(page_directory_t* pgdir)
+{
+    auto* new_pgdir = create_address_space();
+    char* v = (char*)UCODE;
+    char* end = (char*)USTACK_TOP;
+
+    while (v <= end) {
+        page_t* pte = walk(pgdir, v, false);
+        if (pte && pte->present) {
+            u32 paddr = pte->frame * _pmm->frame_size;
+            void* vaddr = p2v(paddr);
+
+            void* mem = kmalloc(PGSIZE, PGSIZE);
+            memcpy(mem, vaddr, PGSIZE);
+
+            int flags = pde_get_flags(*(u32*)pte);
+            map_pages(new_pgdir, v, PGSIZE, v2p(mem), flags);
+        }
+
+        v += PGSIZE;
+    }
+
+    return new_pgdir;
+}
+
 void* VirtualMemoryManager::alloc_page()
 {
     return kmalloc(PGSIZE, PGSIZE);

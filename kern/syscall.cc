@@ -20,6 +20,8 @@ extern int sys_open (const char *path, int flags, int mode);
 extern int sys_write(int fildes, const void *buf, size_t nbyte);
 extern int sys_close(int fd);
 extern int sys_read(int fildes, void *buf, size_t nbyte);
+extern int sys_fork();
+extern int sys_getpid();
 
 static struct syscall_info_s {
     void* call;
@@ -96,6 +98,8 @@ void init_syscall()
     syscalls[SYS_close] = { (void*)sys_close, 1 };
     syscalls[SYS_write] = { (void*)sys_write, 3 };
     syscalls[SYS_read] = { (void*)sys_read, 3 };
+    syscalls[SYS_fork] = { (void*)sys_fork, 0 };
+    syscalls[SYS_getpid] = { (void*)sys_getpid, 0};
 
     register_isr_handler(ISR_SYSCALL, syscall_handler);
 }

@@ -13,9 +13,16 @@ void scheduler(trapframe_t* regs)
     if (current_proc) {
         current_proc->regs = regs;
         //kprintf(" save %s at 0x%x;  ", current_proc->name, current_proc->regs);
+        
         if (current_proc->next)
             current_proc = current_proc->next;
-        else current_proc = &proctable[0];
+        else {
+            for (int i = 0; i < MAXPROCS; ++i) {
+                if (current_proc != &tasks[i] && tasks[i].state != TASK_UNUSED) 
+                    current_proc = &tasks[i];
+                break;
+            }
+        } 
 
         //very tricky!
         vmm.switch_page_directory(current_proc->pgdir);

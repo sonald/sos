@@ -48,6 +48,26 @@ const char* exception_messages[] =
 static interrupt_handler isr_handlers[256];
 extern void busy_wait(int millisecs);
 
+#define IO_PIC1         0x20    // Master (IRQs 0-7)
+#define IO_PIC2         0xA0    // Slave (IRQs 8-15)
+#define IRQ_SLAVE       2       // IRQ at which slave connects to master
+
+// Initial IRQ mask has interrupt 2 enabled (for slave 8259A).
+static u16 irqmask = 0xFFFF & ~(1<<IRQ_SLAVE);
+
+static void picsetmask(ushort mask)
+{
+    irqmask = mask;
+    outb(IO_PIC1+1, mask);
+    outb(IO_PIC2+1, mask >> 8);
+}
+
+void picenable(int irq)
+{
+    if (irq > IRQ_OFFSET) irq -= IRQ_OFFSET;
+    picsetmask(irqmask & ~(1<<irq));
+}
+
 void isr_handler(trapframe_t* regs)
 {
     if (regs->isrno < 32) kputs(exception_messages[regs->isrno]);
@@ -81,12 +101,13 @@ void irq_handler(trapframe_t* regs)
     // If this interrupt involved the slave.
     if (regs->isrno >= 40) {
         // Send reset signal to slave.
-        outb(0xA0, 0x20);
+        outb(IO_PIC2, 0x20);
     }
     // Send reset signal to master. (As well as slave, if necessary).
-    outb(0x20, 0x20);
+    outb(IO_PIC1, 0x20);
 
-    scheduler(regs);
+    if (regs->isrno == IRQ_TIMER) 
+        scheduler(regs);
 }
 
 void register_isr_handler(int isr, interrupt_handler cb)
