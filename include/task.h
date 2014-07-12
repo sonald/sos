@@ -46,6 +46,7 @@ int sys_getpid();
 int sys_fork(); 
 void tasks_init();
 
+proc_t* prepare_userinit(void* prog);
 proc_t* create_proc(void* entry, void* proc, size_t size, const char* name);
 
 #endif

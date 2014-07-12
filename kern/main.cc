@@ -7,7 +7,7 @@
 #include "vm.h"
 #include "kb.h"
 #include "task.h"
-#include "syscall.h"
+#include "unistd.h"
 #include "vfs.h"
 #include "ramfs.h"
 #include "elf.h"
@@ -27,30 +27,41 @@ extern "C" void kernel_init()
     set_text_color(LIGHT_CYAN, BLACK);
 }
 
-void task0()
+
+void init_task()
 {
+    char init_name[] = "echo";
     u8 step = 0;
+    char buf[2] = "";
+    int logo = 'A';
+    pid_t pid;
+    asm volatile ( "int $0x80 \n" :"=a"(pid) :"a"(SYS_fork) :"cc", "memory");
+
+    if (pid == 0) { 
+        asm volatile ( "int $0x80 \n"
+                :"=a"(pid) 
+                :"a"(SYS_exec), "b"(init_name), "c"(0), "d"(0)
+                :"cc", "memory");
+        for(;;);
+        return;
+    }
+
+    asm volatile ( "int $0x80 \n" :"=a"(pid) :"0"(SYS_getpid) :"cc", "memory");
+
     for(;;) {
         int ret = 0;
-        char buf[] = "A";
+        buf[0] = logo;
         asm volatile ( "int $0x80 \n"
                 :"=a"(ret)
                 :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
                 :"cc", "memory");
-        ret = ret % 10;
-        buf[0] = '0'+ret;
+        buf[0] = '0'+pid;
         asm volatile ( "int $0x80 \n"
                 :"=a"(ret)
                 :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
                 :"cc", "memory");
 
         buf[0] = '0'+(step%10);
-        asm volatile ( "int $0x80 \n"
-                :"=a"(ret)
-                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
-                :"cc", "memory");
-
-        buf[0] = ' ';
         asm volatile ( "int $0x80 \n"
                 :"=a"(ret)
                 :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
@@ -58,46 +69,6 @@ void task0()
 
         volatile int r = 0;
         for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 0x7fffff; ++j) {
-                r += j;
-            }
-        }
-
-        step++;
-    }
-}
-
-void task1()
-{
-    u8 step = 0;
-    for(;;) {
-        int ret = 0;
-        char buf[] = "B";
-        asm volatile ( "int $0x80 \n"
-                :"=a"(ret)
-                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
-                :"cc", "memory");
-        ret = ret % 10;
-        buf[0] = '0'+ret;
-        asm volatile ( "int $0x80 \n"
-                :"=a"(ret)
-                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
-                :"cc", "memory");
-
-        buf[0] = '0'+(step%10);
-        asm volatile ( "int $0x80 \n"
-                :"=a"(ret)
-                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
-                :"cc", "memory");
-
-        buf[0] = ' ';
-        asm volatile ( "int $0x80 \n"
-                :"=a"(ret)
-                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
-                :"cc", "memory");
-
-        volatile int r = 0;
-        for (int i = 0; i < 6; i++) {
             for (int j = 0; j < 0x7fffff; ++j) {
                 r += j;
             }
@@ -120,7 +91,7 @@ static void apply_mmap(u32 mmap_length, u32 mmap_addr)
     }
 }
 
-static SOS_UNUSED void test_ramfs() 
+static SOS_UNUSED void test_ramfs(bool content) 
 {
     FileSystem* ramfs = devices[RAMFS_MAJOR];
     
@@ -130,50 +101,19 @@ static SOS_UNUSED void test_ramfs()
     while (de) {
         inode_t* ip = ramfs->dir_lookup(ramfs_root, de->name);
 
-        kprintf("file %s: [", de->name);
-        int buf[64];
-        int len = ramfs->read(ip, buf, sizeof buf - 1, 0);
-        buf[len] = 0;
-        kprintf("%s]\n", buf);
+        kprintf("file %s: ", de->name);
+        if (content) {
+            kputchar('[');
+            int buf[64];
+            int len = ramfs->read(ip, buf, sizeof buf - 1, 0);
+            buf[len] = 0;
+            kprintf("%s]", buf);
+        }
+        kputchar('\n');
 
         vmm.kfree(de);
         i++;
         de = ramfs->dir_read(ramfs_root, i);
-    }
-}
-
-static void load_program(const char* progname)
-{
-    FileSystem* ramfs = devices[RAMFS_MAJOR];
-
-    inode_t* ramfs_root = ramfs->root();
-    inode_t* ip = ramfs->dir_lookup(ramfs_root, progname);
-
-    char* buf = new char[ip->size];
-    int len = ramfs->read(ip, buf, ip->size, 0);
-    if (len < 0) {
-        kprintf("load %s failed\n", progname);
-        return;
-    }
-
-    elf_header_t* elf = (elf_header_t*)buf;
-    if (elf->e_magic != ELF_MAGIC) {
-        kprintf("invalid elf file\n");
-        return;
-    }
-
-    kprintf("elf: 0x%x, entry: 0x%x, ph: %d\n", elf, elf->e_entry, elf->e_phnum);
-    elf_prog_header_t* ph = (elf_prog_header_t*)((char*)elf + elf->e_phoff);
-    for (int i = 0; i < elf->e_phnum; ++i) {
-        kprintf("off: 0x%x, pa: 0x%x, va: 0x%x, fsz: 0x%x, msz: 0x%x\n", 
-                ph[i].p_offset, ph[i].p_pa, ph[i].p_va, ph[i].p_filesz, ph[i].p_memsz);
-        if (ph[i].p_type != ELF_PROG_LOAD) {
-            continue;
-        }
-
-        char* prog = (char*)elf + ph[i].p_offset;
-        create_proc((void*)elf->e_entry, prog, ph[i].p_memsz, "echo");
-        break;
     }
 }
 
@@ -190,7 +130,7 @@ static void load_module(u32 mods_count, u32 mods_base)
     Ramfs* ramfs = new Ramfs;
     ramfs->init(mod_start, mod_end-mod_start, (const char*)p2v(mod->string));
     
-    //test_ramfs();
+    test_ramfs(false);
 }
 
 extern "C" int kernel_main(struct multiboot_info *mb)
@@ -234,9 +174,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     load_module(mb->mods_count, mb->mods_addr);
 
     //for(;;) asm volatile ("hlt");
-    proc_t* proc = create_proc((void*)UCODE, (void*)&task0, 1024, "task0");
-    create_proc((void*)UCODE, (void*)&task1, 1024, "task1");
-    load_program("echo");
+    proc_t* proc = prepare_userinit((void*)&init_task);
 
     vmm.switch_page_directory(proc->pgdir);
     setup_tss(proc->kern_esp);

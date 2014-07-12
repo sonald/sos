@@ -49,7 +49,8 @@ ramfs_gen: tools/ramfs_gen.c
 	gcc -o $@ $^
 
 # user prog
-echo: user/echo.c user/user.ld ramfs_gen
+echo: user/echo.c user/user.ld 
+	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -T user/user.ld -O2 -nostdlib -o $@ $^ -lgcc
 	./ramfs_gen README.md user/echo.c echo
 

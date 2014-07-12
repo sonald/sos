@@ -204,6 +204,30 @@ void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr,
     }
 }
 
+void VirtualMemoryManager::unmap_pages(page_directory_t* pgdir, void *vaddr, 
+        u32 size, u32 paddr, bool free_mem)
+{
+    char* v = (char*)PGROUNDDOWN(vaddr);
+    char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
+
+    //kprintf("unmapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr, 
+            //size / _pmm->frame_size);
+    while (v <= end) {
+        page_t* pte = walk(pgdir, v, false);
+        kassert(pte != NULL);
+        if (!pte->present) panic("%s: 0x%x should be present\n", __func__, vaddr);
+
+        if (free_mem) {
+            free_page(p2v(pte->frame * _pmm->frame_size));
+        }
+        *(u32*)pte = 0;
+        flush_tlb_entry((u32)v);
+
+        v += _pmm->frame_size;
+        paddr += _pmm->frame_size;
+    }
+}
+
 page_directory_t* VirtualMemoryManager::create_address_space()
 {
     page_directory_t* pdir = (page_directory_t*)alloc_page();
@@ -216,27 +240,27 @@ page_directory_t* VirtualMemoryManager::create_address_space()
                 kmap[i].phys_start, kmap[i].perm);
     }
 
-    //TODO: copy KHEAP entries instead of mapping
     return pdir;
 }
 
+/** 
+ * used by execv, shallow copy of user-part address space for text and data.
+ * user stack should be newly allocated.
+ * TODO: shallow copy code, deep copy data, bypass user stack
+ */
 page_directory_t* VirtualMemoryManager::copy_page_directory(page_directory_t* pgdir)
 {
     auto* new_pgdir = create_address_space();
     char* v = (char*)UCODE;
-    char* end = (char*)USTACK_TOP;
+    char* end = (char*)USTACK;
 
-    while (v <= end) {
+    while (v < end) {
         page_t* pte = walk(pgdir, v, false);
         if (pte && pte->present) {
             u32 paddr = pte->frame * _pmm->frame_size;
-            void* vaddr = p2v(paddr);
-
-            void* mem = kmalloc(PGSIZE, PGSIZE);
-            memcpy(mem, vaddr, PGSIZE);
-
             int flags = pde_get_flags(*(u32*)pte);
-            map_pages(new_pgdir, v, PGSIZE, v2p(mem), flags);
+
+            map_pages(new_pgdir, v, PGSIZE, paddr, flags);
         }
 
         v += PGSIZE;

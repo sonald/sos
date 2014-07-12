@@ -7,20 +7,19 @@ typedef int (*syscall1_t)(u32);
 typedef int (*syscall2_t)(u32, u32);
 typedef int (*syscall3_t)(u32, u32, u32);
 typedef int (*syscall4_t)(u32, u32, u32, u32);
-typedef int (*syscall5_t)(u32, u32, u32, u32, u32);
 
 #define do_syscall0(fn) fn()
 #define do_syscall1(fn, arg0) fn(arg0)
 #define do_syscall2(fn, arg0, arg1) fn(arg0, arg1)
 #define do_syscall3(fn, arg0, arg1, arg2) fn(arg0, arg1, arg2)
 #define do_syscall4(fn, arg0, arg1, arg2, arg3) fn(arg0, arg1, arg2, arg3)
-#define do_syscall5(fn, arg0, arg1, arg2, arg3, arg4) fn(arg0, arg1, arg2, arg3, arg4)
 
 extern int sys_open (const char *path, int flags, int mode);
 extern int sys_write(int fildes, const void *buf, size_t nbyte);
 extern int sys_close(int fd);
 extern int sys_read(int fildes, void *buf, size_t nbyte);
 extern int sys_fork();
+extern int sys_execve(const char *path, char *const argv[], char *const envp[]);
 extern int sys_getpid();
 
 static struct syscall_info_s {
@@ -78,14 +77,6 @@ static void syscall_handler(trapframe_t* regs)
                 break;
             }
 
-        case 5:
-            {
-                syscall5_t fn = (syscall5_t)info.call;
-                regs->eax = do_syscall5(fn, regs->ebx, regs->ecx,
-                        regs->edx, regs->esi, regs->edi);
-                break;
-            }
-
         default: panic("SYSCALL crash\n");
     }
 }
@@ -99,7 +90,8 @@ void init_syscall()
     syscalls[SYS_write] = { (void*)sys_write, 3 };
     syscalls[SYS_read] = { (void*)sys_read, 3 };
     syscalls[SYS_fork] = { (void*)sys_fork, 0 };
-    syscalls[SYS_getpid] = { (void*)sys_getpid, 0};
+    syscalls[SYS_getpid] = { (void*)sys_getpid, 0 };
+    syscalls[SYS_exec] = { (void*)sys_execve, 3 };
 
     register_isr_handler(ISR_SYSCALL, syscall_handler);
 }

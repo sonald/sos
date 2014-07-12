@@ -6,7 +6,6 @@
 
 #define NR_INITRD_FILES 64
 #define RAMFS_ENTRY_MAGIC 0xBF
-#define NAMELEN 64
 
 typedef struct initrd_entry_header
 {
