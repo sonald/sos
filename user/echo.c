@@ -1,13 +1,17 @@
-#include <unistd.h>
+#include "unistd.h"
+#include "sprintf.h"
 
 _syscall0(pid_t, getpid);
 _syscall0(pid_t, fork);
 _syscall3(int, write, int, fd, const void*, buf, size_t, nbyte);
 
-extern "C" void _start()
+#ifdef __cplusplus
+extern "C" 
+#endif
+void _start()
 {
     int logo = 'C';
-    char buf[] = "C";
+    char buf[] = "this is the initial content of buffer";
 
     pid_t pid = fork();
     if (pid == 0) {
@@ -15,14 +19,10 @@ extern "C" void _start()
     } 
     pid = getpid();
 
-    u8 step = 0;
+    int step = 0;
     for(;;) {
-        buf[0] = logo;
-        write(0, buf, 1);
-        buf[0] = '0'+pid;
-        write(0, buf, 1);
-        buf[0] = '0'+(step%10);
-        write(0, buf, 1);
+        int len = sprintf(buf, sizeof buf - 1, "[%c%d %d] ", logo, pid, step);
+        write(0, buf, len);
 
         volatile int r = 0;
         for (int i = 0; i < 3; i++) {

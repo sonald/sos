@@ -2,6 +2,7 @@
 #define _COMMON_H 
 
 #include "types.h"
+#include "stdarg.h"
 
 #if !defined __i386__
 #error "target error, need a cross-compiler with ix86-elf as target"
@@ -20,12 +21,6 @@ void panic(const char* fmt, ...);
 int max(int a, int b);
 int min(int a, int b);
 
-void* memcpy(void* dst, const void* src, int n);
-void* memset(void *b, int c, int len);
-int strlen(const char* s);
-char* strcpy(char* dst, const char* src);
-int strcmp(const char *s1, const char *s2);
-int strncmp(const char *s1, const char *s2, size_t n);
 
 #define SOS_UNUSED __attribute__((unused))
 
@@ -39,26 +34,12 @@ void outb(u16 port, u8 val);
 u8 inb(u16 port);
 u16 inw(u16 port);
 
-char* itoa(int d, char* buf, int base);
-char* utoa(u32 u, char* buf, int base);
-
 /*
  * early vga access
  */
 
 // all theses routines assume in VGA text-mode, which is guaranteed by GRUB
 void kprintf(const char* fmt, ...);
-
-typedef char* va_list;
-#define va_start(ap, last) (ap = (((char*)&last) + sizeof(last)))
-#define va_arg(ap, type) ({      \
-        type r = *(type*)ap;     \
-        ap = ap + sizeof(type*); \
-        r;                       \
-        }) 
-
-#define va_end(ap) (ap = NULL)
-
 void kvprintf(const char* fmt, va_list args);
 
 void kputs(const char* msg);

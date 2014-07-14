@@ -1,4 +1,5 @@
 #include "common.h"
+#include "string.h"
 #include "isr.h"
 #include "vm.h"
 #include "task.h"

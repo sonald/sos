@@ -1,4 +1,5 @@
 #include "task.h"
+#include "string.h"
 #include "vm.h"
 #include "x86.h"
 #include "errno.h"
@@ -75,20 +76,22 @@ int sys_fork()
 
     // user stack copied
     page_t* pte = vmm.walk(current_proc->pgdir, task_usr_stack0, false);
-    kassert(pte && pte->present);
+    kassert(pte && pte->present && pte->user);
     void* old_stack = p2v(pte->frame * PGSIZE);
     memcpy(new_stack, old_stack, PGSIZE);
 
-    kassert(proc->user_esp == current_proc->user_esp);
+    kassert(proc->regs->useresp == current_proc->regs->useresp);
 
     kprintf("fork %d -> %d\n", current_proc->pid, next_pid);
+    kprintf("RET: uesp: 0x%x, eip: 0x%x\n", proc->regs->useresp, proc->regs->eip);
     proc->state = TASK_READY;
     return next_pid;
 }
 
-static int load_proc(proc_t* proc, void* entry, void* code, size_t size, int flags)
+static int load_proc(proc_t* proc, void* code, size_t size, int flags)
 {
     void* vaddr = (void*)UCODE; 
+    if (size < PGSIZE) size = PGSIZE;
     void* tmp = vmm.kmalloc(size, PGSIZE);
     u32 paddr = v2p(tmp);
     vmm.unmap_pages(proc->pgdir, vaddr, size, paddr, false);
@@ -96,17 +99,6 @@ static int load_proc(proc_t* proc, void* entry, void* code, size_t size, int fla
     // copy from tmp avoid a page directory switch 
     memcpy(tmp, code, size);
 
-    proc->entry = entry;
-    
-    trapframe_t* regs = proc->regs;
-    memset(regs, 0, sizeof regs);
-    regs->useresp = proc->user_esp;
-    regs->esp = proc->kern_esp;
-    regs->ss = regs->es = regs->ds = regs->fs = regs->gs = 0x23;
-    regs->cs = 0x1b;
-    regs->eip = A2I(entry);
-    regs->eflags = 0x202;
-    proc->regs = regs;
     return 0;
 }
 
@@ -150,12 +142,22 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
             continue; 
         }
 
-        load_proc(current_proc, (void*)elf->e_entry, prog, ph[i].p_memsz, PDE_USER);
+        load_proc(current_proc, prog, ph[i].p_memsz, PDE_USER);
         break;
     }
 
     strcpy(current_proc->name, path);
     kprintf("execv task(%d, %s)\n", current_proc->pid, path);
+
+    current_proc->entry = (void*)elf->e_entry;
+    
+    trapframe_t* regs = current_proc->regs;
+    memset(regs, 0, sizeof regs);
+    regs->ss = regs->es = regs->ds = regs->fs = regs->gs = 0x23;
+    regs->cs = 0x1b;
+    regs->eip = elf->e_entry;
+    regs->eflags = 0x202;
+    regs->useresp = current_proc->user_esp;
     return 0;
 }
 
@@ -199,7 +201,7 @@ proc_t* prepare_userinit(void* prog)
     trapframe_t* regs = (trapframe_t*)((char*)proc->kern_esp - sizeof(trapframe_t));
     memset(regs, 0, sizeof regs);
     regs->useresp = proc->user_esp;
-    regs->esp = proc->kern_esp;
+    //regs->esp = proc->kern_esp;
     regs->ss = regs->es = regs->ds = regs->fs = regs->gs = 0x23;
     regs->cs = 0x1b;
     regs->eip = A2I(vaddr);

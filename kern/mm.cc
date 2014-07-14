@@ -1,4 +1,5 @@
 #include "common.h"
+#include "string.h"
 #include "mm.h"
 #include "mmu.h"
 

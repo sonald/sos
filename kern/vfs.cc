@@ -1,4 +1,5 @@
 #include "vfs.h"
+#include "string.h"
 #include "common.h"
 #include "task.h"
 #include "errno.h"
@@ -39,6 +40,7 @@ static inode_t* namei(const char* path)
         return NULL;
     }
 
+    return NULL;
 }
 
 // no real mountpoints now, hardcoded for testing
@@ -62,23 +64,33 @@ int sys_open(const char *path, int flags, int mode)
     if (!f) return -EINVAL;
 
     f->set_inode(ip);
+    return fd;
 }
 
 int sys_close(int fildes)
 {
+    (void)fildes;
     return 0;
 }
 
 int sys_write(int fildes, const void *buf, size_t nbyte)
 {
+    size_t nwrite = 0;
     if (fildes == 0) {
-        kputs((const char*)buf);
+        char* p = (char*)buf;
+        while (*p && nwrite < nbyte) {
+            kputchar(*p++);
+            ++nwrite;
+        }
     }
-    return 0;
+    return nwrite;
 }
 
 int sys_read(int fildes, void *buf, size_t nbyte)
 {
+    (void)fildes;
+    (void)buf;
+    (void)nbyte;
     return 0;
 }
 

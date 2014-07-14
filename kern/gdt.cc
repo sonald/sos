@@ -1,5 +1,6 @@
 #include "gdt.h"
 #include "common.h"
+#include "string.h"
 #include "task.h"
 
 BEGIN_CDECL

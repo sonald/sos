@@ -1,4 +1,5 @@
 #include "syscall.h"
+#include "string.h"
 #include "isr.h"
 #include "task.h"
 

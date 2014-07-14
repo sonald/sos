@@ -7,6 +7,8 @@ volatile u32 timer_ticks = 0;
 
 extern tss_entry_t shared_tss;
 extern "C" void sched(u32 new_context);
+extern void setup_tss(u32 stack);
+extern "C" void flush_tss();
 
 void scheduler(trapframe_t* regs)
 {
@@ -25,9 +27,10 @@ void scheduler(trapframe_t* regs)
         } 
 
         //very tricky!
+        setup_tss(current_proc->kern_esp);
+        flush_tss();
         vmm.switch_page_directory(current_proc->pgdir);
         
-        shared_tss.esp0 = current_proc->kern_esp;
         //kprintf(" load %s at 0x%x; ", current_proc->name, current_proc->regs);
         sched(A2I(current_proc->regs));
     }

@@ -16,6 +16,7 @@ extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
 extern void setup_tss(u32);
 extern void init_syscall();
+extern int sys_write(int fildes, const void *buf, size_t nbyte);
 
 
 /*
@@ -27,6 +28,11 @@ extern "C" void kernel_init()
     set_text_color(LIGHT_CYAN, BLACK);
 }
 
+int recursive_sum(int n)
+{
+    if (n == 1) return 1;
+    return n + recursive_sum(n-1);
+}
 
 void init_task()
 {
@@ -167,13 +173,14 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     vmm.init(&pmm);
     tasks_init();
 
+    //for(;;) asm volatile ("hlt");
+
     kbd.init();
     picenable(IRQ_KBD);
     picenable(IRQ_TIMER);
 
     load_module(mb->mods_count, mb->mods_addr);
 
-    //for(;;) asm volatile ("hlt");
     proc_t* proc = prepare_userinit((void*)&init_task);
 
     vmm.switch_page_directory(proc->pgdir);
