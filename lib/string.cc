@@ -37,15 +37,15 @@ int memcmp(const void *s1, const void * s2, size_t count)
 }
 
 
-int strlen(const char* s)
+size_t strlen(const char* s)
 {
-    register int ret asm ("eax");
+    register size_t ret asm ("ecx");
     asm (
         "cld \n"
         "repne scasb \n"
         "notl %0 \n"
         "decl %0 "
-        :"=a"(ret):"0"(0), "D"(s), "c"(0xffffffff));
+        :"=c"(ret):"a"(0), "D"(s), "0"(-1));
     return ret;
 }
 
