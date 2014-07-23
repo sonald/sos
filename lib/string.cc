@@ -1,14 +1,27 @@
 #include "string.h"
 
-//dst and src should not overlay
-//FIMXE: optimize when needed
-
 void * memcpy(void * dst, const void * src, size_t n)
 {
     asm (
         "cld \n"
         "rep movsb \n"
         ::"D"(dst), "S"(src), "c"(n): "cc", "memory");
+    return dst;
+}
+
+void* memmove(void* dst, const void * src, size_t n)
+{
+    if (dst > src) {
+        asm (
+            "cld \n"
+            "rep movsb \n"
+            ::"D"(dst), "S"(src), "c"(n): "cc", "memory");
+    } else {
+        asm (
+            "std \n"
+            "rep movsb \n"
+            ::"D"((char*)dst+n-1), "S"((char*)src+n-1), "c"(n): "cc", "memory");
+    }
     return dst;
 }
 
@@ -153,4 +166,41 @@ int strncmp(const char *s1, const char *s2, size_t count)
         :"=a"(ret) :"S"(s1), "D"(s2), "c"(count));
     return ret;
 }
+
+char* strchr(const char *s, int c)
+{
+    char* ret = 0;
+    asm (
+        "cld \n"
+        "1: lodsb \n"
+        "cmpb %%al, %%dl \n"
+        "je 2f \n"
+        "testb %%al, %%al \n"
+        "jne 1b \n"
+        "movl $1, %0 \n"
+        "2: decl %0 \n"
+        :"=S"(ret):"d"(c), "S"(s)
+        :"al"
+        );
+    return ret;
+}
+
+char* strrchr(const char *s, int c)
+{
+    char* ret = 0;
+    asm (
+            "cld \n"
+            "movb %%al, %%ah \n"
+            "1: lodsb \n"
+            "cmpb %%al, %%ah \n"
+            "jne 2f \n"
+            "movl %2, %0 \n"
+            "decl %0 \n"
+            "2: testb %%al, %%al \n"
+            "jne 1b \n"
+            :"=d"(ret):"0"(0), "S"(s), "a"(c)
+        );
+    return ret;
+}
+
 
