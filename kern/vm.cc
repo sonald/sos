@@ -120,6 +120,11 @@ bool VirtualMemoryManager::init(PhysicalMemoryManager* pmm)
     return true;
 }
 
+page_directory_t* VirtualMemoryManager::kernel_page_directory()
+{
+    return _kernel_page_directory;
+}
+
 void VirtualMemoryManager::dump_page_directory(page_directory_t* pgdir)
 {
     if (!pgdir) return;

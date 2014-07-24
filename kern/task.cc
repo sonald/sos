@@ -83,7 +83,7 @@ int sys_fork()
     kassert(proc->regs->useresp == current_proc->regs->useresp);
 
     kprintf("fork %d -> %d\n", current_proc->pid, next_pid);
-    kprintf("RET: uesp: 0x%x, eip: 0x%x\n", proc->regs->useresp, proc->regs->eip);
+    //kprintf("RET: uesp: 0x%x, eip: 0x%x\n", proc->regs->useresp, proc->regs->eip);
     proc->state = TASK_READY;
     return next_pid;
 }
@@ -201,7 +201,6 @@ proc_t* prepare_userinit(void* prog)
     trapframe_t* regs = (trapframe_t*)((char*)proc->kern_esp - sizeof(trapframe_t));
     memset(regs, 0, sizeof regs);
     regs->useresp = proc->user_esp;
-    //regs->esp = proc->kern_esp;
     regs->ss = regs->es = regs->ds = regs->fs = regs->gs = 0x23;
     regs->cs = 0x1b;
     regs->eip = A2I(vaddr);
@@ -213,6 +212,49 @@ proc_t* prepare_userinit(void* prog)
     kprintf("%s(%d, 0x%x) @0x%x, ustack: 0x%x, kesp: 0x%x\n", 
             __func__, proc->pid, proc, paddr, paddr_stack0, proc->kern_esp);
 
+    return proc;
+}
+
+proc_t* create_kthread(const char* name, kthread_t prog)
+{
+    proc_t* proc = find_free_process();
+    if (!proc) return NULL;
+
+    memset(proc, 0, sizeof(*proc));
+    proc->state = TASK_CREATE;
+
+    proc->ppid = current_proc->pid;
+    proc->pid = next_pid;
+
+    if (!current_proc) current_proc = proc;
+    else { 
+        proc->next = current_proc->next;
+        current_proc->next = proc;
+    }
+    strncpy(proc->name, name, sizeof proc->name - 1);
+
+
+    proc->pgdir = vmm.kernel_page_directory();
+    kassert(proc->pgdir);
+
+
+    void* task_kern_stack = vmm.alloc_page();
+
+    proc->entry = (void*)prog;
+    proc->kern_esp = A2I(task_kern_stack) + PGSIZE;
+    proc->user_esp = 0;
+    
+    trapframe_t* regs = (trapframe_t*)((char*)proc->kern_esp - sizeof(trapframe_t));
+    memset(regs, 0, sizeof regs);
+    regs->useresp = proc->user_esp;
+    regs->ss = regs->es = regs->ds = regs->fs = regs->gs = SEG_KDATA*8;
+    regs->cs = SEG_KCODE*8;
+    regs->eip = A2I(prog);
+    regs->eflags = 0x202;
+    proc->regs = regs;
+
+    proc->state = TASK_READY;
+    kprintf("%s(%d, %s)\n", __func__, proc->pid, proc->name);
     return proc;
 }
 

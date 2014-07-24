@@ -34,6 +34,22 @@ int recursive_sum(int n)
     return n + recursive_sum(n-1);
 }
 
+void idle_thread()
+{
+    asm volatile (
+        "1: hlt \n"
+        "jmp 1b");
+}
+
+void kthread1()
+{
+    int count = 0;
+    while (1) {
+        kprintf(" [KT1 %d] ", count++);
+        busy_wait(4000);
+    }
+}
+
 void init_task()
 {
     char init_name[] = "echo";
@@ -182,6 +198,9 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     load_module(mb->mods_count, mb->mods_addr);
 
     proc_t* proc = prepare_userinit((void*)&init_task);
+
+    create_kthread("kthread1", kthread1);
+    create_kthread("idle", idle_thread);
 
     vmm.switch_page_directory(proc->pgdir);
     setup_tss(proc->kern_esp);

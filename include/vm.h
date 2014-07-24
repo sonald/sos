@@ -29,6 +29,7 @@ class VirtualMemoryManager
         void dump_page_directory(page_directory_t* pgdir);
         page_directory_t* create_address_space();
         page_directory_t* copy_page_directory(page_directory_t* pgdir);
+        page_directory_t* kernel_page_directory();
 
         // alloc one kernel page and return vaddr 
         void* alloc_page();
