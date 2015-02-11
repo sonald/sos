@@ -4,6 +4,9 @@
 #include "mmu.h"
 #include "memlayout.h"
 
+//TODO: no lock for pmm now
+//kernel is preemptive, but since no mem allocation occurs in ISRs, 
+//there is no risk now. need spinlock after support SMP.
 class PhysicalMemoryManager {
     public:
         friend class VirtualMemoryManager;

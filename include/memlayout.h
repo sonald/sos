@@ -18,6 +18,8 @@
 #define USTACK_TOP (USTACK+PGSIZE)
 #define UCODE   0x08000000
 
+/* p2v /v2p is only possible in kernel space, 
+ * since I know the rule of mapping */
 #ifndef __ASSEMBLER__
 // wont used by nasm
 static inline u32 v2p(void *a) { return ((u32)a)  - KERNEL_VIRTUAL_BASE; }
