@@ -19,6 +19,7 @@
 #define UCODE   0x08000000
 
 #ifndef __ASSEMBLER__
+// wont used by nasm
 static inline u32 v2p(void *a) { return ((u32)a)  - KERNEL_VIRTUAL_BASE; }
 static inline void *p2v(u32 a) { return (void*)(a + KERNEL_VIRTUAL_BASE); }
 #endif

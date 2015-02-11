@@ -7,7 +7,7 @@
 #include "vm.h"
 #include "kb.h"
 #include "task.h"
-#include "unistd.h"
+#include "syscall.h"
 #include "vfs.h"
 #include "ramfs.h"
 #include "elf.h"
