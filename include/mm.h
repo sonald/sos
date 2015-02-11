@@ -59,5 +59,7 @@ class PhysicalMemoryManager {
         u32* _freeEnd;
 };
 
+extern PhysicalMemoryManager pmm;
+
 
 #endif

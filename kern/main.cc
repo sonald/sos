@@ -11,6 +11,7 @@
 #include "vfs.h"
 #include "ramfs.h"
 #include "elf.h"
+#include "ata.h"
 
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
@@ -183,17 +184,16 @@ extern "C" int kernel_main(struct multiboot_info *mb)
         last_address = p2v(mod->mod_end);
     }
 
-    PhysicalMemoryManager pmm;
-
     pmm.init(memsize, last_address);
     vmm.init(&pmm);
+    pata_probe();
     tasks_init();
-
-    //for(;;) asm volatile ("hlt");
-
     kbd.init();
+
     picenable(IRQ_KBD);
     picenable(IRQ_TIMER);
+
+    for(;;) asm volatile ("hlt");
 
     load_module(mb->mods_count, mb->mods_addr);
 

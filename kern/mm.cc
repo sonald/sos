@@ -10,6 +10,8 @@
 #endif
 
 extern u32* _end;
+PhysicalMemoryManager pmm;
+
 #define BITS_PER_INT (sizeof(u32)*8)
 
 static inline u32 aligned(u32 size, u32 frame_size)

@@ -25,8 +25,8 @@
 #define IRQ11 43 // reserve
 #define IRQ12 44 // PS/2 mouse
 #define IRQ13 45 // FPU
-#define IRQ14 46 // ATA HD1
-#define IRQ15 47 // ATA HD2
+#define IRQ_ATA1 46 // ATA HD1
+#define IRQ_ATA2 47 // ATA HD2
 
 #define ISR_SYSCALL 0x80 
 

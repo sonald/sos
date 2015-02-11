@@ -17,7 +17,8 @@ kernel_srcs=kern/boot.s kern/main.cc kern/common.cc kern/cxx_rt.cc \
 			kern/irq_stubs.s kern/gdt.cc kern/isr.cc kern/timer.cc \
 			kern/mm.cc kern/vm.cc kern/kb.cc kern/context.s \
 			kern/syscall.cc kern/task.cc kern/vfs.cc kern/ramfs.cc \
-			lib/string.cc lib/sprintf.cc
+			kern/ata.cc \
+			lib/string.cc lib/sprintf.cc 
 
 kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))
 kernel_objs := $(patsubst %.s, $(OBJS_DIR)/%.o, $(kernel_objs))
@@ -32,10 +33,10 @@ DEPFILES := $(patsubst %.s, kern_objs/%.d, $(DEPFILES))
 all: run ramfs_gen
 
 debug: kernel
-	qemu-system-i386 -kernel kernel -m 32 -s -S
+	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd0.img,format=qcow2 -S
 
 run: kernel echo
-	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio
+	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd0.img,format=qcow2
 
 kernel: $(kern_objs) kern/kernel.ld
 	$(CXX) -T kern/kernel.ld -O2 -nostdlib -o $@ $^ -lgcc
