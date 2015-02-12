@@ -39,9 +39,10 @@ void scheduler(trapframe_t* regs)
 static void timer_interrupt(trapframe_t* regs)
 {
     (void)regs;
+    timer_ticks++;
     u16 cur = get_cursor();
     set_cursor(CURSOR(70, 24));
-    kprintf("T: %d", timer_ticks++);
+    kprintf("T: %d", timer_ticks);
     set_cursor(cur);
 }
 
@@ -66,6 +67,7 @@ void busy_wait(int millisecs)
     u32 end = timer_ticks + millisecs / HZ;
     while (timer_ticks < end) {
         asm volatile ("hlt");
+        asm volatile ("nop");
     }
        
 }

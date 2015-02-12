@@ -11,7 +11,7 @@
 #include "vfs.h"
 #include "ramfs.h"
 #include "elf.h"
-#include "ata.h"
+#include "blkio.h"
 
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
@@ -44,10 +44,21 @@ void idle_thread()
 
 void kthread1()
 {
+    dev_t ROOT_DEV = 1;
+    Buffer* mbr = bio.read(ROOT_DEV, 0);
+    if (mbr) {
+        kprintf("PART: ");
+        uint32_t* p = (uint32_t*)&mbr->data[0x1c0];
+        for (size_t i = 0; i < 4; i++, p++) {
+            kprintf("%x ", *p);
+        }
+        kputchar('\n');
+    }
+
     int count = 0;
     while (1) {
         kprintf(" [KT1 %d] ", count++);
-        busy_wait(4000);
+        busy_wait(100000);
     }
 }
 
@@ -186,14 +197,14 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     pmm.init(memsize, last_address);
     vmm.init(&pmm);
-    pata_probe();
     tasks_init();
     kbd.init();
+    bio.init();
 
     picenable(IRQ_KBD);
     picenable(IRQ_TIMER);
 
-    for(;;) asm volatile ("hlt");
+    //for(;;) asm volatile ("hlt");
 
     load_module(mb->mods_count, mb->mods_addr);
 
