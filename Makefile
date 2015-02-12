@@ -33,10 +33,10 @@ DEPFILES := $(patsubst %.s, kern_objs/%.d, $(DEPFILES))
 all: run ramfs_gen
 
 debug: kernel
-	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd0.img,format=qcow2 -S
+	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd0.img,format=raw -S
 
 run: kernel echo
-	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd0.img,format=qcow2
+	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd0.img,format=raw
 
 kernel: $(kern_objs) kern/kernel.ld
 	$(CXX) -T kern/kernel.ld -O2 -nostdlib -o $@ $^ -lgcc

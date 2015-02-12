@@ -35,6 +35,15 @@ static void ata_wait(int iobase)
         ;
 }
 
+static inline bool ata_ready(int iobase)
+{
+    uint8_t r = 0;
+    while (!((r = inb(iobase+ATA_STATUS_REG)) & (ATA_DRQ|ATA_ERR)))
+        ;
+
+    return !(r & ATA_ERR);
+}
+
 PATADevice::PATADevice()
 {
 }
@@ -57,26 +66,36 @@ void PATADevice::init(int bus, bool master)
         }
     }
 
-    u8 r = 0;
-    while (!((r = inb(_iobase+ATA_STATUS_REG)) & (ATA_DRQ|ATA_ERR)))
-        ;
+    char model[41];
+    char serial[21];
 
-    uint32_t sectors = 0;
-    char modal[41];
-    if (r & ATA_ERR) { this->_valid = false; }
+    if (!ata_ready(_iobase)) { this->_valid = false; }
     else {
         uint16_t data[256];
         for (size_t i = 0; i < ARRAYLEN(data); i++) {
             data[i] = inw(_iobase+ATA_DATA_REG);
         }
 
-        memcpy(modal, &data[27], 40);
-        modal[40] = '\0';
-        sectors = *(uint32_t*)&data[60];
+        auto fn = [](uint16_t* src, char* dst, size_t sz) {
+            for (size_t i = 0; i < sz; i++, src++) {
+                dst[i*2] = *src >> 8;
+                dst[i*2+1] = *src & 0xff;
+            }
+            
+            for (size_t i = sz*2; i > 0; i--) {
+                if (dst[i] <= 0x20) 
+                    dst[i] = 0;
+                else break;
+            }
+        };
 
+        fn(&data[10], (char*)&serial, 10);
+        fn(&data[27], (char*)&model, 20);
+        _sectors = data[60] | (data[61] << 16);
     }
-    kprintf("IDE %d %s %sdetected, sectors %d, modal (%s)", bus, master?"master":"slave",
-            _valid?"":"not ", sectors, modal);
+    kprintf("IDE %d %s %sdetected, sectors %d, model (%s) serial (%s)", 
+            bus, master?"master":"slave",
+            _valid?"":"not ", _sectors, model, serial);
 }
 
 void pata_probe()
