@@ -22,6 +22,7 @@ enum proc_state {
 
 typedef struct proc_s {
     trapframe_t* regs;
+    kcontext_t* kctx;
 
     pid_t pid;
     pid_t ppid;
@@ -31,11 +32,13 @@ typedef struct proc_s {
     u32 user_esp;
     void* entry;
     enum proc_state state;
+    bool need_resched;
 
     page_directory_t* pgdir;
 
     File* files[FILES_PER_PROC];
 
+    void* channel; // sleep on
     struct proc_s* next;
 } proc_t;
 
@@ -44,6 +47,7 @@ extern proc_t tasks[MAXPROCS];
 int sys_getppid();
 int sys_getpid();
 int sys_fork(); 
+int sys_sleep();
 void tasks_init();
 
 proc_t* prepare_userinit(void* prog);

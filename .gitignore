@@ -10,3 +10,4 @@ kernel
 echo
 initramfs.img
 ramfs_gen
+*.img

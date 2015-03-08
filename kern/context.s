@@ -3,9 +3,11 @@
 
 global switch_to_usermode
 global flush_tss
-global sched
+global yield
+global switch_to
 
 extern trap_return
+extern scheduler
 
 ; parameters: esp, eip
 switch_to_usermode:
@@ -46,8 +48,29 @@ flush_tss:
     ltr ax
     ret
 
-sched:
-    mov eax, [esp+4]
-    mov esp, eax
+yield:
+    ret
 
-    jmp trap_return
+;; [esp] old ret eip
+;; [esp+4] old addr of kctx
+;; [esp+8] next kctx
+switch_to:
+    mov eax, [esp+4]
+    mov edx, [esp+8] 
+
+    ;; eip is right at esp, no need to push
+    push ebp
+    push edi
+    push esi
+    push ebx
+
+    mov [eax], esp ;; save kctx at old
+    mov esp, edx 
+
+    pop ebx
+    pop esi
+    pop edi
+    pop ebp
+    ;; this will return to trap_return if new task is not run before.
+    ;; else, return to break point in isr
+    ret

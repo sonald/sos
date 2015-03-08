@@ -11,7 +11,9 @@
 #include "vfs.h"
 #include "ramfs.h"
 #include "elf.h"
+#include "ata.h"
 #include "blkio.h"
+#include "sched.h"
 
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
@@ -44,7 +46,7 @@ void idle_thread()
 
 void kthread1()
 {
-    dev_t ROOT_DEV = 1;
+    dev_t ROOT_DEV = DEVNO(IDE_MAJOR, 0);
     Buffer* mbr = bio.read(ROOT_DEV, 0);
     if (mbr) {
         kprintf("PART: ");
@@ -57,8 +59,13 @@ void kthread1()
 
     int count = 0;
     while (1) {
-        kprintf(" [KT1 %d] ", count++);
-        busy_wait(100000);
+        kprintf(" <KT1 %d>\n", count++);
+        asm volatile ( "int $0x80 \n" ::"a"(SYS_sleep) :"cc", "memory");
+        //pid_t pid = 0;
+        //asm volatile ( "int $0x80 \n" :"=a"(pid) :"0"(SYS_getpid) :"cc", "memory");
+        kputs(" <after sleep> ");
+        busy_wait(1000);
+        //bio.read(ROOT_DEV, 0);
     }
 }
 
@@ -188,6 +195,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     if (mb->flags & MULTIBOOT_FLAG_MMAP) {
         apply_mmap(mb->mmap_length, mb->mmap_addr);
     }
+    set_text_color(LIGHT_GREEN, BLACK);
 
     void* last_address = NULL;
     if (mb->flags & MULTIBOOT_FLAG_MODS) {
@@ -199,6 +207,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     vmm.init(&pmm);
     tasks_init();
     kbd.init();
+    ata_init();
     bio.init();
 
     picenable(IRQ_KBD);

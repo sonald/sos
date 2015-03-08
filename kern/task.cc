@@ -5,6 +5,8 @@
 #include "errno.h"
 #include "elf.h"
 
+extern "C" void trap_return();
+
 // this contains not-only user mode process and also kernel-threads
 proc_t tasks[MAXPROCS];
 
@@ -43,6 +45,14 @@ int sys_getpid()
     return current_proc->pid;
 }
 
+int sys_sleep()
+{
+    kassert(current_proc);
+    current_proc->state = TASK_SLEEP;
+    current_proc->need_resched = true;
+    return 0;
+}
+
 int sys_fork() 
 {
     proc_t* proc = find_free_process();
@@ -67,6 +77,11 @@ int sys_fork()
     proc->regs = (trapframe_t*)((char*)proc->kern_esp - sizeof(trapframe_t));
     *(proc->regs) = *(current_proc->regs);
     proc->regs->eax = 0; // return of child process
+
+    proc->kctx = (kcontext_t*)((char*)proc->regs - sizeof(kcontext_t));
+    *(proc->kctx) = *(current_proc->kctx);
+    //memset(proc->kctx, 0, sizeof(*proc->kctx));
+    proc->kctx->eip = A2I(trap_return);
 
     // setup user stack (only one-page, will and should expand at PageFault)
     void* task_usr_stack0 = (void*)USTACK; 
@@ -207,6 +222,10 @@ proc_t* prepare_userinit(void* prog)
     regs->eflags = 0x202;
     proc->regs = regs;
 
+    proc->kctx = (kcontext_t*)((char*)proc->regs - sizeof(kcontext_t));
+    memset(proc->kctx, 0, sizeof(*proc->kctx));
+    proc->kctx->eip = A2I(trap_return);
+
     proc->pid = next_pid;
     proc->state = TASK_READY;
     kprintf("%s(%d, 0x%x) @0x%x, ustack: 0x%x, kesp: 0x%x\n", 
@@ -252,6 +271,10 @@ proc_t* create_kthread(const char* name, kthread_t prog)
     regs->eip = A2I(prog);
     regs->eflags = 0x202;
     proc->regs = regs;
+
+    proc->kctx = (kcontext_t*)((char*)proc->regs - sizeof(kcontext_t));
+    memset(proc->kctx, 0, sizeof(*proc->kctx));
+    proc->kctx->eip = A2I(trap_return);
 
     proc->state = TASK_READY;
     kprintf("%s(%d, %s)\n", __func__, proc->pid, proc->name);

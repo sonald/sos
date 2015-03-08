@@ -113,4 +113,15 @@ bool PATADevice::write(Buffer* bufp)
 {
 }
 
+void ata_init()
+{
+    kprintf("Probing IDE hard drives\n");
+    auto* pata0 = new PATADevice;
+    pata0->init(0, true);
+    blk_device_register(DEVNO(IDE_MAJOR, 0), pata0);
+
+    //patas[1].init(0, false);
+    picenable(IRQ_ATA1);
+    //picenable(IRQ_ATA2);
+}
 

@@ -42,7 +42,7 @@ typedef int8_t s8;
 typedef int pid_t;
 typedef unsigned short uid_t;
 typedef unsigned char gid_t;
-typedef unsigned short dev_t;
+typedef uint32_t dev_t;
 typedef unsigned short ino_t;
 typedef unsigned short mode_t;
 typedef unsigned short umode_t;

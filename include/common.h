@@ -68,6 +68,7 @@ void kputchar(char c);
 #define CURSORX(cur) (((cur) >> 8) & 0x00ff)
 #define CURSORY(cur) ((cur) & 0x00ff)
 
+u8 get_text_color();
 void set_text_color(u8 fg, u8 bg);
 void set_cursor(u16 cur);
 u16 get_cursor();

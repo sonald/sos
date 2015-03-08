@@ -39,6 +39,10 @@ typedef struct trapframe_s {
     u32 useresp, ss;  // exists only when PL switched
 } __attribute__((packed)) trapframe_t;
 
+typedef struct kcontext_s {
+    u32 ebx, esi, edi, ebp, eip;
+} __attribute__((packed)) kcontext_t;
+
 BEGIN_CDECL
 
 void isr_handler(trapframe_t* regs);

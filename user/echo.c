@@ -21,7 +21,7 @@ void _start()
 
     int step = 0;
     for(;;) {
-        int len = sprintf(buf, sizeof buf - 1, "[%c%d %d] ", logo, pid, step);
+        int len = sprintf(buf, sizeof buf - 1, "{%c%d %d} ", logo, pid, step);
         write(0, buf, len);
 
         volatile int r = 0;

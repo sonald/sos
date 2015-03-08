@@ -3,12 +3,9 @@
 
 #include "types.h"
 #include "fcntl.h"
+#include "devices.h"
 
 #define NAMELEN 64
-
-#define MAJOR(a) (((u32)(a))>>16)
-#define MINOR(a) ((a) & 0xFFFF)
-#define DEVNO(ma, mi) ((((u32)(ma))<<16) | (((u32)(mi)) & 0xFFFF))
 
 enum NODE_TYPE {
     I_INVAL,
@@ -68,13 +65,6 @@ class FileSystem {
     protected:
         inode_t* _iroot;
 };
-
-#define TTY_MAJOR 0
-#define RAMFS_MAJOR 1
-#define IDE_MAJOR   2
-#define FLOPPY_MAJOR  3
-
-#define NDEV  4
 
 #define NR_FILE 64      // max files to open system-wide
 extern File cached_files[NR_FILE];

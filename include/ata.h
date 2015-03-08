@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "blkio.h"
+#include "devices.h"
 
 #define NR_ATA 4
 
@@ -83,15 +84,15 @@ enum ATAFlags {
 #define ATA_CMD_WRITE 0x30
 
 
-class PATADevice {
+class PATADevice: public BlockDevice {
     public:
         PATADevice();
         
         bool valid() const { return _valid; }
         void init(int bus, bool master);
 
-        bool read(Buffer* bufp);        
-        bool write(Buffer* bufp);
+        bool read(Buffer* bufp) override;
+        bool write(Buffer* bufp) override;
 
     private:
         bool _valid {false};
@@ -108,6 +109,8 @@ class PATADevice {
         u8 _inb(u16 port);
         u16 _inw(u16 port);
 };
+
+extern void ata_init();
 
 #endif /* ATA_H */
 

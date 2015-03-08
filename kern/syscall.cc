@@ -20,6 +20,7 @@ extern int sys_write(int fildes, const void *buf, size_t nbyte);
 extern int sys_close(int fd);
 extern int sys_read(int fildes, void *buf, size_t nbyte);
 extern int sys_fork();
+extern int sys_sleep();
 extern int sys_execve(const char *path, char *const argv[], char *const envp[]);
 extern int sys_getpid();
 
@@ -91,6 +92,7 @@ void init_syscall()
     syscalls[SYS_write] = { (void*)sys_write, 3 };
     syscalls[SYS_read] = { (void*)sys_read, 3 };
     syscalls[SYS_fork] = { (void*)sys_fork, 0 };
+    syscalls[SYS_sleep] = { (void*)sys_sleep, 0 };
     syscalls[SYS_getpid] = { (void*)sys_getpid, 0 };
     syscalls[SYS_exec] = { (void*)sys_execve, 3 };
 

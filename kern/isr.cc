@@ -1,5 +1,6 @@
 #include "isr.h"
 #include "types.h"
+#include "task.h"
 #include <limits.h>
 
 /* This is a simple string array. It contains the message that
@@ -92,11 +93,6 @@ extern void scheduler(trapframe_t* regs);
 
 void irq_handler(trapframe_t* regs)
 {
-    if (isr_handlers[regs->isrno]) {
-        interrupt_handler cb = isr_handlers[regs->isrno];
-        cb(regs);
-    }
-
     // Send an EOI (end of interrupt) signal to the PICs.
     // If this interrupt involved the slave.
     if (regs->isrno >= 40) {
@@ -106,7 +102,12 @@ void irq_handler(trapframe_t* regs)
     // Send reset signal to master. (As well as slave, if necessary).
     outb(IO_PIC1, 0x20);
 
-    if (regs->isrno == IRQ_TIMER) 
+    if (isr_handlers[regs->isrno]) {
+        interrupt_handler cb = isr_handlers[regs->isrno];
+        cb(regs);
+    }
+
+    if (regs->isrno == IRQ_TIMER || current_proc->need_resched) 
         scheduler(regs);
 }
 

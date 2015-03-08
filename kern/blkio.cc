@@ -1,11 +1,11 @@
 #include "blkio.h"
 #include "string.h"
-#include "ata.h"
-#include "isr.h"
+#include "devices.h"
+#include "task.h"
+#include "sched.h"
 
 BlockIOManager bio;
 Buffer* waitq = nullptr;
-PATADevice patas[NR_ATA];
 
 void BlockIOManager::init()
 {
@@ -22,11 +22,6 @@ void BlockIOManager::init()
         q.prev = &p;
     }
 
-    kprintf("Probing IDE hard drives\n");
-    patas[0].init(0, true);
-    //patas[1].init(0, false);
-    picenable(IRQ_ATA1);
-    //picenable(IRQ_ATA2);
 }
 
 Buffer* BlockIOManager::allocBuffer(dev_t dev, sector_t sect)
@@ -40,6 +35,8 @@ recheck:
             }
 
             //sleep(&_cache[i]);
+            current_proc->channel = &_cache[i];
+            current_proc->state = TASK_SLEEP;
             goto recheck;
         }
     }
@@ -61,7 +58,9 @@ recheck:
 Buffer* BlockIOManager::read(dev_t dev, sector_t sect)
 {
     Buffer* bp = allocBuffer(dev, sect);
-    patas[dev-1].read(bp);
+    auto* device = blk_device_get(dev);
+    kassert(device != nullptr);
+    device->read(bp);
     return bp;
 }
 
