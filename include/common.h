@@ -29,11 +29,6 @@ void* operator new(size_t len);
 void operator delete[](void *ptr);
 void* operator new[](size_t len);
 
-// port io
-void outb(u16 port, u8 val);
-u8 inb(u16 port);
-u16 inw(u16 port);
-
 /*
  * early vga access
  */
@@ -67,9 +62,10 @@ void kputchar(char c);
 #define CURSOR(x, y) (((x << 8) & 0xff00) | (y & 0x00ff))
 #define CURSORX(cur) (((cur) >> 8) & 0x00ff)
 #define CURSORY(cur) ((cur) & 0x00ff)
+#define COLOR(fg, bg) ((((fg) & 0x0f) | ((bg) & 0xf0)) & 0xff)
 
 u8 get_text_color();
-void set_text_color(u8 fg, u8 bg);
+void set_text_color(u8);
 void set_cursor(u16 cur);
 u16 get_cursor();
 void clear();

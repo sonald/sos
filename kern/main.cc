@@ -28,7 +28,7 @@ extern int sys_write(int fildes, const void *buf, size_t nbyte);
 extern "C" void kernel_init()
 {
     clear();
-    set_text_color(LIGHT_CYAN, BLACK);
+    set_text_color(COLOR(LIGHT_CYAN, BLACK));
 }
 
 int recursive_sum(int n)
@@ -57,15 +57,35 @@ void kthread1()
         kputchar('\n');
     }
 
+    bool released = false;
     int count = 0;
     while (1) {
-        kprintf(" <KT1 %d>\n", count++);
-        asm volatile ( "int $0x80 \n" ::"a"(SYS_sleep) :"cc", "memory");
-        //pid_t pid = 0;
-        //asm volatile ( "int $0x80 \n" :"=a"(pid) :"0"(SYS_getpid) :"cc", "memory");
-        kputs(" <after sleep> ");
-        busy_wait(1000);
-        //bio.read(ROOT_DEV, 0);
+        kprintf(" <KT1 %d> ", count++);
+        // two ways to reschedule here: by syscall or call scheduler directly
+        //asm volatile ( "int $0x80 \n" ::"a"(SYS_sleep) :"cc", "memory");
+        //{ // method 2
+            //cli();
+            //scheduler(current_proc->regs); // no iret, no restore IF
+            //sti();
+        //}
+        busy_wait(2000);
+        if (!released) {
+            bio.release(mbr);
+            released = true;
+        }
+    }
+}
+
+void kthread2()
+{
+    int count = 0;
+    while (1) {
+        busy_wait(2000);
+        kprintf(" |KT2 %d| ", count++);
+        dev_t ROOT_DEV = DEVNO(IDE_MAJOR, 0);
+        Buffer* mbr = bio.read(ROOT_DEV, 0);
+        kputs(" |KT2: read| ");
+        bio.release(mbr);
     }
 }
 
@@ -181,13 +201,13 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     init_timer();
     init_syscall();
 
-    set_text_color(LIGHT_GREEN, BLACK);
+    set_text_color(COLOR(LIGHT_GREEN, BLACK));
     const char* msg = "Welcome to SOS....\n";
     kputs(msg);
     u32 memsize = 0;
     if (mb->flags & MULTIBOOT_FLAG_MEM) {
         memsize = mb->low_mem + mb->high_mem;
-        set_text_color(LIGHT_RED, BLACK);
+        set_text_color(COLOR(LIGHT_RED, BLACK));
         kprintf("detected mem(%dKB): low: %dKB, hi: %dKB\n",
                 memsize, mb->low_mem, mb->high_mem);
     }
@@ -195,7 +215,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     if (mb->flags & MULTIBOOT_FLAG_MMAP) {
         apply_mmap(mb->mmap_length, mb->mmap_addr);
     }
-    set_text_color(LIGHT_GREEN, BLACK);
+    set_text_color(COLOR(LIGHT_GREEN, BLACK));
 
     void* last_address = NULL;
     if (mb->flags & MULTIBOOT_FLAG_MODS) {
@@ -220,6 +240,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     proc_t* proc = prepare_userinit((void*)&init_task);
 
     create_kthread("kthread1", kthread1);
+    create_kthread("kthread2", kthread2);
     create_kthread("idle", idle_thread);
 
     vmm.switch_page_directory(proc->pgdir);

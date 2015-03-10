@@ -17,7 +17,7 @@ kernel_srcs=kern/boot.s kern/main.cc kern/common.cc kern/cxx_rt.cc \
 			kern/irq_stubs.s kern/gdt.cc kern/isr.cc kern/timer.cc \
 			kern/mm.cc kern/vm.cc kern/kb.cc kern/context.s \
 			kern/syscall.cc kern/task.cc kern/vfs.cc kern/ramfs.cc \
-			kern/ata.cc kern/blkio.cc kern/devices.cc \
+			kern/ata.cc kern/blkio.cc kern/devices.cc kern/spinlock.cc \
 			lib/string.cc lib/sprintf.cc 
 
 kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))

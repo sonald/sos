@@ -9,9 +9,9 @@
 typedef uint32_t sector_t;
 
 enum BufferFlags {
-    BUF_EMPTY = 0x01,
-    BUF_DIRTY = 0x02,
-    BUF_BUSY  = 0x04
+    BUF_EMPTY = 0x01, // not loaded from disk
+    BUF_DIRTY = 0x02, // need to write to disk
+    BUF_BUSY  = 0x04  // hold by a task
 };
 
 struct Buffer {
@@ -29,6 +29,7 @@ class BlockIOManager {
         void init();
         Buffer* read(dev_t dev, sector_t sect);
         bool write(Buffer* bufp);
+        void release(Buffer* bufp);
 
     private:
         Buffer _cache[NR_BUFFERS];

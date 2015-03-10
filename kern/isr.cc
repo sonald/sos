@@ -1,6 +1,7 @@
 #include "isr.h"
 #include "types.h"
 #include "task.h"
+#include "x86.h"
 #include <limits.h>
 
 /* This is a simple string array. It contains the message that

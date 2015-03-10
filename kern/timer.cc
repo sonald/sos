@@ -1,6 +1,8 @@
 #include "timer.h"
+#include "x86.h"
 #include "isr.h"
 #include "task.h"
+#include "spinlock.h"
 
 static const u32 FREQ = 1193180;
 volatile u32 timer_ticks = 0;
@@ -10,8 +12,16 @@ extern "C" void switch_to(kcontext_t** old, kcontext_t* next);
 extern void setup_tss(u32 stack);
 extern "C" void flush_tss();
 
+Spinlock schedlock("sched");
+
 void scheduler(trapframe_t* regs)
 {
+    //NOTE: should never spin in interrupt context! so check IF flag 
+    //to determine if in irq context. this is not a good way.
+    auto flags = readflags();
+    if ((flags & FL_IF)) {
+        schedlock.lock();
+    }
     if (current_proc) {
         if (current_proc->need_resched) current_proc->need_resched = false;
         current_proc->regs = regs;
@@ -32,7 +42,7 @@ void scheduler(trapframe_t* regs)
         }
 
         if (old == current_proc) return;
-        //kprintf("sched: %s -> %s ", old->name, current_proc->name);
+        //kprintf("(sched: %s -> %s) ", old->name, current_proc->name);
         //very tricky!
         setup_tss(current_proc->kern_esp);
         flush_tss();
@@ -40,20 +50,21 @@ void scheduler(trapframe_t* regs)
         
         switch_to(&old->kctx, current_proc->kctx);
     }
+    if (schedlock.locked())
+        schedlock.release();
 }
 
 static void timer_interrupt(trapframe_t* regs)
 {
     (void)regs;
     timer_ticks++;
-    if (timer_ticks % HZ == 0) {
-        set_text_color(LIGHT_CYAN, WHITE);
-        u16 cur = get_cursor();
-        set_cursor(CURSOR(70, 0));
-        kprintf("T: %d", timer_ticks/HZ);
-        set_cursor(cur);
-        set_text_color(LIGHT_GREEN, BLACK);
-    }
+    auto old = get_text_color();
+    set_text_color(COLOR(LIGHT_CYAN, WHITE));
+    u16 cur = get_cursor();
+    set_cursor(CURSOR(70, 0));
+    kprintf("T: %d", timer_ticks/HZ);
+    set_cursor(cur);
+    set_text_color(old);
 }
 
 void init_timer()

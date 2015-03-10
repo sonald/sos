@@ -178,9 +178,14 @@ void kputs(const char* msg)
     }
 }
 
-void set_text_color(u8 fg, u8 bg)
+u8 get_text_color()
 {
-    _attrib = ((fg & 0x0f) | (bg & 0xf0)) & 0xff;
+    return _attrib;
+}
+
+void set_text_color(u8 val)
+{
+    _attrib = val;
 }
 
 void set_cursor(u16 cur)

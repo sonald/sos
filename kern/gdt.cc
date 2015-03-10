@@ -1,5 +1,5 @@
 #include "gdt.h"
-#include "common.h"
+#include "x86.h"
 #include "string.h"
 #include "task.h"
 

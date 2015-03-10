@@ -78,7 +78,7 @@ VirtualMemoryManager::VirtualMemoryManager()
 
 void VirtualMemoryManager::test_malloc()
 {
-    set_text_color(LIGHT_GREEN, BLACK);
+    set_text_color(COLOR(LIGHT_GREEN, BLACK));
     void* p1 = kmalloc(0x80-3, 4);
     void* p2 = kmalloc(0x100, 8);
     void* p3 = kmalloc(0x400, PGSIZE/2);

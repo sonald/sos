@@ -1,5 +1,6 @@
 #include "kb.h"
 #include "isr.h"
+#include "x86.h"
 
 enum KB_ENCODER_IO {
     KB_ENC_INPUT_BUF =   0x60,
