@@ -4,14 +4,45 @@
 #include "x86.h"
 #include "errno.h"
 #include "elf.h"
+#include "spinlock.h"
+#include "sched.h"
+#include "timer.h"
 
 extern "C" void trap_return();
+
+Spinlock tasklock("task");
 
 // this contains not-only user mode process and also kernel-threads
 proc_t tasks[MAXPROCS];
 
 proc_t* current_proc = NULL;
 static int next_pid = 0;
+
+void sleep(Spinlock* lk, void* chan)
+{
+    current_proc->channel = chan;
+    current_proc->state = TASK_SLEEP;
+    kprintf(" (%s:sleep) ", current_proc->name);
+    lk->release();
+    scheduler(current_proc->regs); 
+    lk->lock();
+    kprintf(" (%s:awaked) ");
+}
+
+void wakeup(void* chan)
+{
+    if ((readflags() & FL_IF))
+        tasklock.lock();
+    auto* tsk = &tasks[0];
+    while (tsk) {
+        if (tsk->state == TASK_SLEEP && tsk->channel == chan) {
+            tsk->state = TASK_READY;
+            tsk->channel = NULL;
+        }
+        tsk = tsk->next;
+    }
+    tasklock.release();
+}
 
 static proc_t* find_free_process()
 {
@@ -80,7 +111,6 @@ int sys_fork()
 
     proc->kctx = (kcontext_t*)((char*)proc->regs - sizeof(kcontext_t));
     *(proc->kctx) = *(current_proc->kctx);
-    //memset(proc->kctx, 0, sizeof(*proc->kctx));
     proc->kctx->eip = A2I(trap_return);
 
     // setup user stack (only one-page, will and should expand at PageFault)

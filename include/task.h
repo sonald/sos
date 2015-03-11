@@ -4,6 +4,7 @@
 #include "isr.h"
 #include "vm.h"
 #include "vfs.h"
+#include "spinlock.h"
 
 #define MAXPROCS 16
 #define PROC_NAME_LEN 31
@@ -49,6 +50,9 @@ int sys_getpid();
 int sys_fork(); 
 int sys_sleep();
 void tasks_init();
+
+void sleep(Spinlock* lk, void* chan);
+void wakeup(void* chan);
 
 proc_t* prepare_userinit(void* prog);
 proc_t* create_proc(void* entry, void* proc, size_t size, const char* name);

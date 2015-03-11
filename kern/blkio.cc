@@ -42,14 +42,7 @@ recheck:
                 return &_cache[i];
             }
 
-            //sleep(&_cache[i]);
-            current_proc->channel = &_cache[i];
-            current_proc->state = TASK_SLEEP;
-            kprintf(" (BIO:sleep) ");
-            biolock.release();
-            scheduler(current_proc->regs); // no iret, no restore IF
-            biolock.lock();
-            kprintf(" (BIO:awaked) ");
+            sleep(&biolock, &_cache[i]);
             goto recheck;
         }
     }
@@ -90,14 +83,7 @@ void BlockIOManager::release(Buffer* bufp)
     kprintf("[BIO: %s release] ", current_proc->name);
     kassert(bufp && (bufp->flags & BUF_BUSY));
     bufp->flags &= ~BUF_BUSY;
-    auto* tsk = &tasks[0];
-    while (tsk) {
-        if (tsk->state == TASK_SLEEP && tsk->channel == bufp) {
-            tsk->state = TASK_READY;
-            tsk->channel = NULL;
-        }
-        tsk = tsk->next;
-    }
+    wakeup(bufp);
     biolock.release();
 }
 
