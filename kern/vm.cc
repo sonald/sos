@@ -60,8 +60,8 @@ static void page_fault(trapframe_t* regs)
 
     kprintf("PF: addr 0x%x, %s, %c, %c, %s\n", fault_addr,
             (present?"P":"NP"), (rw?'W':'R'), (us?'U':'S'), (rsvd?"RSVD":""));
-    if (current_proc) {
-        kprintf("current: %s, regs: 0x%x\n", current_proc->name, current_proc->regs);
+    if (current) {
+        kprintf("current: %s, regs: 0x%x\n", current->name, current->regs);
     }
     panic("");
 }

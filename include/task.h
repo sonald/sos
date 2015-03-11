@@ -43,7 +43,7 @@ typedef struct proc_s {
     struct proc_s* next;
 } proc_t;
 
-extern proc_t* current_proc;
+extern proc_t* current;
 extern proc_t tasks[MAXPROCS];
 int sys_getppid();
 int sys_getpid();

@@ -51,7 +51,7 @@ int sys_open(const char *path, int flags, int mode)
 
     int fd = 0;
     for (fd = 0; fd < FILES_PER_PROC; fd++) {
-        if (!current_proc->files[fd])
+        if (!current->files[fd])
             break;
     }
 
@@ -64,7 +64,7 @@ int sys_open(const char *path, int flags, int mode)
     if (!f) return -EINVAL;
 
     f->set_inode(ip);
-    current_proc->files[fd] = f;
+    current->files[fd] = f;
     return fd;
 }
 

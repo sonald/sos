@@ -13,7 +13,7 @@ void Spinlock::lock()
 #ifdef DEBUG_SPINLOCK
     auto old = get_text_color();
     set_text_color(COLOR(BROWN, WHITE));
-    kprintf("[%s:L %s] ", _name, current_proc->name);
+    kprintf("[%s:L %s] ", _name, current->name);
     set_text_color(old);
 #endif
 }
@@ -24,7 +24,7 @@ void Spinlock::release()
 #ifdef DEBUG_SPINLOCK
     auto old = get_text_color();
     set_text_color(COLOR(BROWN, WHITE));
-    kprintf("[%s:R %s] ", _name, current_proc->name);
+    kprintf("[%s:R %s] ", _name, current->name);
     set_text_color(old);
 #endif
 }

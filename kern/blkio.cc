@@ -80,7 +80,7 @@ bool BlockIOManager::write(Buffer* bufp)
 void BlockIOManager::release(Buffer* bufp)
 {
     biolock.lock();
-    kprintf("[BIO: %s release] ", current_proc->name);
+    kprintf("[BIO: %s release] ", current->name);
     kassert(bufp && (bufp->flags & BUF_BUSY));
     bufp->flags &= ~BUF_BUSY;
     wakeup(bufp);

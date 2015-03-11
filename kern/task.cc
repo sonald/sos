@@ -15,18 +15,18 @@ Spinlock tasklock("task");
 // this contains not-only user mode process and also kernel-threads
 proc_t tasks[MAXPROCS];
 
-proc_t* current_proc = NULL;
+proc_t* current = NULL;
 static int next_pid = 0;
 
 void sleep(Spinlock* lk, void* chan)
 {
-    current_proc->channel = chan;
-    current_proc->state = TASK_SLEEP;
-    kprintf(" (%s:sleep) ", current_proc->name);
+    current->channel = chan;
+    current->state = TASK_SLEEP;
+    kprintf(" (%s:sleep) ", current->name);
     lk->release();
-    scheduler(current_proc->regs); 
+    scheduler(current->regs); 
     lk->lock();
-    kprintf(" (%s:awaked) ");
+    kprintf(" (%s:awaked) ", current->name);
 }
 
 void wakeup(void* chan)
@@ -66,21 +66,21 @@ repeat:
 
 int sys_getppid()
 {
-    kassert(current_proc);
-    return current_proc->ppid;
+    kassert(current);
+    return current->ppid;
 }
 
 int sys_getpid()
 {
-    kassert(current_proc);
-    return current_proc->pid;
+    kassert(current);
+    return current->pid;
 }
 
 int sys_sleep()
 {
-    kassert(current_proc);
-    current_proc->state = TASK_SLEEP;
-    current_proc->need_resched = true;
+    kassert(current);
+    current->state = TASK_SLEEP;
+    current->need_resched = true;
     return 0;
 }
 
@@ -89,28 +89,28 @@ int sys_fork()
     proc_t* proc = find_free_process();
     if (!proc) return -1;
 
-    *proc = *current_proc;
+    *proc = *current;
     proc->state = TASK_CREATE;
 
-    proc->ppid = current_proc->pid;
+    proc->ppid = current->pid;
     proc->pid = next_pid;
 
-    if (!current_proc) current_proc = proc;
+    if (!current) current = proc;
     else { 
-        proc->next = current_proc->next;
-        current_proc->next = proc;
+        proc->next = current->next;
+        current->next = proc;
     }
 
-    proc->pgdir = vmm.copy_page_directory(current_proc->pgdir);
+    proc->pgdir = vmm.copy_page_directory(current->pgdir);
 
     void* task_kern_stack = vmm.alloc_page();
     proc->kern_esp = A2I(task_kern_stack) + PGSIZE;
     proc->regs = (trapframe_t*)((char*)proc->kern_esp - sizeof(trapframe_t));
-    *(proc->regs) = *(current_proc->regs);
+    *(proc->regs) = *(current->regs);
     proc->regs->eax = 0; // return of child process
 
     proc->kctx = (kcontext_t*)((char*)proc->regs - sizeof(kcontext_t));
-    *(proc->kctx) = *(current_proc->kctx);
+    *(proc->kctx) = *(current->kctx);
     proc->kctx->eip = A2I(trap_return);
 
     // setup user stack (only one-page, will and should expand at PageFault)
@@ -120,14 +120,14 @@ int sys_fork()
             v2p(new_stack), PDE_USER|PDE_WRITABLE);
 
     // user stack copied
-    page_t* pte = vmm.walk(current_proc->pgdir, task_usr_stack0, false);
+    page_t* pte = vmm.walk(current->pgdir, task_usr_stack0, false);
     kassert(pte && pte->present && pte->user);
     void* old_stack = p2v(pte->frame * PGSIZE);
     memcpy(new_stack, old_stack, PGSIZE);
 
-    kassert(proc->regs->useresp == current_proc->regs->useresp);
+    kassert(proc->regs->useresp == current->regs->useresp);
 
-    kprintf("fork %d -> %d\n", current_proc->pid, next_pid);
+    kprintf("fork %d -> %d\n", current->pid, next_pid);
     //kprintf("RET: uesp: 0x%x, eip: 0x%x\n", proc->regs->useresp, proc->regs->eip);
     proc->state = TASK_READY;
     return next_pid;
@@ -187,22 +187,22 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
             continue; 
         }
 
-        load_proc(current_proc, prog, ph[i].p_memsz, PDE_USER);
+        load_proc(current, prog, ph[i].p_memsz, PDE_USER);
         break;
     }
 
-    strcpy(current_proc->name, path);
-    kprintf("execv task(%d, %s)\n", current_proc->pid, path);
+    strcpy(current->name, path);
+    kprintf("execv task(%d, %s)\n", current->pid, path);
 
-    current_proc->entry = (void*)elf->e_entry;
+    current->entry = (void*)elf->e_entry;
     
-    trapframe_t* regs = current_proc->regs;
+    trapframe_t* regs = current->regs;
     memset(regs, 0, sizeof regs);
     regs->ss = regs->es = regs->ds = regs->fs = regs->gs = 0x23;
     regs->cs = 0x1b;
     regs->eip = elf->e_entry;
     regs->eflags = 0x202;
-    regs->useresp = current_proc->user_esp;
+    regs->useresp = current->user_esp;
     return 0;
 }
 
@@ -220,8 +220,8 @@ proc_t* prepare_userinit(void* prog)
     memset(proc, 0, sizeof(*proc));
     strcpy(proc->name, "init");
 
-    kassert(current_proc == NULL);
-    current_proc = proc;
+    kassert(current == NULL);
+    current = proc;
 
     page_directory_t* pdir = vmm.create_address_space();
 
@@ -272,13 +272,13 @@ proc_t* create_kthread(const char* name, kthread_t prog)
     memset(proc, 0, sizeof(*proc));
     proc->state = TASK_CREATE;
 
-    proc->ppid = current_proc->pid;
+    proc->ppid = current->pid;
     proc->pid = next_pid;
 
-    if (!current_proc) current_proc = proc;
+    if (!current) current = proc;
     else { 
-        proc->next = current_proc->next;
-        current_proc->next = proc;
+        proc->next = current->next;
+        current->next = proc;
     }
     strncpy(proc->name, name, sizeof proc->name - 1);
 

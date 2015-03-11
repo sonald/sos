@@ -65,7 +65,7 @@ void kthread1()
         //asm volatile ( "int $0x80 \n" ::"a"(SYS_sleep) :"cc", "memory");
         //{ // method 2
             //cli();
-            //scheduler(current_proc->regs); // no iret, no restore IF
+            //scheduler(current->regs); // no iret, no restore IF
             //sti();
         //}
         busy_wait(2000);

@@ -108,7 +108,7 @@ void irq_handler(trapframe_t* regs)
         cb(regs);
     }
 
-    if (regs->isrno == IRQ_TIMER || current_proc->need_resched) 
+    if (regs->isrno == IRQ_TIMER || current->need_resched) 
         scheduler(regs);
 }
 

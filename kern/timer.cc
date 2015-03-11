@@ -22,16 +22,16 @@ void scheduler(trapframe_t* regs)
     if ((flags & FL_IF)) {
         schedlock.lock();
     }
-    if (current_proc) {
-        if (current_proc->need_resched) current_proc->need_resched = false;
-        current_proc->regs = regs;
+    if (current) {
+        if (current->need_resched) current->need_resched = false;
+        current->regs = regs;
         
-        auto* old = current_proc;
+        auto* old = current;
         bool rewind = old->next != NULL;
         proc_t* tsk = old->next ? old->next: &tasks[0];
         while (tsk) {
             if (old != tsk && tsk->state == TASK_READY) {
-                current_proc = tsk;
+                current = tsk;
                 break;
             }
             tsk = tsk->next;
@@ -41,14 +41,14 @@ void scheduler(trapframe_t* regs)
             }
         }
 
-        if (old == current_proc) return;
-        //kprintf("(sched: %s -> %s) ", old->name, current_proc->name);
+        if (old == current) return;
+        //kprintf("(sched: %s -> %s) ", old->name, current->name);
         //very tricky!
-        setup_tss(current_proc->kern_esp);
+        setup_tss(current->kern_esp);
         flush_tss();
-        vmm.switch_page_directory(current_proc->pgdir);
+        vmm.switch_page_directory(current->pgdir);
         
-        switch_to(&old->kctx, current_proc->kctx);
+        switch_to(&old->kctx, current->kctx);
     }
     if (schedlock.locked())
         schedlock.release();
