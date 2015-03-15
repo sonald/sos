@@ -7,8 +7,8 @@
 class Spinlock {
     public:
         Spinlock(const char* name): _name(name) {}
-        void lock();
-        void release();
+        uint32_t lock();
+        void release(uint32_t oldflags = 0);
         bool locked() const;
 
     private:

@@ -18,3 +18,5 @@ problems about pmm
 + spinlock can not used in irq context in uniprocess system.
 + take care of the IF state, sleep can only happen with IF enabled context 
   and wakeup from irq context leave IF disabled.
++ about spinlock: busy-waiting isn't enough when access syscall is a trap gate (IF enabled).
+  we need to make sure cli'ed so fork / exec will not be preempted before finished.

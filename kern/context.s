@@ -3,11 +3,7 @@
 
 global switch_to_usermode
 global flush_tss
-global yield
 global switch_to
-
-extern trap_return
-extern scheduler
 
 ; parameters: esp, eip
 switch_to_usermode:
@@ -46,9 +42,6 @@ switch_to_usermode:
 flush_tss:
     mov ax, 0x28
     ltr ax
-    ret
-
-yield:
     ret
 
 ;; [esp] old ret eip

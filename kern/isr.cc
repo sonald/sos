@@ -79,7 +79,7 @@ void isr_handler(trapframe_t* regs)
         return;
     }
 
-    kprintf("regs: ds: 0x%x, edi: 0x%x, esi: 0x%x, ebp: 0x%x, esp: 0x%x\n"
+    kprintf(" regs: ds: 0x%x, edi: 0x%x, esi: 0x%x, ebp: 0x%x, esp: 0x%x\n"
             "ebx: 0x%x, edx: 0x%x, ecx: 0x%x, eax: 0x%x, isr: %d, errno: %d\n"
             "eip: 0x%x, cs: 0x%x, eflags: 0b%b, useresp: 0x%x, ss: 0x%x\n",
             regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, 
@@ -94,14 +94,16 @@ extern void scheduler(trapframe_t* regs);
 
 void irq_handler(trapframe_t* regs)
 {
-    // Send an EOI (end of interrupt) signal to the PICs.
-    // If this interrupt involved the slave.
-    if (regs->isrno >= 40) {
-        // Send reset signal to slave.
-        outb(IO_PIC2, 0x20);
+    if (regs->isrno >= 32 && regs->isrno <= 47) {
+        // Send an EOI (end of interrupt) signal to the PICs.
+        // If this interrupt involved the slave.
+        if (regs->isrno >= 40) {
+            // Send reset signal to slave.
+            outb(IO_PIC2, 0x20);
+        }
+        // Send reset signal to master. (As well as slave, if necessary).
+        outb(IO_PIC1, 0x20);
     }
-    // Send reset signal to master. (As well as slave, if necessary).
-    outb(IO_PIC1, 0x20);
 
     if (isr_handlers[regs->isrno]) {
         interrupt_handler cb = isr_handlers[regs->isrno];

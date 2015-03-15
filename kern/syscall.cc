@@ -2,6 +2,7 @@
 #include "string.h"
 #include "isr.h"
 #include "task.h"
+#include "spinlock.h"
 
 typedef int (*syscall0_t)();
 typedef int (*syscall1_t)(u32);
@@ -32,6 +33,7 @@ static struct syscall_info_s {
 
 static void syscall_handler(trapframe_t* regs)
 {
+    current->regs = regs;
     if (regs->eax >= NR_SYSCALL) {
         kprintf("invalid syscall number: %d\n", regs->eax);
         regs->eax = -1;
@@ -39,7 +41,9 @@ static void syscall_handler(trapframe_t* regs)
     }
     
     struct syscall_info_s info = syscalls[regs->eax];
-    if (!info.call) return;
+    if (!info.call) {
+        return;
+    } 
 
     switch(info.nr_args) {
         case 0:

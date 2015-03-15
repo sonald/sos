@@ -31,8 +31,7 @@ void sleep(Spinlock* lk, void* chan)
 
 void wakeup(void* chan)
 {
-    if ((readflags() & FL_IF))
-        tasklock.lock();
+    auto oldflags = tasklock.lock();
     auto* tsk = &tasks[0];
     while (tsk) {
         if (tsk->state == TASK_SLEEP && tsk->channel == chan) {
@@ -41,11 +40,12 @@ void wakeup(void* chan)
         }
         tsk = tsk->next;
     }
-    tasklock.release();
+    tasklock.release(oldflags);
 }
 
 static proc_t* find_free_process()
 {
+    auto oldflags = tasklock.lock();
 repeat:
     if ((++next_pid) < 0) next_pid = 1; // wrapped
     for (int i = 0; i < MAXPROCS; ++i) {
@@ -61,6 +61,7 @@ repeat:
         }
     }
 
+    tasklock.release(oldflags);
     return p;
 }
 
@@ -78,9 +79,11 @@ int sys_getpid()
 
 int sys_sleep()
 {
+    auto oldflags = tasklock.lock();
     kassert(current);
     current->state = TASK_SLEEP;
     current->need_resched = true;
+    tasklock.release(oldflags);
     return 0;
 }
 
@@ -89,6 +92,7 @@ int sys_fork()
     proc_t* proc = find_free_process();
     if (!proc) return -1;
 
+    auto oldflags = tasklock.lock();
     *proc = *current;
     proc->state = TASK_CREATE;
 
@@ -115,22 +119,24 @@ int sys_fork()
 
     // setup user stack (only one-page, will and should expand at PageFault)
     void* task_usr_stack0 = (void*)USTACK; 
+    page_t* pte = vmm.walk(proc->pgdir, task_usr_stack0, false);
+    kassert(pte == NULL);
     void* new_stack = vmm.alloc_page();
     vmm.map_pages(proc->pgdir, task_usr_stack0, PGSIZE,
             v2p(new_stack), PDE_USER|PDE_WRITABLE);
 
     // user stack copied
-    page_t* pte = vmm.walk(current->pgdir, task_usr_stack0, false);
+    pte = vmm.walk(current->pgdir, task_usr_stack0, false);
     kassert(pte && pte->present && pte->user);
     void* old_stack = p2v(pte->frame * PGSIZE);
     memcpy(new_stack, old_stack, PGSIZE);
 
-    kassert(proc->regs->useresp == current->regs->useresp);
-
     kprintf("fork %d -> %d\n", current->pid, next_pid);
+    kassert(proc->regs->useresp == current->regs->useresp);
     //kprintf("RET: uesp: 0x%x, eip: 0x%x\n", proc->regs->useresp, proc->regs->eip);
     proc->state = TASK_READY;
-    return next_pid;
+    tasklock.release(oldflags);
+    return proc->pid;
 }
 
 static int load_proc(proc_t* proc, void* code, size_t size, int flags)
@@ -142,6 +148,7 @@ static int load_proc(proc_t* proc, void* code, size_t size, int flags)
     vmm.unmap_pages(proc->pgdir, vaddr, size, paddr, false);
     vmm.map_pages(proc->pgdir, vaddr, size, paddr, flags);
     // copy from tmp avoid a page directory switch 
+    //kprintf("  %s: copy code %x to %x \n", __func__, code, tmp);
     memcpy(tmp, code, size);
 
     return 0;
@@ -152,6 +159,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     (void)argv;
     (void)envp;
 
+    auto oldflags = tasklock.lock();
     kprintf("path(0x%x): %s\n", path, path);
     FileSystem* ramfs = devices[RAMFS_MAJOR];
 
@@ -163,12 +171,14 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     int len = ramfs->read(ip, buf, ip->size, 0);
     if (len < 0) {
         kprintf("load %s failed\n", path);
+        tasklock.release(oldflags);
         return -ENOENT;
     }
 
     elf_header_t* elf = (elf_header_t*)buf;
     if (elf->e_magic != ELF_MAGIC) {
         kprintf("invalid elf file\n");
+        tasklock.release(oldflags);
         return -EINVAL;
     }
 
@@ -197,12 +207,14 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     current->entry = (void*)elf->e_entry;
     
     trapframe_t* regs = current->regs;
-    memset(regs, 0, sizeof regs);
-    regs->ss = regs->es = regs->ds = regs->fs = regs->gs = 0x23;
-    regs->cs = 0x1b;
+    //memset(regs, 0, sizeof *regs);
+    //regs->ss = regs->es = regs->ds = regs->fs = regs->gs = 0x23;
+    //regs->cs = 0x1b;
     regs->eip = elf->e_entry;
-    regs->eflags = 0x202;
-    regs->useresp = current->user_esp;
+    //regs->eflags = 0x202;
+    regs->useresp = USTACK_TOP;
+
+    tasklock.release(oldflags);
     return 0;
 }
 
@@ -282,10 +294,8 @@ proc_t* create_kthread(const char* name, kthread_t prog)
     }
     strncpy(proc->name, name, sizeof proc->name - 1);
 
-
     proc->pgdir = vmm.kernel_page_directory();
     kassert(proc->pgdir);
-
 
     void* task_kern_stack = vmm.alloc_page();
 

@@ -31,12 +31,6 @@ extern "C" void kernel_init()
     set_text_color(COLOR(LIGHT_CYAN, BLACK));
 }
 
-int recursive_sum(int n)
-{
-    if (n == 1) return 1;
-    return n + recursive_sum(n-1);
-}
-
 void idle_thread()
 {
     asm volatile (
@@ -61,13 +55,6 @@ void kthread1()
     int count = 0;
     while (1) {
         kprintf(" <KT1 %d> ", count++);
-        // two ways to reschedule here: by syscall or call scheduler directly
-        //asm volatile ( "int $0x80 \n" ::"a"(SYS_sleep) :"cc", "memory");
-        //{ // method 2
-            //cli();
-            //scheduler(current->regs); // no iret, no restore IF
-            //sti();
-        //}
         busy_wait(2000);
         if (!released) {
             bio.release(mbr);
@@ -97,6 +84,15 @@ void init_task()
     int logo = 'A';
     pid_t pid;
     asm volatile ( "int $0x80 \n" :"=a"(pid) :"a"(SYS_fork) :"cc", "memory");
+
+    {
+        volatile int r = 0;
+        for (int i = 0; i < 1; i++) {
+            for (int j = 0; j < 0x7fffff; ++j) {
+                r += j;
+            }
+        }
+    }
 
     if (pid == 0) { 
         asm volatile ( "int $0x80 \n"

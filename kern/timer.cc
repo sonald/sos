@@ -18,13 +18,10 @@ void scheduler(trapframe_t* regs)
 {
     //NOTE: should never spin in interrupt context! so check IF flag 
     //to determine if in irq context. this is not a good way.
-    auto flags = readflags();
-    if ((flags & FL_IF)) {
-        schedlock.lock();
-    }
+    auto oldflags = schedlock.lock();
     if (current) {
         if (current->need_resched) current->need_resched = false;
-        current->regs = regs;
+        //current->regs = regs; // this is faulty!
         
         auto* old = current;
         bool rewind = old->next != NULL;
@@ -41,8 +38,9 @@ void scheduler(trapframe_t* regs)
             }
         }
 
-        if (old == current) return;
-        //kprintf("(sched: %s -> %s) ", old->name, current->name);
+        if (old == current) goto out;
+        //kprintf("(sched: %s(%d) -> %s(%d)) ", old->name, old->pid,
+                //current->name, current->pid);
         //very tricky!
         setup_tss(current->kern_esp);
         flush_tss();
@@ -50,8 +48,9 @@ void scheduler(trapframe_t* regs)
         
         switch_to(&old->kctx, current->kctx);
     }
-    if (schedlock.locked())
-        schedlock.release();
+
+out:
+    schedlock.release(oldflags);
 }
 
 static void timer_interrupt(trapframe_t* regs)

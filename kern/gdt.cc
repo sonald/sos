@@ -145,7 +145,7 @@ void init_idt()
 
     // 0x80 for syscall
     setup_idt_entry(0x80, (u32)isr128, 0x08,
-            GDTE_PRESENT(1) | GDTE_DPL(3) | IDTE_INT_GATE);
+            GDTE_PRESENT(1) | GDTE_DPL(3) | IDTE_TRAP_GATE);
 
     SETUP_IRQ(0, 32);
     SETUP_IRQ(1, 33);

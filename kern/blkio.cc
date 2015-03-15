@@ -29,15 +29,14 @@ void BlockIOManager::init()
 
 Buffer* BlockIOManager::allocBuffer(dev_t dev, sector_t sect)
 {
-    auto oldflags = readflags();
-    biolock.lock();
+    auto oldflags = biolock.lock();
 recheck:
     for (int i = 0; i  <NR_BUFFERS; i++) {
         if (_cache[i].dev == dev && _cache[i].sector == sect) {
             if (!(_cache[i].flags & BUF_BUSY)) {
                 _cache[i].flags |= BUF_BUSY;
                 kprintf(" (BIO:reget) ");
-                biolock.release();
+                biolock.release(oldflags);
                 if (oldflags & FL_IF) sti();
                 return &_cache[i];
             }
@@ -53,7 +52,7 @@ recheck:
             bp->dev = dev;
             bp->sector = sect;
             bp->flags |= BUF_BUSY;
-            biolock.release();
+            biolock.release(oldflags);
             return bp;
         }
     }
@@ -79,11 +78,11 @@ bool BlockIOManager::write(Buffer* bufp)
 
 void BlockIOManager::release(Buffer* bufp)
 {
-    biolock.lock();
+    auto oldflags = biolock.lock();
     kprintf("[BIO: %s release] ", current->name);
     kassert(bufp && (bufp->flags & BUF_BUSY));
     bufp->flags &= ~BUF_BUSY;
     wakeup(bufp);
-    biolock.release();
+    biolock.release(oldflags);
 }
 

@@ -3,10 +3,12 @@
 #include "common.h"
 #include "task.h"
 #include "errno.h"
+#include "spinlock.h"
 
 File cached_files[NR_FILE];
 inode_t* rooti = NULL;
 FileSystem* devices[NDEV] = {NULL, };
+Spinlock vfslock("vfs");
 
 static File* get_free_file()
 {
@@ -50,21 +52,32 @@ int sys_open(const char *path, int flags, int mode)
     (void)mode;
 
     int fd = 0;
+    vfslock.lock();
     for (fd = 0; fd < FILES_PER_PROC; fd++) {
         if (!current->files[fd])
             break;
     }
 
-    if (fd >= FILES_PER_PROC) return -EINVAL;
+    if (fd >= FILES_PER_PROC) {
+        vfslock.release();
+        return -EINVAL;
+    }
 
     inode_t* ip = namei(path);
-    if (!ip) return -ENOENT;
+    if (!ip) {
+        vfslock.release();
+        return -ENOENT;
+    }
     
     File* f = get_free_file();
-    if (!f) return -EINVAL;
+    if (!f) {
+        vfslock.release();
+        return -EINVAL;
+    }
 
     f->set_inode(ip);
     current->files[fd] = f;
+    vfslock.release();
     return fd;
 }
 
@@ -80,7 +93,9 @@ int sys_write(int fildes, const void *buf, size_t nbyte)
     if (fildes == 0) {
         char* p = (char*)buf;
         while (*p && nwrite < nbyte) {
+            vfslock.lock();
             kputchar(*p++);
+            vfslock.release();
             ++nwrite;
         }
     }

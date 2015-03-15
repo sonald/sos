@@ -27,7 +27,6 @@ idt_flush:
 %macro isr_noerrcode 1
 global isr%1
 isr%1:
-    cli ; seems unneccesary due to int-gate
     push 0
     push %1
     jmp isr_stub
@@ -36,7 +35,6 @@ isr%1:
 %macro isr_errcode 1
 global isr%1
 isr%1:
-    cli ; seems unneccesary due to int-gate
     push %1
     jmp isr_stub
 %endmacro
@@ -44,7 +42,6 @@ isr%1:
 %macro def_irq 2
 global irq%1
 irq%1:
-    cli ; seems unneccesary cause I use int-gate
     push 0
     push %2
     jmp irq_stub
