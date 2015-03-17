@@ -2,6 +2,7 @@
 #include "types.h"
 #include "task.h"
 #include "x86.h"
+#include "sched.h"
 #include <limits.h>
 
 /* This is a simple string array. It contains the message that
@@ -90,8 +91,6 @@ void isr_handler(trapframe_t* regs)
     }
 }
 
-extern void scheduler(trapframe_t* regs);
-
 void irq_handler(trapframe_t* regs)
 {
     if (regs->isrno >= 32 && regs->isrno <= 47) {
@@ -111,7 +110,7 @@ void irq_handler(trapframe_t* regs)
     }
 
     if (regs->isrno == IRQ_TIMER || current->need_resched) 
-        scheduler(regs);
+        scheduler();
 }
 
 void register_isr_handler(int isr, interrupt_handler cb)

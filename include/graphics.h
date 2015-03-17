@@ -37,4 +37,36 @@ typedef struct ModeInfoBlock_s {
     uint16_t reserved2;
 } __attribute__((packed)) ModeInfoBlock_t;
 
+struct Rgb 
+{
+    uint8_t r, g, b;
+    Rgb(): r{0}, g{0}, b{0} {}
+    Rgb(uint8_t r, uint8_t g, uint8_t b): r{r}, g{g}, b{b} {}
+};
+
+typedef struct position_s
+{
+    int x, y;
+} position_t;
+
+class VideoMode
+{
+    public:
+        void init(ModeInfoBlock_t* modeinfo);
+        void drawLine(int x0, int y0, int x1, int y1, Rgb rgb);
+        void drawLine(position_t p1, position_t p2, Rgb rgb);
+        void drawPixel(int x, int y, Rgb rgb);
+        void drawRect(position_t p, int width, int height, Rgb rgb);
+        void fillRect(position_t p, int width, int height, Rgb rgb);
+
+    private:
+        char* _base;
+        uint32_t _pitch;
+        uint32_t _width, _height;
+
+        void octant0(position_t p1, position_t p2, Rgb rgb);
+};
+
+extern VideoMode videoMode;
+
 #endif

@@ -24,7 +24,7 @@ void sleep(Spinlock* lk, void* chan)
     current->state = TASK_SLEEP;
     kprintf(" (%s:sleep) ", current->name);
     lk->release();
-    scheduler(current->regs); 
+    scheduler(); 
     lk->lock();
     kprintf(" (%s:awaked) ", current->name);
 }

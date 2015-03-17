@@ -7,9 +7,24 @@ static inline void sti() { asm volatile ("sti":::"cc"); }
 static inline void cli() { asm volatile ("cli":::"cc"); }
 
 // port io
-void outb(u16 port, u8 val);
-u8 inb(u16 port);
-u16 inw(u16 port);
+static inline void outb(u16 port, u8 val)
+{
+    __asm__ __volatile__ ( "outb %1, %0" : : "dN"(port), "a"(val));
+}
+
+static inline u8 inb(u16 port)
+{
+    u8 val;
+    __asm__ __volatile__ ( "inb %1, %0" : "=a"(val) : "dN"(port));
+    return val;
+}
+
+static inline u16 inw(u16 port)
+{
+    u16 val;
+    __asm__ __volatile__ ( "inw %1, %0" : "=a"(val) : "dN"(port));
+    return val;
+}
 
 // Eflags register
 #define FL_CF           0x00000001      // Carry Flag

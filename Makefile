@@ -18,7 +18,7 @@ kernel_srcs=kern/boot.s kern/main.cc kern/common.cc kern/cxx_rt.cc \
 			kern/mm.cc kern/vm.cc kern/kb.cc kern/context.s \
 			kern/syscall.cc kern/task.cc kern/vfs.cc kern/ramfs.cc \
 			kern/ata.cc kern/blkio.cc kern/devices.cc kern/spinlock.cc \
-			kern/graphics.cc \
+			kern/graphics.cc kern/display.cc \
 			lib/string.cc lib/sprintf.cc 
 
 kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))
@@ -34,13 +34,14 @@ DEPFILES := $(patsubst %.s, kern_objs/%.d, $(DEPFILES))
 all: run ramfs_gen
 
 debug: kernel
-	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd0.img,format=raw -S
+	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd.img,format=raw -vga std
 
 run: kernel echo hd.img
 	qemu-system-i386 -m 32 -s -monitor stdio -hda hd.img -vga std
 
 hd.img: kernel 
 	hdiutil attach hd.img
+	mkdir -p /Volumes/NO\ NAME/boot/grub
 	cp grub.cfg /Volumes/NO\ NAME/boot
 	cp grub.cfg /Volumes/NO\ NAME/boot/grub
 	cp kernel /Volumes/NO\ NAME/
