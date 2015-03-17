@@ -34,14 +34,19 @@ mboot:
     ; Multiboot macros to make a few lines later more readable
     MULTIBOOT_PAGE_ALIGN    equ 1<<0
     MULTIBOOT_MEMORY_INFO   equ 1<<1
+    MULTIBOOT_VIDEO_INFO   equ 1<<2
     MULTIBOOT_HEADER_MAGIC  equ 0x1BADB002
-    MULTIBOOT_HEADER_FLAGS  equ MULTIBOOT_PAGE_ALIGN | MULTIBOOT_MEMORY_INFO  
+    MULTIBOOT_HEADER_FLAGS  equ MULTIBOOT_PAGE_ALIGN | MULTIBOOT_MEMORY_INFO | MULTIBOOT_VIDEO_INFO
     MULTIBOOT_CHECKSUM  equ -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
 
     ; This is the GRUB Multiboot header. A boot signature
     dd MULTIBOOT_HEADER_MAGIC
     dd MULTIBOOT_HEADER_FLAGS
     dd MULTIBOOT_CHECKSUM
+
+    dd  0, 0, 0, 0, 0
+    dd  0 ; 0 = set graphics mode
+    dd  800, 600, 24 ; Width, height, depth
     
 [section .text]
 ; physical address for _start, need it before paing enabled.

@@ -18,6 +18,7 @@ kernel_srcs=kern/boot.s kern/main.cc kern/common.cc kern/cxx_rt.cc \
 			kern/mm.cc kern/vm.cc kern/kb.cc kern/context.s \
 			kern/syscall.cc kern/task.cc kern/vfs.cc kern/ramfs.cc \
 			kern/ata.cc kern/blkio.cc kern/devices.cc kern/spinlock.cc \
+			kern/graphics.cc \
 			lib/string.cc lib/sprintf.cc 
 
 kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))
@@ -35,8 +36,16 @@ all: run ramfs_gen
 debug: kernel
 	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd0.img,format=raw -S
 
-run: kernel echo
-	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd0.img,format=raw
+run: kernel echo hd.img
+	qemu-system-i386 -m 32 -s -monitor stdio -hda hd.img -vga std
+
+hd.img: kernel 
+	hdiutil attach hd.img
+	cp grub.cfg /Volumes/NO\ NAME/boot
+	cp grub.cfg /Volumes/NO\ NAME/boot/grub
+	cp kernel /Volumes/NO\ NAME/
+	cp initramfs.img /Volumes/NO\ NAME
+	hdiutil detach disk2
 
 kernel: $(kern_objs) kern/kernel.ld
 	$(CXX) -T kern/kernel.ld -O2 -nostdlib -o $@ $^ -lgcc

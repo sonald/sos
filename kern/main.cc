@@ -14,6 +14,7 @@
 #include "ata.h"
 #include "blkio.h"
 #include "sched.h"
+#include "graphics.h"
 
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
@@ -201,26 +202,49 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     const char* msg = "Welcome to SOS....\n";
     kputs(msg);
     u32 memsize = 0;
-    if (mb->flags & MULTIBOOT_FLAG_MEM) {
+    if (mb->flags & MULTIBOOT_INFO_MEMORY) {
         memsize = mb->low_mem + mb->high_mem;
         set_text_color(COLOR(LIGHT_RED, BLACK));
         kprintf("detected mem(%dKB): low: %dKB, hi: %dKB\n",
                 memsize, mb->low_mem, mb->high_mem);
     }
 
-    if (mb->flags & MULTIBOOT_FLAG_MMAP) {
+    if (mb->flags & MULTIBOOT_INFO_MEM_MAP) {
         apply_mmap(mb->mmap_length, mb->mmap_addr);
     }
     set_text_color(COLOR(LIGHT_GREEN, BLACK));
 
     void* last_address = NULL;
-    if (mb->flags & MULTIBOOT_FLAG_MODS) {
+    if (mb->flags & MULTIBOOT_INFO_MODS) {
         module_t* mod = (module_t*)p2v(mb->mods_addr);
         last_address = p2v(mod->mod_end);
     }
 
     pmm.init(memsize, last_address);
     vmm.init(&pmm);
+    if (mb->flags & MULTIBOOT_INFO_VBE_INFO) {
+        //VbeInfoBlock_t* vbe = (VbeInfoBlock_t*)mb->vbe_control_info;
+        ModeInfoBlock_t* modinfo = (ModeInfoBlock_t*)
+            (mb->vbe_mode_info+KERNEL_VIRTUAL_BASE);
+
+        if (modinfo->attributes & 0x80) {
+            char* video = (char*)0xE0000000;
+            uint32_t video_phys = modinfo->physbase;
+            uint32_t vramsize = modinfo->Yres * modinfo->pitch;
+            vmm.map_pages(vmm.kernel_page_directory(), (void*)video,
+                    vramsize, video_phys, PDE_USER|PDE_WRITABLE);
+            vmm.switch_page_directory(vmm.kernel_page_directory());
+            for (int row = 4; row < 100; row++) {
+                for (int j = 0; j < 300; j+=3) {
+                    *(video + row*modinfo->pitch + j) = 0xf0;
+                    *(video + row*modinfo->pitch + j+1) = 0x80;
+                    *(video + row*modinfo->pitch + j+2) = 0x08;
+                }
+            }
+            for(;;);
+        }
+    }
+
     tasks_init();
     kbd.init();
     ata_init();
