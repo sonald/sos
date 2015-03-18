@@ -34,16 +34,13 @@ DEPFILES := $(patsubst %.s, kern_objs/%.d, $(DEPFILES))
 all: run ramfs_gen
 
 debug: kernel
-	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd.img,format=raw -vga std
+	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio -drive file=hd.img,format=raw -vga vmware
 
 run: kernel echo hd.img
-	qemu-system-i386 -m 32 -s -monitor stdio -hda hd.img -vga std
+	qemu-system-i386 -m 32 -s -monitor stdio -hda hd.img -vga vmware
 
 hd.img: kernel 
 	hdiutil attach hd.img
-	mkdir -p /Volumes/NO\ NAME/boot/grub
-	cp grub.cfg /Volumes/NO\ NAME/boot
-	cp grub.cfg /Volumes/NO\ NAME/boot/grub
 	cp kernel /Volumes/NO\ NAME/
 	cp initramfs.img /Volumes/NO\ NAME
 	hdiutil detach disk2

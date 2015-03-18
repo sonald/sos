@@ -229,16 +229,30 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
         if (modinfo->attributes & 0x80) {
             videoMode.init(modinfo);
-            char* video = (char*)0xE0000000;
-            for (int row = 4; row < 100; row++) {
-                for (int j = 0; j < 300; j+=3) {
-                    *(video + row*modinfo->pitch + j) = 0xff;
-                    *(video + row*modinfo->pitch + j+1) = 0x80;
-                    *(video + row*modinfo->pitch + j+2) = 0x08;
-                }
-            }
             current_display = &graph_console;
-            videoMode.drawLine(300, 100, 500, 200, {0xff, 0x00, 0x00});
+            videoMode.drawLine(100, 100, 400, 200, {0xff, 0x00, 0x00});
+            videoMode.drawLine(100, 100, 500, 200, {0x00, 0xff, 0x00});
+
+            videoMode.drawLine(0, 150, 590, 150, {0xff, 0xff, 0xff});
+            videoMode.drawLine(150, 0, 150, 600, {0xf0, 0xef, 0x8f});
+
+            videoMode.drawLine(200, 100, 300, 400, {0x00, 0xff, 0x00});
+            videoMode.drawLine({10, 10}, {200, 50}, {0xe0, 0xff, 0xe0});
+            videoMode.drawLine({220, 50}, {12, 12}, {0xe0, 0xff, 0xe0});
+            videoMode.drawLine({10, 10}, {80, 300}, {0xe0, 0xff, 0xe0});
+            videoMode.drawLine({10, 30}, {100, 30}, {0xe0, 0xff, 0xe0});
+            videoMode.drawLine({20, 300}, {200, 60}, {0x20, 0x20, 0xff});
+            videoMode.drawLine({20, 100}, {200, 60}, {0x20, 0x20, 0xff});
+            videoMode.drawLine({20, 100}, {200, 70}, {0x20, 0x20, 0xff});
+            videoMode.drawLine({20, 100}, {100, 90}, {0x20, 0x20, 0xff});
+            videoMode.drawLine({40, 230}, {120, 40}, {0xff, 0xff, 0x00});
+            videoMode.drawLine({150, 200}, {150, 40},  {0xf0, 0x20, 0xf0});
+            videoMode.drawLine({200, 200}, {500, 500}, {0xf0, 0x20, 0xf0});
+            videoMode.drawLine({200, 500}, {500, 200}, {0xf0, 0x20, 0xf0});
+
+            videoMode.fillRect({40, 40}, 40, 20, {0xff, 0xff, 0xff});
+            videoMode.drawRect({38, 38}, 44, 24, {0xff, 0xe0, 0x00});
+
         }
         for(;;) asm ("cli; hlt");
     }

@@ -65,6 +65,7 @@ class VideoMode
         uint32_t _width, _height;
 
         void octant0(position_t p1, position_t p2, Rgb rgb);
+        void octant1(position_t p1, position_t p2, Rgb rgb);
 };
 
 extern VideoMode videoMode;
