@@ -3,8 +3,29 @@
 #include "vm.h"
 #include "string.h"
 #include "font.h"
-
+      
 VideoMode videoMode;
+Rgb colormap[] = {
+    0x000000,  
+    0x0000ff,  
+    0x00ff00,  
+    0x00ffff,  
+    0xff0000,  
+    0xff00ff,  
+    0xa52a2a,  
+    0xd3d3d3,  
+    0xbebebe,  
+    0xadd8e6,  
+    0x90ee90,  
+    0xe0ffff,  
+    0xcd5c5c,
+    0xee00ee,  
+    0xff4040,  
+    0xffffff,  
+    0xffff00,  
+    0xfafad2,  
+    0x800080   
+};
 
 void VideoMode::init(ModeInfoBlock_t* modeinfo)
 {
@@ -16,7 +37,7 @@ void VideoMode::init(ModeInfoBlock_t* modeinfo)
     _pitch = modeinfo->pitch;
     _width = modeinfo->Xres;
     _height = modeinfo->Yres;
-    vmm.switch_page_directory(vmm.kernel_page_directory());
+    //vmm.switch_page_directory(vmm.kernel_page_directory());
 }
 
 void VideoMode::drawLine(int x0, int y0, int x1, int y1, Rgb rgb)
@@ -66,6 +87,7 @@ void VideoMode::octant1(position_t p1, position_t p2, Rgb rgb)
     drawPixel(p2.x, p2.y, rgb);
 }
 
+// FIXME: bounds check
 void VideoMode::drawLine(position_t p1, position_t p2, Rgb rgb)
 {
     if (p1.x > p2.x) {
@@ -89,6 +111,9 @@ void VideoMode::drawPixel(int x, int y, Rgb rgb)
 
 void VideoMode::drawRect(position_t p, int width, int height, Rgb rgb)
 {
+    width = min(_width - p.x, width);
+    height = min(_height - p.y, height);
+
     auto l = p.x, r = p.x+width-1, t = p.y, b = p.y+height-1;
     drawLine(l, t, r, t, rgb);
     drawLine(l, t, l, b, rgb);
@@ -96,9 +121,11 @@ void VideoMode::drawRect(position_t p, int width, int height, Rgb rgb)
     drawLine(l, b, r, b, rgb);
 }
 
-// FIXME: can be optimized
 void VideoMode::fillRect(position_t p, int width, int height, Rgb rgb)
 {
+    width = min(_width - p.x, width);
+    height = min(_height - p.y, height);
+
     if (height == 0 || width == 0) return;
     char* start = _base + p.y * _pitch + p.x * 3;
     for (int i = 0; i < width; i++) {
@@ -106,7 +133,6 @@ void VideoMode::fillRect(position_t p, int width, int height, Rgb rgb)
         *(start + i*3 + 1) = rgb.g;
         *(start + i*3 + 2) = rgb.r;
     }
-
 
     for (int j = 0; j < height-1; j++) {
         memcpy(start+_pitch, start, width*3);
@@ -133,16 +159,17 @@ void VideoMode::drawChar(position_t p, char c, Rgb rgb)
         char* ln = (start + i*_pitch);
         for (int j = 0; j < 8; j++) {
             auto v = f[i*8+j];
+            Rgb* p = (Rgb*)(ln + j*3);
             if (v == '*') {
-                *(ln + j*3) = rgb.b;
-                *(ln + j*3 + 1) = rgb.g;
-                *(ln + j*3 + 2) = rgb.r;
+                *p = rgb;
+            } else {
+                *p = {0, 0, 0}; //bg color
             }
         }
     }
 }
 
-//FIXME: optimize: use one giant memmove instead
+// FIXME: bounds check
 void VideoMode::blitCopy(position_t dst, position_t src, int width, int height)
 {
     char* start = _base + dst.y * _pitch + dst.x * 3;

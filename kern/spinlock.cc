@@ -20,7 +20,7 @@ uint32_t Spinlock::lock()
 
 #ifdef DEBUG_SPINLOCK
     auto old = get_text_color();
-    set_text_color(COLOR(BROWN, WHITE));
+    set_text_color(BROWN);
     kprintf("[%s:L %s (IF %d)] ", _name, current?current->name:"",
             (oldflags&FL_IF)?1:0);
     set_text_color(old);
@@ -33,7 +33,7 @@ void Spinlock::release(uint32_t oldflags)
 {
 #ifdef DEBUG_SPINLOCK
     auto old = get_text_color();
-    set_text_color(COLOR(BROWN, WHITE));
+    set_text_color(BROWN);
     kprintf("[%s:R %s (IF %d)] ", _name, current?current->name:"",
             (oldflags&FL_IF)?1:0);
     set_text_color(old);

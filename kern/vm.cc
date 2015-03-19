@@ -246,6 +246,23 @@ page_directory_t* VirtualMemoryManager::create_address_space()
                 kmap[i].phys_start, kmap[i].perm);
     }
 
+    if (_kernel_page_directory) {
+        // copy other dynamically created kernel mapping
+        // currently video memory mapping
+        char* v = (char*)0xE0000000;
+        char* end = (char*)0xF0000000;
+        while (v < end) {
+            page_t* pte = walk(_kernel_page_directory, v, false);
+            if (pte && pte->present) {
+                u32 paddr = pte->frame * _pmm->frame_size;
+                int flags = pde_get_flags(*(u32*)pte);
+
+                map_pages(pdir, v, PGSIZE, paddr, flags);
+            }
+
+            v += PGSIZE;
+        }
+    }
     return pdir;
 }
 

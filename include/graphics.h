@@ -39,9 +39,12 @@ typedef struct ModeInfoBlock_s {
 
 struct Rgb 
 {
-    uint8_t r, g, b;
-    Rgb(): r{0}, g{0}, b{0} {}
-    Rgb(uint8_t r, uint8_t g, uint8_t b): r{r}, g{g}, b{b} {}
+    uint8_t b, g, r; // match memory layout of pixel
+    Rgb(): b{0}, g{0}, r{0} {}
+    Rgb(uint8_t r, uint8_t g, uint8_t b): b{b}, g{g}, r{r} {}
+    Rgb(uint32_t rgb)
+        :b{(uint8_t)(rgb & 0xff)},
+        g{(uint8_t)((rgb>>8) & 0xff)}, r{(uint8_t)(rgb>>16)} {}
 };
 
 typedef struct position_s
@@ -76,5 +79,6 @@ class VideoMode
 };
 
 extern VideoMode videoMode;
+extern Rgb colormap[];
 
 #endif

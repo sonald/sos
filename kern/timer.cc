@@ -58,7 +58,7 @@ static void timer_interrupt(trapframe_t* regs)
     (void)regs;
     timer_ticks++;
     auto old = current_display->get_text_color();
-    current_display->set_text_color(COLOR(LIGHT_CYAN, WHITE));
+    current_display->set_text_color(LIGHT_CYAN);
     auto cur = current_display->get_cursor();
     current_display->set_cursor({70, 0});
 

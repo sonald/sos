@@ -79,14 +79,14 @@ void Console::scroll(int lines)
     _cy = max(_cy-lines, 0);
 }
 
-u8 Console::get_text_color()
+Color Console::get_text_color()
 {
-    return _attrib;
+    return (Color)_attrib;
 }
 
-void Console::set_text_color(u8 val)
+void Console::set_text_color(Color val)
 {
-    _attrib = val;
+    _attrib = (u8)val;
 }
 
 void Console::set_cursor(position_t cur)
@@ -115,14 +115,15 @@ void Console::clear()
 }
 
 
-u8 GraphicDisplay::get_text_color()
+Color GraphicDisplay::get_text_color()
 {
-    return 7;
+    return _clridx;
 }
 
-void GraphicDisplay::set_text_color(u8 clr)
+void GraphicDisplay::set_text_color(Color clr)
 {
-    _clr = {0xff, 0xff, 0};
+    _clridx = (clr > MAXCOLOR) ? WHITE : clr;
+    _clr = colormap[_clridx];
 }
 
 void GraphicDisplay::set_cursor(position_t cur)
@@ -188,3 +189,39 @@ void GraphicDisplay::scroll(int lines)
 
     _cursor.y = min(max(_cursor.y-1, 0), _rows-1);
 }
+
+void video_mode_test()
+{
+    videoMode.drawLine(100, 100, 400, 200, {0xff, 0x00, 0x00});
+    videoMode.drawLine(100, 100, 500, 200, {0x00, 0xff, 0x00});
+
+    videoMode.drawLine(0, 150, 590, 150, {0xff, 0xff, 0xff});
+    videoMode.drawLine(150, 0, 150, 600, {0xf0, 0xef, 0x8f});
+
+    videoMode.drawLine(200, 100, 300, 400, {0x00, 0xff, 0x00});
+    videoMode.drawLine({10, 10}, {200, 50}, {0xe0, 0xff, 0xe0});
+    videoMode.drawLine({220, 50}, {12, 12}, {0xe0, 0xff, 0xe0});
+    videoMode.drawLine({10, 10}, {80, 300}, {0xe0, 0xff, 0xe0});
+    videoMode.drawLine({10, 30}, {100, 30}, {0xe0, 0xff, 0xe0});
+    videoMode.drawLine({20, 300}, {200, 60}, {0x20, 0x20, 0xff});
+    videoMode.drawLine({20, 100}, {200, 60}, {0x20, 0x20, 0xff});
+    videoMode.drawLine({20, 100}, {200, 70}, {0x20, 0x20, 0xff});
+    videoMode.drawLine({20, 100}, {100, 90}, {0x20, 0x20, 0xff});
+    videoMode.drawLine({40, 230}, {120, 40}, {0xff, 0xff, 0x00});
+    videoMode.drawLine({150, 200}, {150, 40},  {0xf0, 0x20, 0xf0});
+    videoMode.drawLine({200, 200}, {500, 500}, {0xf0, 0x20, 0xf0});
+    videoMode.drawLine({200, 500}, {500, 200}, {0xf0, 0x20, 0xf0});
+
+    videoMode.fillRect({40, 40}, 40, 20, colormap[CYAN]);
+    videoMode.drawRect({38, 38}, 44, 24, {0xff, 0xe0, 0x00});
+
+    videoMode.blitCopy({100, 100}, {38, 38}, 44, 24);
+    videoMode.drawString({80, 80}, "hello, SOS", {0xe0, 0x80, 0xe0});
+    videoMode.fillRect({0, 570}, 800, 40, {0xff, 0x00, 0xff});
+
+    for (int i = 0; i <= MAXCOLOR; i++) {
+        current_display->set_text_color((Color)(i % (MAXCOLOR + 1)));
+        kprintf("%d: comming here  %x \n", i, i);
+    }
+}
+

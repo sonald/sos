@@ -29,7 +29,7 @@ extern int sys_write(int fildes, const void *buf, size_t nbyte);
  */
 extern "C" void kernel_init()
 {
-    current_display->clear();
+    //current_display->clear();
 }
 
 void idle_thread()
@@ -198,13 +198,13 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     init_timer();
     init_syscall();
 
-    current_display->set_text_color(COLOR(LIGHT_GREEN, BLACK));
+    current_display->set_text_color(LIGHT_GREEN);
     const char* msg = "Welcome to SOS....\n";
     kputs(msg);
     u32 memsize = 0;
     if (mb->flags & MULTIBOOT_INFO_MEMORY) {
         memsize = mb->low_mem + mb->high_mem;
-        current_display->set_text_color(COLOR(LIGHT_RED, BLACK));
+        current_display->set_text_color(LIGHT_RED);
         kprintf("detected mem(%dKB): low: %dKB, hi: %dKB\n",
                 memsize, mb->low_mem, mb->high_mem);
     }
@@ -212,7 +212,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     if (mb->flags & MULTIBOOT_INFO_MEM_MAP) {
         apply_mmap(mb->mmap_length, mb->mmap_addr);
     }
-    current_display->set_text_color(COLOR(LIGHT_GREEN, BLACK));
+    current_display->set_text_color(LIGHT_GREEN);
 
     void* last_address = NULL;
     if (mb->flags & MULTIBOOT_INFO_MODS) {
@@ -229,46 +229,12 @@ extern "C" int kernel_main(struct multiboot_info *mb)
         if (modinfo->attributes & 0x80) {
             videoMode.init(modinfo);
             current_display = &graph_console;
-            videoMode.drawLine(100, 100, 400, 200, {0xff, 0x00, 0x00});
-            videoMode.drawLine(100, 100, 500, 200, {0x00, 0xff, 0x00});
-
-            videoMode.drawLine(0, 150, 590, 150, {0xff, 0xff, 0xff});
-            videoMode.drawLine(150, 0, 150, 600, {0xf0, 0xef, 0x8f});
-
-            videoMode.drawLine(200, 100, 300, 400, {0x00, 0xff, 0x00});
-            videoMode.drawLine({10, 10}, {200, 50}, {0xe0, 0xff, 0xe0});
-            videoMode.drawLine({220, 50}, {12, 12}, {0xe0, 0xff, 0xe0});
-            videoMode.drawLine({10, 10}, {80, 300}, {0xe0, 0xff, 0xe0});
-            videoMode.drawLine({10, 30}, {100, 30}, {0xe0, 0xff, 0xe0});
-            videoMode.drawLine({20, 300}, {200, 60}, {0x20, 0x20, 0xff});
-            videoMode.drawLine({20, 100}, {200, 60}, {0x20, 0x20, 0xff});
-            videoMode.drawLine({20, 100}, {200, 70}, {0x20, 0x20, 0xff});
-            videoMode.drawLine({20, 100}, {100, 90}, {0x20, 0x20, 0xff});
-            videoMode.drawLine({40, 230}, {120, 40}, {0xff, 0xff, 0x00});
-            videoMode.drawLine({150, 200}, {150, 40},  {0xf0, 0x20, 0xf0});
-            videoMode.drawLine({200, 200}, {500, 500}, {0xf0, 0x20, 0xf0});
-            videoMode.drawLine({200, 500}, {500, 200}, {0xf0, 0x20, 0xf0});
-
-            videoMode.fillRect({40, 40}, 40, 20, {0xff, 0xff, 0xff});
-            videoMode.drawRect({38, 38}, 44, 24, {0xff, 0xe0, 0x00});
-
-            videoMode.drawString({80, 80}, "hello, SOS", {0xe0, 0x80, 0xe0});
-            videoMode.drawChar({90, 90}, 'A', {0x0, 0x0, 0xff});
-            videoMode.drawChar({90, 98}, 'B', {0x0, 0x0, 0xff});
-            videoMode.drawChar({90, 106}, 'C', {0x0, 0x0, 0xff});
-            videoMode.drawChar({90, 114}, 'D', {0x0, 0x0, 0xff});
-
-            videoMode.blitCopy({100, 100}, {38, 38}, 44, 24);
-            kputs("Come from Video Mode!");
-            videoMode.fillRect({0, 560}, 800, 40, {0xff, 0x00, 0xff});
             //current_display->clear();
-            for (int i = 0; i < 45; i++) {
-                kprintf("%d: comming here  %x \n", i, i);
-            }
+            //video_mode_test();
         }
     }
+    //for(;;) asm volatile ("hlt");
 
-    for(;;) asm volatile ("hlt");
     tasks_init();
     kbd.init();
     ata_init();
