@@ -198,21 +198,15 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     init_timer();
     init_syscall();
 
-    current_display->set_text_color(LIGHT_GREEN);
-    const char* msg = "Welcome to SOS....\n";
-    kputs(msg);
     u32 memsize = 0;
     if (mb->flags & MULTIBOOT_INFO_MEMORY) {
         memsize = mb->low_mem + mb->high_mem;
         current_display->set_text_color(LIGHT_RED);
-        kprintf("detected mem(%dKB): low: %dKB, hi: %dKB\n",
-                memsize, mb->low_mem, mb->high_mem);
     }
 
-    if (mb->flags & MULTIBOOT_INFO_MEM_MAP) {
-        apply_mmap(mb->mmap_length, mb->mmap_addr);
-    }
-    current_display->set_text_color(LIGHT_GREEN);
+    //if (mb->flags & MULTIBOOT_INFO_MEM_MAP) {
+        //apply_mmap(mb->mmap_length, mb->mmap_addr);
+    //}
 
     void* last_address = NULL;
     if (mb->flags & MULTIBOOT_INFO_MODS) {
@@ -229,11 +223,21 @@ extern "C" int kernel_main(struct multiboot_info *mb)
         if (modinfo->attributes & 0x80) {
             videoMode.init(modinfo);
             current_display = &graph_console;
-            //current_display->clear();
-            //video_mode_test();
+            current_display->clear();
+            video_mode_test();
         }
     }
-    //for(;;) asm volatile ("hlt");
+    for(;;) asm volatile ("hlt");
+    current_display->set_text_color(CYAN);
+    const char* msg = "booting SOS....\n";
+    kputs(msg);
+    current_display->set_text_color(YELLOW);
+    kprintf("detected mem(%dKB): low: %dKB, hi: %dKB\n",
+            memsize, mb->low_mem, mb->high_mem);
+    if (mb->flags & MULTIBOOT_INFO_MEM_MAP) {
+        apply_mmap(mb->mmap_length, mb->mmap_addr);
+    }
+    current_display->set_text_color(WHITE);
 
     tasks_init();
     kbd.init();

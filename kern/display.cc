@@ -219,6 +219,8 @@ void video_mode_test()
     videoMode.drawString({80, 80}, "hello, SOS", {0xe0, 0x80, 0xe0});
     videoMode.fillRect({0, 570}, 800, 40, {0xff, 0x00, 0xff});
 
+    videoMode.blitCopy({0, 400}, {0, 560}, 800, 40);
+
     for (int i = 0; i <= MAXCOLOR; i++) {
         current_display->set_text_color((Color)(i % (MAXCOLOR + 1)));
         kprintf("%d: comming here  %x \n", i, i);

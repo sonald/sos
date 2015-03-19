@@ -3,7 +3,10 @@
 #include "vm.h"
 #include "string.h"
 #include "font.h"
-      
+#include "spinlock.h"
+
+Spinlock videolock("video");
+
 VideoMode videoMode;
 Rgb colormap[] = {
     0x000000,  
@@ -155,6 +158,8 @@ void VideoMode::drawChar(position_t p, char c, Rgb rgb)
     if (c <= 0) return;
     char* start = _base + p.y * _pitch + p.x * 3;
     const char* f = builtin_font[(int)c-1];
+
+    auto oflags = videolock.lock();
     for (int i = 0; i < 16; i++) {
         char* ln = (start + i*_pitch);
         for (int j = 0; j < 8; j++) {
@@ -167,6 +172,7 @@ void VideoMode::drawChar(position_t p, char c, Rgb rgb)
             }
         }
     }
+    videolock.release(oflags);
 }
 
 // FIXME: bounds check
@@ -174,7 +180,13 @@ void VideoMode::blitCopy(position_t dst, position_t src, int width, int height)
 {
     char* start = _base + dst.y * _pitch + dst.x * 3;
     char* old = _base + src.y * _pitch + src.x * 3;
-    auto expand = min(width*3, _pitch);
+    uint32_t expand = min(width*3, _pitch);
+    if (expand == _pitch && dst.x == 0 && src.x == 0) {
+        expand *= height;
+        memmove(start, old, expand);
+        return;
+    } 
+    // slow version
     for (int j = 0; j < height; j++) {
         memcpy(start, old, expand);
         start += _pitch;
