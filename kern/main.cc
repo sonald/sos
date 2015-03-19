@@ -30,7 +30,6 @@ extern int sys_write(int fildes, const void *buf, size_t nbyte);
 extern "C" void kernel_init()
 {
     current_display->clear();
-    //set_text_color(COLOR(LIGHT_CYAN, BLACK));
 }
 
 void idle_thread()
@@ -253,10 +252,23 @@ extern "C" int kernel_main(struct multiboot_info *mb)
             videoMode.fillRect({40, 40}, 40, 20, {0xff, 0xff, 0xff});
             videoMode.drawRect({38, 38}, 44, 24, {0xff, 0xe0, 0x00});
 
+            videoMode.drawString({80, 80}, "hello, SOS", {0xe0, 0x80, 0xe0});
+            videoMode.drawChar({90, 90}, 'A', {0x0, 0x0, 0xff});
+            videoMode.drawChar({90, 98}, 'B', {0x0, 0x0, 0xff});
+            videoMode.drawChar({90, 106}, 'C', {0x0, 0x0, 0xff});
+            videoMode.drawChar({90, 114}, 'D', {0x0, 0x0, 0xff});
+
+            videoMode.blitCopy({100, 100}, {38, 38}, 44, 24);
+            kputs("Come from Video Mode!");
+            videoMode.fillRect({0, 560}, 800, 40, {0xff, 0x00, 0xff});
+            //current_display->clear();
+            for (int i = 0; i < 45; i++) {
+                kprintf("%d: comming here  %x \n", i, i);
+            }
         }
-        for(;;) asm ("cli; hlt");
     }
 
+    for(;;) asm volatile ("hlt");
     tasks_init();
     kbd.init();
     ata_init();
@@ -265,7 +277,6 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     picenable(IRQ_KBD);
     picenable(IRQ_TIMER);
 
-    //for(;;) asm volatile ("hlt");
 
     load_module(mb->mods_count, mb->mods_addr);
 

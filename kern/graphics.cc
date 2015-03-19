@@ -1,6 +1,8 @@
 #include "graphics.h"
+#include "common.h"
 #include "vm.h"
 #include "string.h"
+#include "font.h"
 
 VideoMode videoMode;
 
@@ -87,15 +89,17 @@ void VideoMode::drawPixel(int x, int y, Rgb rgb)
 
 void VideoMode::drawRect(position_t p, int width, int height, Rgb rgb)
 {
-    drawLine(p, {p.x+width, p.y}, rgb);
-    drawLine({p.x, p.y+height}, {p.x+width, p.y+height}, rgb);
-    drawLine(p, {p.x, p.y+height}, rgb);
-    drawLine({p.x+width, p.y}, {p.x+width, p.y+height}, rgb);
+    auto l = p.x, r = p.x+width-1, t = p.y, b = p.y+height-1;
+    drawLine(l, t, r, t, rgb);
+    drawLine(l, t, l, b, rgb);
+    drawLine(r, t, r, b, rgb);
+    drawLine(l, b, r, b, rgb);
 }
 
 // FIXME: can be optimized
 void VideoMode::fillRect(position_t p, int width, int height, Rgb rgb)
 {
+    if (height == 0 || width == 0) return;
     char* start = _base + p.y * _pitch + p.x * 3;
     for (int i = 0; i < width; i++) {
         *(start + i*3) = rgb.b;
@@ -104,9 +108,50 @@ void VideoMode::fillRect(position_t p, int width, int height, Rgb rgb)
     }
 
 
-    for (int j = 0; j < height; j++) {
+    for (int j = 0; j < height-1; j++) {
         memcpy(start+_pitch, start, width*3);
         start += _pitch;
+    }
+}
+
+void VideoMode::drawString(position_t p, const char* s, Rgb rgb)
+{
+    int step = builtin_fontinfo.xadvance;
+    int len = strlen(s);
+    for (int i = 0; i < len; i++) {
+        drawChar(p, s[i], rgb);
+        p.x += step;
+    }
+}
+
+void VideoMode::drawChar(position_t p, char c, Rgb rgb)
+{
+    if (c <= 0) return;
+    char* start = _base + p.y * _pitch + p.x * 3;
+    const char* f = builtin_font[(int)c-1];
+    for (int i = 0; i < 16; i++) {
+        char* ln = (start + i*_pitch);
+        for (int j = 0; j < 8; j++) {
+            auto v = f[i*8+j];
+            if (v == '*') {
+                *(ln + j*3) = rgb.b;
+                *(ln + j*3 + 1) = rgb.g;
+                *(ln + j*3 + 2) = rgb.r;
+            }
+        }
+    }
+}
+
+//FIXME: optimize: use one giant memmove instead
+void VideoMode::blitCopy(position_t dst, position_t src, int width, int height)
+{
+    char* start = _base + dst.y * _pitch + dst.x * 3;
+    char* old = _base + src.y * _pitch + src.x * 3;
+    auto expand = min(width*3, _pitch);
+    for (int j = 0; j < height; j++) {
+        memcpy(start, old, expand);
+        start += _pitch;
+        old += _pitch;
     }
 }
 

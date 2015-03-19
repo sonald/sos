@@ -58,6 +58,13 @@ class VideoMode
         void drawPixel(int x, int y, Rgb rgb);
         void drawRect(position_t p, int width, int height, Rgb rgb);
         void fillRect(position_t p, int width, int height, Rgb rgb);
+        void drawString(position_t p, const char* s, Rgb rgb);
+        void drawChar(position_t p, char c, Rgb rgb);
+
+        void blitCopy(position_t dst, position_t src, int width, int height);
+
+        int width() const { return _width; }
+        int height() const { return _height; }
 
     private:
         char* _base;

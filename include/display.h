@@ -5,7 +5,7 @@
 #include "graphics.h"
 
 #define COLOR(fg, bg) ((((fg) & 0x0f) | ((bg) & 0xf0)) & 0xff)
-enum {
+enum Color {
     BLACK =       0,   // BLACK   
     BLUE =        1,   // BLUE    
     GREEN =       2,   // GREEN   
@@ -33,6 +33,7 @@ class Display
         virtual position_t get_cursor() = 0;
         virtual void clear() = 0;
 
+        virtual void scroll(int lines) = 0;
         virtual void putchar(char c) = 0;
 };
 
@@ -46,10 +47,10 @@ class Console: public Display
         void clear() override;
 
         void putchar(char c) override;
+        void scroll(int lines) override;
 
     private:
         void set_phy_cursor(int x, int y);
-        void scroll(int lines);
 
         int _cx {0}, _cy {0};
         u8 _attrib {0x0F};
@@ -64,9 +65,13 @@ class GraphicDisplay: public Display
         position_t get_cursor() override;
         void clear() override;
         void putchar(char c) override;
+        void scroll(int lines) override;
 
     private:
-        position_t _cursor;
+
+        position_t _cursor {0, 0};
+        int _rows {34}, _cols {88};
+        Rgb _clr {0xff, 0xff, 0x0};
 };
 
 extern Console console;
