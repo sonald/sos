@@ -39,6 +39,58 @@ void idle_thread()
         "jmp 1b");
 }
 
+static void debug_print(Keyboard* kb)
+{
+    key_packet_t pkt = kb->kbbuf().read();
+    KeyCode key = pkt.keycode;
+    if (key == KEY_UNKNOWN || (pkt.status & KB_RELEASE))
+        return;
+
+    if (kb->shift_down()) {
+        if (key >= KEY_A && key <= KEY_Z) {
+            kputchar(key - 0x20);
+        } else if (key >= KEY_0 && key <= KEY_9){
+        }
+    } else {
+        if (key == KEY_RETURN)
+            kputchar('\n');
+        else if (key == KEY_TAB)
+            kputchar('\t');
+        else if (key == KEY_BACKSPACE)
+            kputchar('\b');
+        else
+            kputchar(key);
+    }
+}
+
+void tty_thread()
+{
+    
+    while (1) {
+        if (!kbd.msbuf().empty()) {
+            mouse_packet_t pkt = kbd.msbuf().read();
+
+            auto old = current_display->get_text_color();
+            auto cur = current_display->get_cursor();
+            cli();
+            current_display->set_text_color(LIGHT_BLUE);
+            current_display->set_cursor({60, 2});
+
+            kprintf(" @%d, %d, 0x%x@ ", pkt.relx, pkt.rely, pkt.flags);
+
+            current_display->set_cursor(cur);
+            current_display->set_text_color(old);
+            sti();
+        }
+
+        if (!kbd.kbbuf().empty()) {
+            debug_print(&kbd);
+        }
+
+        asm ("hlt");
+    }
+}
+
 void kthread1()
 {
     dev_t ROOT_DEV = DEVNO(IDE_MAJOR, 0);
@@ -72,7 +124,6 @@ void kthread2()
         kprintf(" |KT2 %d| ", count++);
         dev_t ROOT_DEV = DEVNO(IDE_MAJOR, 0);
         Buffer* mbr = bio.read(ROOT_DEV, 0);
-        kputs(" |KT2: read| ");
         bio.release(mbr);
     }
 }
@@ -225,9 +276,15 @@ extern "C" int kernel_main(struct multiboot_info *mb)
             current_display = &graph_console;
             current_display->clear();
             video_mode_test();
+            kprintf("VideoMode:\n "
+                    "winsize: %d, pitch: %d, xres: %d, yres: %d,"
+                    "planes: %d, banks: %d, bank_size: %d\n",
+                    modinfo->winsize, modinfo->pitch, modinfo->Xres,
+                    modinfo->Yres, modinfo->planes, modinfo->banks,
+                    modinfo->bank_size);
         }
     }
-    for(;;) asm volatile ("hlt");
+    //for(;;) asm volatile ("hlt");
     current_display->set_text_color(CYAN);
     const char* msg = "booting SOS....\n";
     kputs(msg);
@@ -237,17 +294,19 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     if (mb->flags & MULTIBOOT_INFO_MEM_MAP) {
         apply_mmap(mb->mmap_length, mb->mmap_addr);
     }
-    current_display->set_text_color(WHITE);
+    current_display->set_text_color(LIGHT_MAGENTA);
 
     tasks_init();
-    kbd.init();
+    kbd.init(); // both kb & mouse
     ata_init();
     bio.init();
 
     picenable(IRQ_KBD);
+    picenable(IRQ_MOUSE);
     picenable(IRQ_TIMER);
 
 
+    //for(;;) asm volatile ("hlt");
     load_module(mb->mods_count, mb->mods_addr);
 
     proc_t* proc = prepare_userinit((void*)&init_task);
@@ -255,6 +314,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     create_kthread("kthread1", kthread1);
     create_kthread("kthread2", kthread2);
     create_kthread("idle", idle_thread);
+    create_kthread("tty", tty_thread);
 
     vmm.switch_page_directory(proc->pgdir);
     setup_tss(proc->kern_esp);

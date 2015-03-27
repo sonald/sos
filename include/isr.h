@@ -10,8 +10,8 @@
 
 #define IRQ0 32 // PIT
 #define IRQ_TIMER 32 // PIT
-#define IRQ1 33 // KBD
 #define IRQ_KBD 33
+#define IRQ1 IRQ_KBD
 #define IRQ2 34 // slave
 #define IRQ3 35 // serial2
 #define IRQ4 36 // serial1
@@ -23,7 +23,8 @@
 #define IRQ9  41 // IRQ2
 #define IRQ10 42 // reserve
 #define IRQ11 43 // reserve
-#define IRQ12 44 // PS/2 mouse
+#define IRQ_MOUSE 44 // PS/2 mouse
+#define IRQ12 IRQ_MOUSE
 #define IRQ13 45 // FPU
 #define IRQ_ATA1 46 // ATA HD1
 #define IRQ_ATA2 47 // ATA HD2

@@ -22,11 +22,11 @@ void sleep(Spinlock* lk, void* chan)
 {
     current->channel = chan;
     current->state = TASK_SLEEP;
-    kprintf(" (%s:sleep) ", current->name);
+    //kprintf(" (%s:sleep) ", current->name);
     lk->release();
     scheduler(); 
     lk->lock();
-    kprintf(" (%s:awaked) ", current->name);
+    //kprintf(" (%s:awaked) ", current->name);
 }
 
 void wakeup(void* chan)

@@ -13,14 +13,14 @@ enum KB_CTRL_IO {
 };
 
 enum KB_CTRL_STATS_MASK {
-    KB_CTRL_STATS_MASK_OUT_BUF   =   0x01, 
-    KB_CTRL_STATS_MASK_IN_BUF    =   0x02,
-    KB_CTRL_STATS_MASK_SYSTEM    =   0x04,
-    KB_CTRL_STATS_MASK_CMD_DATA  =   0x08,
-    KB_CTRL_STATS_MASK_LOCKED    =   0x10,
-    KB_CTRL_STATS_MASK_AUX_BUF   =   0x20,
-    KB_CTRL_STATS_MASK_TIMEOUT   =   0x40,
-    KB_CTRL_STATS_MASK_PARITY    =   0x80 
+    KBC_STATS_MASK_OUT_BUF   =   0x01, 
+    KBC_STATS_MASK_IN_BUF    =   0x02,
+    KBC_STATS_MASK_SYSTEM    =   0x04,
+    KBC_STATS_MASK_CMD_DATA  =   0x08,
+    KBC_STATS_MASK_LOCKED    =   0x10,
+    KBC_STATS_MASK_AUX_BUF   =   0x20,
+    KBC_STATS_MASK_TIMEOUT   =   0x40,
+    KBC_STATS_MASK_PARITY    =   0x80 
 };
 
 #define KB_CTRL_STATS_OUT_BUF_EMPTY 0    
@@ -51,21 +51,21 @@ enum KB_ENC_CMDS {
 
 
 enum KB_CTRL_CMDS {
-    KB_CTRL_CMD_READ             =   0x20,
-    KB_CTRL_CMD_WRITE            =   0x60,
-    KB_CTRL_CMD_SELF_TEST        =   0xAA,
-    KB_CTRL_CMD_INTERFACE_TEST   =   0xAB,
-    KB_CTRL_CMD_DISABLE          =   0xAD,
-    KB_CTRL_CMD_ENABLE           =   0xAE,
-    KB_CTRL_CMD_READ_IN_PORT     =   0xC0,
-    KB_CTRL_CMD_READ_OUT_PORT    =   0xD0,
-    KB_CTRL_CMD_WRITE_OUT_PORT   =   0xD1,
-    KB_CTRL_CMD_READ_TEST_INPUTS =   0xE0,
-    KB_CTRL_CMD_SYSTEM_RESET     =   0xFE,
-    KB_CTRL_CMD_MOUSE_DISABLE    =   0xA7,
-    KB_CTRL_CMD_MOUSE_ENABLE     =   0xA8,
-    KB_CTRL_CMD_MOUSE_PORT_TEST  =   0xA9,
-    KB_CTRL_CMD_MOUSE_WRITE      =   0xD4
+    KBC_CMD_READ             =   0x20,
+    KBC_CMD_WRITE            =   0x60,
+    KBC_CMD_SELF_TEST        =   0xAA,
+    KBC_CMD_INTERFACE_TEST   =   0xAB,
+    KBC_CMD_DISABLE          =   0xAD,
+    KBC_CMD_ENABLE           =   0xAE,
+    KBC_CMD_READ_IN_PORT     =   0xC0,
+    KBC_CMD_READ_OUT_PORT    =   0xD0,
+    KBC_CMD_WRITE_OUT_PORT   =   0xD1,
+    KBC_CMD_READ_TEST_INPUTS =   0xE0,
+    KBC_CMD_SYSTEM_RESET     =   0xFE,
+    KBC_CMD_MOUSE_DISABLE    =   0xA7,
+    KBC_CMD_MOUSE_ENABLE     =   0xA8,
+    KBC_CMD_MOUSE_PORT_TEST  =   0xA9,
+    KBC_CMD_MOUSE_WRITE      =   0xD4
 };
 
 enum KB_ERROR {
@@ -142,7 +142,7 @@ static KeyCode _xtkb_scancode_std[] = {
     KEY_SLASH,      //0x35
     KEY_RSHIFT,     //0x36
     KEY_KP_ASTERISK,//0x37
-    KEY_RALT,       //0x38
+    KEY_LALT,       //0x38
     KEY_SPACE,      //0x39
     KEY_CAPSLOCK,   //0x3a
     KEY_F1,         //0x3b
@@ -171,29 +171,22 @@ static KeyCode _xtkb_scancode_std[] = {
     KEY_F12         //0x58
 };
 
-
-static void debug_print(Keyboard* kb)
-{
-    KeyCode key = kb->last_key();
-    if (key == KEY_UNKNOWN)
-        return;
-
-    if (kb->shift_down()) {
-        if (key >= KEY_A && key <= KEY_Z) {
-            kputchar(key - 0x20);
-        } else if (key >= KEY_0 && key <= KEY_9){
-        }
-    } else {
-        if (key == KEY_RETURN)
-            kputchar('\n');
-        else if (key == KEY_TAB)
-            kputchar('\t');
-        else if (key == KEY_BACKSPACE)
-            kputchar('\b');
-        else
-            kputchar(key);
-    }
-}
+static struct {
+    uint8_t scan;
+    KeyCode keycode;
+} _xtkb_scancode_ex[] = {
+    {0x1c, KEY_KP_ENTER},
+    {0x1d, KEY_RCTRL},
+    {0x35, KEY_KP_DIVIDE},
+    {0x38, KEY_RALT},
+    {0x47, KEY_HOME},
+    {0x4f, KEY_END},
+    {0x51, KEY_PAGEDOWN},
+    {0x52, KEY_INSERT},
+    {0x53, KEY_DELETE},
+    //{0x5d, KEY_APPS},
+    {0x9c, KEY_KP_ENTER},
+};
 
 Keyboard kbd; 
 
@@ -202,64 +195,135 @@ static void keyboard_irq(trapframe_t* regs)
     static bool _is_extended = false;
     (void)regs;
 
-    if (!kbd.can_read()) return;
-
-    u8 data = kbd.kbe_read();
+    u8 data = kbd.kbe_wait_and_read();
     if (data == 0xE0) {
         _is_extended = true;
         return;
     }
 
-    if (_is_extended) {
-        //TODO:
-        _is_extended = false;
-    } else {
-        if (data & 0x80) {
-            //Break Code
-            switch(_xtkb_scancode_std[data & 0x7f]) {
-                case KEY_LSHIFT:
-                case KEY_RSHIFT:
-                    kbd.set_shift_down(false); break;
-
-                case KEY_LCTRL:
-                case KEY_RCTRL:
-                    kbd.set_ctrl_down(false); break;
-
-                case KEY_LALT:
-                case KEY_RALT:
-                    kbd.set_alt_down(false); break;
-
-                default: break;
+    key_packet_t packet;
+    if (data & 0x80) {
+        packet.status = KB_RELEASE;
+        if (_is_extended) {
+            for (int i = 0, len = ARRAYLEN(_xtkb_scancode_ex); i < len; i++) {
+                if (_xtkb_scancode_ex[i].scan == (data&0x7f)) {
+                    packet.keycode = _xtkb_scancode_ex[i].keycode;
+                }
             }
-        } else {
-            //Make Code
-            kbd.set_last_key(_xtkb_scancode_std[data]);
-            switch(kbd.last_key()) {
-                case KEY_LSHIFT:
-                case KEY_RSHIFT:
-                    kbd.set_shift_down(true); break;
+        } else 
+            packet.keycode = _xtkb_scancode_std[data & 0x7f];
 
-                case KEY_LCTRL:
-                case KEY_RCTRL:
-                    kbd.set_ctrl_down(true); break;
+        //Break Code
+        switch(packet.keycode) {
+            case KEY_LSHIFT:
+            case KEY_RSHIFT:
+                kbd.set_shift_down(false); break;
 
-                case KEY_LALT:
-                case KEY_RALT:
-                    kbd.set_alt_down(true); break;
+            case KEY_LCTRL:
+            case KEY_RCTRL:
+                kbd.set_ctrl_down(false); break;
 
-                default: break;
-            }
+            case KEY_LALT:
+            case KEY_RALT:
+                kbd.set_alt_down(false); break;
 
-            debug_print(&kbd);
+            default: break;
         }
+    } else {
+        packet.status = KB_PRESS;
+        if (_is_extended) {
+            for (int i = 0, len = ARRAYLEN(_xtkb_scancode_ex); i < len; i++) {
+                if (_xtkb_scancode_ex[i].scan == (data&0x7f)) {
+                    packet.keycode = _xtkb_scancode_ex[i].keycode;
+                }
+            }
+        } else 
+            packet.keycode = _xtkb_scancode_std[data];
+
+        //Make Code
+        switch(packet.keycode) {
+            case KEY_LSHIFT:
+            case KEY_RSHIFT:
+                kbd.set_shift_down(true); break;
+
+            case KEY_LCTRL:
+            case KEY_RCTRL:
+                kbd.set_ctrl_down(true); break;
+
+            case KEY_LALT:
+            case KEY_RALT:
+                kbd.set_alt_down(true); break;
+
+            default: break;
+        }
+
+    }
+
+    kbd.kbbuf().write(packet);        
+    if (_is_extended) { _is_extended = false; } 
+}
+
+static void mouse_irq(trapframe_t* regs)
+{
+    static int _state = 1;
+    static u8 _status = 0;
+    static volatile short xm = 0, ym = 0;
+
+    (void)regs;
+
+    auto st = kbd.kbc_read();
+    while (st & KBC_STATS_MASK_OUT_BUF) {
+        u8 data = kbd.kbe_read();
+        if (!(st & 0x20)) { st = kbd.kbc_read(); continue; }
+
+        if (_state == 1) { // first byte
+            if (!(data & 0x08)) { st = kbd.kbc_read(); continue; }
+
+            _status = data;
+            xm = 0, ym = 0;
+            _state = 2;
+        } else if (_state == 2) {
+            xm = data;
+            _state = 3;
+        } else if (_state == 3) {
+            ym = data;
+            _state = 1;
+            if ((_status & 0x80) || (_status & 0x40)) {
+                st = kbd.kbc_read(); continue; 
+            }
+
+            mouse_packet_t pkt;
+            pkt.flags = 0;
+            if  (_status & 0x1) pkt.flags |= MOUSE_LEFT_DOWN;
+            if  (_status & 0x2) pkt.flags |= MOUSE_RIGHT_DOWN;
+            if  (_status & 0x4) pkt.flags |= MOUSE_MID_DOWN;
+            if (_status & 0x10) xm |= 0xff00;
+            if (_status & 0x20) ym |= 0xff00;
+            pkt.relx = xm;
+            pkt.rely = ym;
+            kbd.msbuf().write(pkt);
+        }
+        st = kbd.kbc_read();
     }
 }
 
+//FIXME: need to check if mouse exists and this won't work 
+//if got usb mouse. (no usb bus configured)
 void Keyboard::init()
 {
+    kbc_send(KBC_CMD_MOUSE_ENABLE);
+    // enable mouse data reporting
+    kbc_send(KBC_CMD_MOUSE_WRITE);
     kbe_send(KBE_CMD_ENABLE);
+    check_reply();
+
+    kbc_send(KBC_CMD_WRITE);
+    kbe_send(0x47);
+    check_reply();
+
     set_leds(false, false, false);
-    register_isr_handler(IRQ1, keyboard_irq);
+    register_isr_handler(IRQ_KBD, keyboard_irq);
+    register_isr_handler(IRQ_MOUSE, mouse_irq);
 }
 
 Keyboard::Keyboard()
@@ -272,35 +336,61 @@ Keyboard::Keyboard()
 
 void Keyboard::kbe_send(u8 cmd)
 {
-    while (1) {
-        if ((kbc_read() & KB_CTRL_STATS_MASK_IN_BUF) == 0)
-            break;
-        kputs("kbc_read wait");
-    }
+    poll_aux_status();
+    //while (1) {
+        //if (can_write()) break;
+    //}
     outb(KB_ENC_CMD_REG, cmd);
 }
 
 void Keyboard::kbc_send(u8 cmd)
 {
-    while (1) {
-        if ((kbc_read() & KB_CTRL_STATS_MASK_IN_BUF) == 0)
-            break;
-        kputs("kbc_read wait");
-    }
+    //while (1) {
+        //if (can_write()) break;
+    //}
+    poll_aux_status();
     outb(KB_CTRL_CMD_REG, cmd);
+}
+
+int Keyboard::poll_aux_status()
+{
+	int retries=0;
+
+	while ((kbc_read()&0x03) && retries < 60) {
+ 		if (can_read()) kbe_read();
+		retries++;
+	}
+	return !(retries==60);
+}
+
+// 0: ok
+// 1: resend
+// 2: bad
+int Keyboard::check_reply()
+{
+    auto d = kbc_read();
+    if (d == 0xFA) { // ACK
+        return 0;
+    } else if (d == 0xFE) {
+        return 1;
+    }
+    return 2;
+}
+
+bool Keyboard::can_write()
+{
+    return (kbc_read() & KBC_STATS_MASK_IN_BUF) == 0;
 }
 
 bool Keyboard::can_read()
 {
-    return (kbc_read() & KB_CTRL_STATS_MASK_OUT_BUF) == 1;
+    return (kbc_read() & KBC_STATS_MASK_OUT_BUF) == 1;
 }
 
 u8 Keyboard::kbe_wait_and_read()
 {
     while (1) {
-        if ((kbc_read() & KB_CTRL_STATS_MASK_OUT_BUF) == 1)
-            break;
-        kputs("kbc_read wait");
+        if (can_read()) break;
     }
     return inb(KB_ENC_INPUT_BUF);
 }
@@ -331,5 +421,16 @@ void Keyboard::set_leds(bool scroll, bool num, bool caps)
     _scroll_lock_on = scroll;
     _num_lock_on = num;
     _caps_lock_on = caps;
+}
+
+bool Keyboard::hasMouse()
+{
+    kbc_send(KBC_CMD_MOUSE_PORT_TEST);
+    return kbe_read() == 0;
+}
+
+void Keyboard::enableMouse()
+{
+    kbc_send(KBC_CMD_MOUSE_ENABLE);
 }
 

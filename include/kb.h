@@ -1,10 +1,11 @@
 #ifndef _KB_H
 #define _KB_H 
 
-#include "common.h"
+#include "types.h"
+#include "ringbuf.h"
 
-
-enum KeyCode {
+enum KeyCode: int16_t 
+{
 
 // Alphanumeric keys ////////////////
 
@@ -154,14 +155,46 @@ enum KeyCode {
     KEY_SCROLLLOCK        = 0x4010,
     KEY_PAUSE             = 0x4011,
 
-    KEY_UNKNOWN,
-    KEY_NUMKEYCODES
+    KEY_UNKNOWN
 };
 
+enum KeyStatus
+{
+    KB_SCROLL_LOCK = 0x0001,
+    KB_CAPS_LOCK = 0x0002,
+    KB_NUM_LOCK = 0x0004,
+
+    KB_PRESS = 0x0010,
+    KB_RELEASE = 0x0020
+};
+
+typedef struct key_packet_s 
+{
+    KeyCode keycode;
+    uint16_t status;
+} __attribute__((packed)) key_packet_t;
+
+
+enum MouseStatus
+{
+    MOUSE_LEFT_DOWN = 0x0001,
+    MOUSE_RIGHT_DOWN = 0x0002,
+    MOUSE_MID_DOWN = 0x0004,
+};
+
+typedef struct mouse_packet_s 
+{
+    uint16_t flags;
+    short relx, rely;
+} __attribute__((packed)) mouse_packet_t;
 
 class Keyboard
 {
     public:
+        // enough size of ctl-shift-alt-cmd-* 
+        using KeyBuffer = RingBuffer<key_packet_t, 64>; 
+        using MouseBuffer = RingBuffer<mouse_packet_t, 64>; 
+
         Keyboard();
 
         void init();
@@ -171,12 +204,18 @@ class Keyboard
 
         // is KBE is ready
         bool can_read();
+        bool can_write();
         u8 kbe_read();
         u8 kbe_wait_and_read();
 
         u8 kbc_read();
 
         void set_leds(bool scroll, bool num, bool caps);
+        bool hasMouse();
+        void enableMouse();
+
+        KeyBuffer& kbbuf() { return _kbbuf; }
+        MouseBuffer& msbuf() { return _msbuf; }
 
         bool shift_down() const { return _shift_down; }
         bool ctrl_down() const { return _ctrl_down; }
@@ -202,7 +241,11 @@ class Keyboard
         bool _meta_down;
 
         KeyCode _last_key;
+        KeyBuffer _kbbuf; 
+        MouseBuffer _msbuf;
 
+        int check_reply();
+        int poll_aux_status();
 };
 
 extern Keyboard kbd; 

@@ -45,7 +45,7 @@ mboot:
     dd MULTIBOOT_CHECKSUM
 
     dd  0, 0, 0, 0, 0
-    dd  0 ; 0 = set graphics mode
+    dd  1 ; 0 = set graphics mode
     dd  800, 600, 24 ; Width, height, depth
     
 [section .text]
