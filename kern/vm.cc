@@ -1,8 +1,8 @@
-#include "common.h"
-#include "string.h"
-#include "isr.h"
-#include "vm.h"
-#include "task.h"
+#include <common.h>
+#include <string.h>
+#include <isr.h>
+#include <vm.h>
+#include <task.h>
 
 #define addr_in_kernel_space(vaddr) ((u32)(vaddr) > KERNEL_VIRTUAL_BASE)
 
@@ -167,6 +167,7 @@ void VirtualMemoryManager::flush_tlb_entry(u32 vaddr)
 
 page_t* VirtualMemoryManager::walk(page_directory_t* pgdir, void* vaddr, bool create)
 {
+    auto eflags = _lock.lock();
     u32 pde = pgdir->tables[PAGE_DIR_IDX(vaddr)];
     page_table_t* ptable = NULL;
     if (pde & PDE_PRESENT) {
@@ -182,8 +183,10 @@ page_t* VirtualMemoryManager::walk(page_directory_t* pgdir, void* vaddr, bool cr
         pde_set_frame(pde, v2p(ptable));
         pgdir->tables[PAGE_DIR_IDX(vaddr)] = pde;
     } else {
+        _lock.release(eflags);
         return NULL;
     }
+    _lock.release(eflags);
     return &ptable->pages[PAGE_TABLE_IDX(vaddr)];
 }
 
@@ -193,11 +196,12 @@ void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr,
     char* v = (char*)PGROUNDDOWN(vaddr);
     char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
 
+    auto eflags = _lock.lock();
     //kprintf("mapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr, 
             //size / _pmm->frame_size);
     while (v <= end) {
         page_t* pte = walk(pgdir, v, true);
-        if (pte == NULL) return;
+        if (pte == NULL) break;
 
         if (pte->present) panic("map_pages: remap 0x%x\n", vaddr);
         pte->present = 1;
@@ -208,6 +212,7 @@ void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr,
         v += _pmm->frame_size;
         paddr += _pmm->frame_size;
     }
+    _lock.release(eflags);
 }
 
 void VirtualMemoryManager::unmap_pages(page_directory_t* pgdir, void *vaddr, 
@@ -216,6 +221,7 @@ void VirtualMemoryManager::unmap_pages(page_directory_t* pgdir, void *vaddr,
     char* v = (char*)PGROUNDDOWN(vaddr);
     char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
 
+    auto eflags = _lock.lock();
     //kprintf("unmapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr, 
             //size / _pmm->frame_size);
     while (v <= end) {
@@ -232,6 +238,7 @@ void VirtualMemoryManager::unmap_pages(page_directory_t* pgdir, void *vaddr,
         v += _pmm->frame_size;
         paddr += _pmm->frame_size;
     }
+    _lock.release(eflags);
 }
 
 page_directory_t* VirtualMemoryManager::create_address_space()
@@ -239,6 +246,7 @@ page_directory_t* VirtualMemoryManager::create_address_space()
     page_directory_t* pdir = (page_directory_t*)alloc_page();
     if (!pdir) panic("oom");
 
+    auto eflags = _lock.lock();
     kprintf("create_address_space: pdir = 0x%x(0x%x)\n", pdir, v2p(pdir));
     memset(pdir, 0x0, sizeof(page_directory_t));
     for (int i = 0, len = sizeof(kmap)/sizeof(kmap[0]); i < len; i++) {
@@ -263,6 +271,7 @@ page_directory_t* VirtualMemoryManager::create_address_space()
             v += PGSIZE;
         }
     }
+    _lock.release(eflags);
     return pdir;
 }
 
@@ -277,6 +286,7 @@ page_directory_t* VirtualMemoryManager::copy_page_directory(page_directory_t* pg
     char* v = (char*)UCODE;
     char* end = (char*)USTACK;
 
+    auto eflags = _lock.lock();
     while (v < end) {
         page_t* pte = walk(pgdir, v, false);
         if (pte && pte->present) {
@@ -289,6 +299,7 @@ page_directory_t* VirtualMemoryManager::copy_page_directory(page_directory_t* pg
         v += PGSIZE;
     }
 
+    _lock.release(eflags);
     return new_pgdir;
 }
 
@@ -327,6 +338,7 @@ void* VirtualMemoryManager::kmalloc(size_t size, int align)
     size_t realsize = ALIGN(size, align);
     //kprintf("kmalloc: size = %d, realsize = %d, align = %d\n", size, realsize, align);
 
+    auto eflags = _lock.lock();
     kheap_block_head* last = NULL;
     kheap_block_head* h = find_block(&last, realsize);
     if (!h) {
@@ -352,6 +364,7 @@ void* VirtualMemoryManager::kmalloc(size_t size, int align)
 
     h->used = 1;
     kassert(aligned(h->data, align));
+    _lock.release(eflags);
     return h->data;
 }
 
@@ -403,6 +416,7 @@ void VirtualMemoryManager::split_block(VirtualMemoryManager::kheap_block_head* h
 
 void VirtualMemoryManager::kfree(void* ptr)
 {
+    auto eflags = _lock.lock();
     kprintf("[VMM] kfree 0x%x\n", ptr);
     kheap_block_head* h = (kheap_block_head*)((char*)ptr - KHEAD_SIZE); 
     kassert(h->used);
@@ -416,6 +430,7 @@ void VirtualMemoryManager::kfree(void* ptr)
     if (h->next) {
         h = merge_block(h);
     }
+    _lock.release(eflags);
 }
 
 VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::merge_block(

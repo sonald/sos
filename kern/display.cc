@@ -22,9 +22,10 @@ void Console::putchar(char c)
     int stride = 80;
 
     if (c == 0x08) { // backspace
-        if (_cx == 0) return;
-        *(vbase + _cy * stride + _cx) = blank;
-        _cx--;
+        if (_cx > 0) {
+            *(vbase + _cy * stride + _cx) = blank;
+            _cx--;
+        }
     } else if (c == 0x09) { // ht
         _cx = min(stride, (_cx+8) & ~(8-1));
     } else if (c == '\n') {
@@ -122,13 +123,17 @@ Color GraphicDisplay::get_text_color()
 
 void GraphicDisplay::set_text_color(Color clr)
 {
+    auto old = _lock.lock();
     _clridx = (clr > MAXCOLOR) ? WHITE : clr;
     _clr = colormap[_clridx];
+    _lock.release(old);
 }
 
 void GraphicDisplay::set_cursor(position_t cur)
 {
+    auto old = _lock.lock();
     _cursor = cur;
+    _lock.release(old);
 }
 
 position_t GraphicDisplay::get_cursor()
@@ -138,9 +143,11 @@ position_t GraphicDisplay::get_cursor()
 
 void GraphicDisplay::clear()
 {
+    auto old = _lock.lock();
     _cursor = {0, 0};
     videoMode.fillRect({0, 0}, videoMode.width(), videoMode.height(),
             {0, 0, 0});
+    _lock.release(old);
 }
 
 void GraphicDisplay::putchar(char c)
@@ -148,10 +155,12 @@ void GraphicDisplay::putchar(char c)
     auto& fi = builtin_fontinfo;
     position_t pt = {_cursor.x*fi.xadvance, _cursor.y*fi.yadvance};
 
+    auto old = _lock.lock();
     if (c == 0x08) { // backspace
-        if (_cursor.x == 0) return;
-        videoMode.drawChar(pt, c, {0x0, 0x0, 0x0});
-        _cursor.x--;
+        if (_cursor.x > 0) {
+            videoMode.drawChar(pt, c, {0x0, 0x0, 0x0});
+            _cursor.x--;
+        }
     } else if (c == 0x09) { // ht
         _cursor.x = min(_cols, (_cursor.x+8) & ~(8-1));
     } else if (c == '\n') {
@@ -171,6 +180,7 @@ void GraphicDisplay::putchar(char c)
 
     if (_cursor.y >= _rows)
         scroll(1);
+    _lock.release(old);
 }
 
 void GraphicDisplay::scroll(int lines) 

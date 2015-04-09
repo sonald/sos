@@ -3,6 +3,7 @@
 #include "isr.h"
 #include "task.h"
 #include "spinlock.h"
+#include "sys.h"
 
 typedef int (*syscall0_t)();
 typedef int (*syscall1_t)(u32);
@@ -15,15 +16,6 @@ typedef int (*syscall4_t)(u32, u32, u32, u32);
 #define do_syscall2(fn, arg0, arg1) fn(arg0, arg1)
 #define do_syscall3(fn, arg0, arg1, arg2) fn(arg0, arg1, arg2)
 #define do_syscall4(fn, arg0, arg1, arg2, arg3) fn(arg0, arg1, arg2, arg3)
-
-extern int sys_open (const char *path, int flags, int mode);
-extern int sys_write(int fildes, const void *buf, size_t nbyte);
-extern int sys_close(int fd);
-extern int sys_read(int fildes, void *buf, size_t nbyte);
-extern int sys_fork();
-extern int sys_sleep();
-extern int sys_execve(const char *path, char *const argv[], char *const envp[]);
-extern int sys_getpid();
 
 static struct syscall_info_s {
     void* call;
@@ -91,14 +83,17 @@ void init_syscall()
 {
     memset(syscalls, 0, sizeof(syscalls));
 
-    syscalls[SYS_open] = { (void*)sys_write, 3 };
+    syscalls[SYS_open] = { (void*)sys_open, 3 };
     syscalls[SYS_close] = { (void*)sys_close, 1 };
     syscalls[SYS_write] = { (void*)sys_write, 3 };
     syscalls[SYS_read] = { (void*)sys_read, 3 };
     syscalls[SYS_fork] = { (void*)sys_fork, 0 };
     syscalls[SYS_sleep] = { (void*)sys_sleep, 0 };
     syscalls[SYS_getpid] = { (void*)sys_getpid, 0 };
+    syscalls[SYS_getppid] = { (void*)sys_getppid, 0 };
     syscalls[SYS_exec] = { (void*)sys_execve, 3 };
+    syscalls[SYS_mount] = { (void*)sys_mount, 5 };
+    syscalls[SYS_umount] = { (void*)sys_unmount, 1 };
 
     register_isr_handler(ISR_SYSCALL, syscall_handler);
 }

@@ -123,5 +123,6 @@ void ata_init()
     //patas[1].init(0, false);
     picenable(IRQ_ATA1);
     //picenable(IRQ_ATA2);
+    //blk_device_register(DEVNO(IDE_MAJOR, 64), pata1);
 }
 

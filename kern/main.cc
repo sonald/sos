@@ -16,6 +16,8 @@
 #include "sched.h"
 #include "graphics.h"
 #include "display.h"
+#include "fat32.h"
+#include <string.h>
 
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
@@ -95,19 +97,15 @@ void kthread1()
 {
     dev_t ROOT_DEV = DEVNO(IDE_MAJOR, 0);
     Buffer* mbr = bio.read(ROOT_DEV, 0);
-    if (mbr) {
-        kprintf("PART: ");
-        uint32_t* p = (uint32_t*)&mbr->data[0x1c0];
-        for (size_t i = 0; i < 4; i++, p++) {
-            kprintf("%x ", *p);
-        }
-        kputchar('\n');
-    }
 
     bool released = false;
     int count = 0;
     while (1) {
+        auto cur = current_display->get_cursor();
+        current_display->set_cursor({20, 20});
         kprintf(" <KT1 %d> ", count++);
+        current_display->set_cursor(cur);
+
         busy_wait(2000);
         if (!released) {
             bio.release(mbr);
@@ -121,7 +119,11 @@ void kthread2()
     int count = 0;
     while (1) {
         busy_wait(2000);
+        auto cur = current_display->get_cursor();
+        current_display->set_cursor({0, 20});
         kprintf(" |KT2 %d| ", count++);
+        current_display->set_cursor(cur);
+
         dev_t ROOT_DEV = DEVNO(IDE_MAJOR, 0);
         Buffer* mbr = bio.read(ROOT_DEV, 0);
         bio.release(mbr);
@@ -200,10 +202,8 @@ static void apply_mmap(u32 mmap_length, u32 mmap_addr)
     }
 }
 
-static SOS_UNUSED void test_ramfs(bool content) 
+static void test_ramfs(Ramfs* ramfs, bool content) 
 {
-    FileSystem* ramfs = devices[RAMFS_MAJOR];
-    
     inode_t* ramfs_root = ramfs->root();
     int i = 0;
     dentry_t* de = ramfs->dir_read(ramfs_root, i);
@@ -236,10 +236,13 @@ static void load_module(u32 mods_count, u32 mods_base)
     kprintf("load initrd at [0x%x, 0x%x], cmdline: %s\n", mod_start, mod_end,
             p2v(mod->string));
     
-    Ramfs* ramfs = new Ramfs;
-    ramfs->init(mod_start, mod_end-mod_start, (const char*)p2v(mod->string));
+    ramfs_mod_info.addr = mod_start;
+    ramfs_mod_info.size = mod_end - mod_start;
+    ramfs_mod_info.cmdline = (char*)p2v(mod->string);
     
-    test_ramfs(false);
+    vfs.mount("ramfs", "/", "ramfs", 0, 0);
+    auto* mnt = vfs.get_mount("/");
+    test_ramfs((Ramfs*)mnt->fs, false);
 }
 
 extern "C" int kernel_main(struct multiboot_info *mb)
@@ -275,7 +278,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
             videoMode.init(modinfo);
             current_display = &graph_console;
             current_display->clear();
-            video_mode_test();
+            //video_mode_test();
             kprintf("VideoMode:\n "
                     "winsize: %d, pitch: %d, xres: %d, yres: %d,"
                     "planes: %d, banks: %d, bank_size: %d\n",
@@ -284,7 +287,6 @@ extern "C" int kernel_main(struct multiboot_info *mb)
                     modinfo->bank_size);
         }
     }
-    //for(;;) asm volatile ("hlt");
     current_display->set_text_color(CYAN);
     const char* msg = "booting SOS....\n";
     kputs(msg);
@@ -301,13 +303,17 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     ata_init();
     bio.init();
 
+    vfs.register_fs("fat32", create_fat32fs);
+    vfs.register_fs("ramfs", create_ramfs);
+    vfs.init_root(DEVNO(IDE_MAJOR, 1));
+
     picenable(IRQ_KBD);
     picenable(IRQ_MOUSE);
     picenable(IRQ_TIMER);
 
 
-    //for(;;) asm volatile ("hlt");
     load_module(mb->mods_count, mb->mods_addr);
+    //for(;;) asm volatile ("hlt");
 
     proc_t* proc = prepare_userinit((void*)&init_task);
 

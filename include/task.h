@@ -45,10 +45,6 @@ typedef struct proc_s {
 
 extern proc_t* current;
 extern proc_t tasks[MAXPROCS];
-int sys_getppid();
-int sys_getpid();
-int sys_fork(); 
-int sys_sleep();
 void tasks_init();
 
 void sleep(Spinlock* lk, void* chan);

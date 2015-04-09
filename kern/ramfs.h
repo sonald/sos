@@ -5,6 +5,12 @@
 #include "vfs.h"
 
 typedef struct initrd_header initrd_header_t;
+typedef struct ramfs_mod_info_s {
+    char* addr;
+    size_t size;
+    char* cmdline;
+} ramfs_mod_info_t;
+
 class Ramfs: public FileSystem {
     public: 
         Ramfs(): FileSystem() {}
@@ -22,4 +28,6 @@ class Ramfs: public FileSystem {
         char* _cmdline;
 };
 
+extern ramfs_mod_info_t ramfs_mod_info;
+FileSystem* create_ramfs(void*);
 #endif

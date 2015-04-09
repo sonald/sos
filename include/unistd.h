@@ -59,12 +59,19 @@ ret_t fn(t1 arg1, t2 arg2, t3 arg3, t4 arg4) \
     return ret; \
 }
 
-int open (const char *path, int flags, int mode);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int write(int fildes, const void *buf, size_t nbyte);
 int close(int fd);
 int read(int fildes, void *buf, size_t nbyte);
 int fork();
+int exec(const char *path, char *const argv[], char *const envp[]);
 int execve(const char *path, char *const argv[], char *const envp[]);
 int getpid();
 
+#ifdef __cplusplus
+}
+#endif
 #endif

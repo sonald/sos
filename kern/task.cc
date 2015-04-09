@@ -7,6 +7,7 @@
 #include "spinlock.h"
 #include "sched.h"
 #include "timer.h"
+#include <vfs.h>
 
 extern "C" void trap_return();
 
@@ -161,14 +162,12 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
 
     auto oldflags = tasklock.lock();
     kprintf("path(0x%x): %s\n", path, path);
-    FileSystem* ramfs = devices[RAMFS_MAJOR];
 
-    inode_t* ramfs_root = ramfs->root();
-    inode_t* ip = ramfs->dir_lookup(ramfs_root, path);
+    inode_t* ip = vfs.namei(path);
     kassert(ip != NULL);
 
     char* buf = new char[ip->size];
-    int len = ramfs->read(ip, buf, ip->size, 0);
+    int len = vfs.read(ip, buf, ip->size, 0);
     if (len < 0) {
         kprintf("load %s failed\n", path);
         tasklock.release(oldflags);
@@ -201,7 +200,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
         break;
     }
 
-    strcpy(current->name, path);
+    strncpy(current->name, path, sizeof current->name - 1);
     kprintf("execv task(%d, %s)\n", current->pid, path);
 
     current->entry = (void*)elf->e_entry;

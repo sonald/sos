@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "graphics.h"
+#include "spinlock.h"
 
 // http://www.rapidtables.com/web/color/RGB_Color.htm
 enum Color {
@@ -60,6 +61,7 @@ class Console: public Display
         void set_phy_cursor(int x, int y);
         int _cx {0}, _cy {0};
         u8 _attrib {0x0F};
+        Spinlock _lock {"console"};
 };
 
 class GraphicDisplay: public Display 
@@ -78,6 +80,7 @@ class GraphicDisplay: public Display
         int _rows {34}, _cols {88};
         Rgb _clr {colormap[RED]};
         Color _clridx {RED};
+        Spinlock _lock {"graphdisplay"};
 };
 
 extern Console console;

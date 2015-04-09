@@ -8,6 +8,8 @@
 #define NR_INITRD_FILES 64
 #define RAMFS_ENTRY_MAGIC 0xBF
 
+ramfs_mod_info_t ramfs_mod_info;
+
 typedef struct initrd_entry_header
 {
    unsigned char magic; // The magic number is there to check for consistency.
@@ -36,8 +38,9 @@ void Ramfs::init(char* addr, size_t size, const char* cmdline)
     u32 dev = DEVNO(RAMFS_MAJOR, 0);
     _iroot = (inode_t*)vmm.kmalloc(sizeof(inode_t), 1);
     _iroot->dev = dev;
-    _iroot->type = I_DIR;
+    _iroot->type = FsNodeType::Dir;
     _iroot->ino = 0;
+    _iroot->fs = this;
 
     _nr_nodes = _sb->nfiles;
     _nodes = (inode_t*)vmm.kmalloc(sizeof(inode_t)*_nr_nodes, 1);
@@ -49,17 +52,15 @@ void Ramfs::init(char* addr, size_t size, const char* cmdline)
         kassert(de->magic == RAMFS_ENTRY_MAGIC);
         _nodes[i].size = de->length;
         _nodes[i].dev = dev;
-        _nodes[i].type = I_FILE;
+        _nodes[i].type = FsNodeType::File;
         _nodes[i].ino = i+1;
+        _nodes[i].fs = this;
     }
-
-    kassert(devices[RAMFS_MAJOR] == NULL);
-    devices[RAMFS_MAJOR] = this; 
 }
 
 int Ramfs::read(inode_t* ip, void* buf, size_t nbyte, u32 offset) 
 {
-    kassert(ip->type == I_FILE);
+    kassert(ip->type == FsNodeType::File);
     initrd_entry_header* ieh = &_sb->files[ip->ino-1];
 
     if (offset >= ip->size) return 0;
@@ -73,7 +74,7 @@ int Ramfs::read(inode_t* ip, void* buf, size_t nbyte, u32 offset)
 
 int Ramfs::write(inode_t* ip, void* buf, size_t nbyte, u32 offset) 
 {
-    kassert(ip->type == I_FILE);
+    kassert(ip->type == FsNodeType::File);
     (void)buf;
     (void)nbyte;
     (void)offset;
@@ -82,7 +83,7 @@ int Ramfs::write(inode_t* ip, void* buf, size_t nbyte, u32 offset)
 
 inode_t* Ramfs::dir_lookup(inode_t* ip, const char* name) 
 {
-    if (ip->type != I_DIR) return NULL;
+    if (ip->type != FsNodeType::Dir) return NULL;
     
     int i = -1;
     for (i = 0; i < _nr_nodes; ++i) {
@@ -98,7 +99,7 @@ inode_t* Ramfs::dir_lookup(inode_t* ip, const char* name)
 
 dentry_t* Ramfs::dir_read(inode_t* ip, int id) 
 {
-    if (ip->type != I_DIR) return NULL;
+    if (ip->type != FsNodeType::Dir) return NULL;
     if (id >= _nr_nodes) return NULL;
 
     initrd_entry_header_t* ieh = &_sb->files[id];
@@ -106,5 +107,13 @@ dentry_t* Ramfs::dir_read(inode_t* ip, int id)
     strcpy(de->name, ieh->name);
     de->ino = _nodes[id].ino;
     return  de;
+}
+
+FileSystem* create_ramfs(void* data)
+{
+    auto* info = (ramfs_mod_info_t*)data;
+    auto* ramfs = new Ramfs;
+    ramfs->init(info->addr, info->size, info->cmdline);
+    return ramfs; 
 }
 

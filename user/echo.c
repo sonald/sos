@@ -1,9 +1,6 @@
-#include "unistd.h"
-#include "sprintf.h"
-
-_syscall0(pid_t, getpid);
-_syscall0(pid_t, fork);
-_syscall3(int, write, int, fd, const void*, buf, size_t, nbyte);
+#include <unistd.h>
+#include <sprintf.h>
+#include <fcntl.h>
 
 #ifdef __cplusplus
 extern "C" 

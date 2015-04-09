@@ -18,7 +18,8 @@ kernel_srcs=kern/boot.s kern/main.cc kern/common.cc kern/cxx_rt.cc \
 			kern/mm.cc kern/vm.cc kern/kb.cc kern/context.s \
 			kern/syscall.cc kern/task.cc kern/vfs.cc kern/ramfs.cc \
 			kern/ata.cc kern/blkio.cc kern/devices.cc kern/spinlock.cc \
-			kern/graphics.cc kern/display.cc kern/font.cc \
+			kern/graphics.cc kern/display.cc kern/font.cc kern/disk.cc \
+			kern/devfs.cc kern/fat32.cc \
 			lib/string.cc lib/sprintf.cc  
 
 kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))
@@ -67,7 +68,7 @@ ramfs_gen: tools/ramfs_gen.c
 	gcc -o $@ $^
 
 # user prog
-echo: user/echo.c lib/sprintf.cc user/user.ld 
+echo: user/echo.c user/libc.c lib/sprintf.cc user/user.ld 
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^ 
 	./ramfs_gen README.md user/echo.c echo

@@ -4,6 +4,7 @@
 #include "mm.h"
 #include "memlayout.h"
 #include "mmu.h"
+#include <spinlock.h>
 
 class VirtualMemoryManager 
 {
@@ -12,19 +13,17 @@ class VirtualMemoryManager
 
         bool init(PhysicalMemoryManager* pmm);
 
-        page_t* walk(page_directory_t* pgdir, void* vaddr, bool create = false);
         void map_pages(page_directory_t* pgdir, void *vaddr, u32 size,
                 u32 paddr, u32 flags);
         void unmap_pages(page_directory_t* pgdir, void *vaddr, u32 size,
                 u32 paddr, bool free_mem);
-
+        page_t* walk(page_directory_t* pgdir, void* vaddr, bool create = false);
         /**
          * Causes the specified page directory to be loaded into the
          * CR3 register.
          **/
         void switch_page_directory(page_directory_t *pgdir);
         page_directory_t* current_directory() const { return _current_pdir; }
-        void flush_tlb_entry(u32 vaddr); 
 
         void dump_page_directory(page_directory_t* pgdir);
         page_directory_t* create_address_space();
@@ -58,6 +57,7 @@ class VirtualMemoryManager
         kheap_block_head* _kheap_ptr;
         u32* _kern_heap_start;
         u32* _kern_heap_limit;
+        Spinlock _lock {"vmm"};
 
         kheap_block_head* find_block(kheap_block_head** last, size_t size);
         void split_block(kheap_block_head* h, size_t size);
@@ -66,6 +66,7 @@ class VirtualMemoryManager
         bool aligned(void* ptr, int align);
         void* ksbrk(size_t size);
 
+        void flush_tlb_entry(u32 vaddr); 
         void test_malloc();
 
 };
