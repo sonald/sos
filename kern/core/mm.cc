@@ -118,7 +118,6 @@ void PhysicalMemoryManager::clear_region(u32 frame_addr, u32 size)
 PhysicalMemoryManager::PhysicalMemoryManager()
     :_frames((u32*)&_end), _frameCount(0), _frameUsed(0)
 {
-    kputs("new PhysicalMemoryManager\n");
 }
 
 void PhysicalMemoryManager::init(u32 mem_size, void* last_used)
