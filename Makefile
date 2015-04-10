@@ -88,5 +88,13 @@ echo: user/echo.c user/libc.c lib/sprintf.cc user/user.ld
 
 clean:
 	-rm $(OBJS_DIR)/kern/*.o 
+	-rm $(OBJS_DIR)/lib/*.o 
+	-rm $(OBJS_DIR)/kern/core/*.o 
+	-rm $(OBJS_DIR)/kern/runtime/*.o 
+	-rm $(OBJS_DIR)/kern/drv/*.o 
 	-rm $(OBJS_DIR)/kern/*.d
+	-rm $(OBJS_DIR)/kern/core/*.d 
+	-rm $(OBJS_DIR)/kern/runtime/*.d 
+	-rm $(OBJS_DIR)/kern/drv/*.d
+	-rm $(OBJS_DIR)/lib/*.d 
 	-rm kernel
