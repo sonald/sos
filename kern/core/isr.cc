@@ -3,7 +3,7 @@
 #include "task.h"
 #include "x86.h"
 #include "sched.h"
-#include <limits.h>
+#include <sos/limits.h>
 
 /* This is a simple string array. It contains the message that
  * *  corresponds to each and every exception. We get the correct
@@ -87,7 +87,7 @@ void isr_handler(trapframe_t* regs)
             regs->ebx, regs->edx, regs->ecx, regs->eax, regs->isrno, regs->errcode,
             regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
     for(;;) {
-        busy_wait(INT_MAX);
+        asm("cli; hlt");
     }
 }
 

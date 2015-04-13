@@ -17,6 +17,8 @@
 #include "graphics.h"
 #include "display.h"
 #include "fat32.h"
+#include <dirent.h>
+#include <sys.h>
 #include <string.h>
 
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
@@ -132,7 +134,7 @@ void kthread2()
 
 void init_task()
 {
-    char init_name[] = "echo";
+    char init_name[] = "/ram/echo";
     u8 step = 0;
     char buf[2] = "";
     int logo = 'A';
@@ -202,28 +204,34 @@ static void apply_mmap(u32 mmap_length, u32 mmap_addr)
     }
 }
 
-static void test_ramfs(Ramfs* ramfs, bool content) 
+static void test_ramfs(bool content) 
 {
-    inode_t* ramfs_root = ramfs->root();
-    int i = 0;
-    dentry_t* de = ramfs->dir_read(ramfs_root, i);
-    while (de) {
-        inode_t* ip = ramfs->dir_lookup(ramfs_root, de->name);
-
-        kprintf("file %s: ", de->name);
-        if (content) {
-            kputchar('[');
-            int buf[64];
-            int len = ramfs->read(ip, buf, sizeof buf - 1, 0);
-            buf[len] = 0;
-            kprintf("%s]", buf);
+    int fd = sys_open("/ram", O_RDONLY, 0);
+    kassert(fd >= 0);
+    struct dirent dire;
+    bool shown = false;
+    while (sys_readdir(fd, &dire, 1) >= 0) {
+        kprintf("file %s: ", dire.d_name);
+        if (content && !shown) {
+            char filename[NAMELEN+1+5] = "/ram/";
+            strcpy(filename + 5, dire.d_name);
+            int fd2 = sys_open(filename, O_RDONLY, 0);
+            if (fd2 >= 0) {
+                char buf[64];
+                int len = 0;
+                while ((len = sys_read(fd2, buf, sizeof buf - 1)) > 0) {
+                    buf[len] = 0;
+                    kputchar('[');
+                    kputs(buf);
+                    kputchar(']');
+                }                
+                sys_close(fd2); 
+                shown = true;    
+            }
         }
         kputchar('\n');
-
-        vmm.kfree(de);
-        i++;
-        de = ramfs->dir_read(ramfs_root, i);
     }
+    sys_close(fd);
 }
 
 // only care about 1 module
@@ -236,13 +244,12 @@ static void load_module(u32 mods_count, u32 mods_base)
     kprintf("load initrd at [0x%x, 0x%x], cmdline: %s\n", mod_start, mod_end,
             p2v(mod->string));
     
-    ramfs_mod_info.addr = mod_start;
-    ramfs_mod_info.size = mod_end - mod_start;
-    ramfs_mod_info.cmdline = (char*)p2v(mod->string);
-    
-    vfs.mount("ramfs", "/", "ramfs", 0, 0);
-    auto* mnt = vfs.get_mount("/");
-    test_ramfs((Ramfs*)mnt->fs, false);
+    ramfs_mod_info_t info;
+    info.addr = mod_start;
+    info.size = mod_end - mod_start;
+    info.cmdline = (char*)p2v(mod->string);
+    vfs.mount("ramfs", "/ram", "ramfs", 0, (void*)&info);
+    // test_ramfs(true);
 }
 
 extern "C" int kernel_main(struct multiboot_info *mb)
@@ -311,11 +318,9 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     picenable(IRQ_MOUSE);
     picenable(IRQ_TIMER);
 
-
-    load_module(mb->mods_count, mb->mods_addr);
-    //for(;;) asm volatile ("hlt");
-
     proc_t* proc = prepare_userinit((void*)&init_task);
+    load_module(mb->mods_count, mb->mods_addr);
+    // for(;;) asm volatile ("hlt");
 
     create_kthread("kthread1", kthread1);
     create_kthread("kthread2", kthread2);

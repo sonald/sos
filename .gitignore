@@ -11,3 +11,7 @@ echo
 initramfs.img
 ramfs_gen
 *.img
+sos.sublime-project
+sos.sublime-workspace
+tags
+TAGS

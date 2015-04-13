@@ -15,11 +15,13 @@ class Ramfs: public FileSystem {
     public: 
         Ramfs(): FileSystem() {}
         void init(char* addr, size_t size, const char* cmdline);
+        void read_inode(inode_t *) override;
 
-        int read(inode_t* ip, void* buf, size_t nbyte, u32 offset) override;
-        int write(inode_t* ip, void* buf, size_t nbyte, u32 offset) override;
-        inode_t* dir_lookup(inode_t* ip, const char* name) override;
-        dentry_t* dir_read(inode_t* ip, int id) override;
+        dentry_t * lookup(inode_t * dir, dentry_t *) override;
+
+        ssize_t read(File *, char * buf, size_t count, off_t * offset) override;
+        ssize_t write(File *, const char * buf, size_t, off_t *offset) override;
+        int readdir(File *, dentry_t *, filldir_t) override;
 
     private:
         inode_t* _nodes;
@@ -28,6 +30,5 @@ class Ramfs: public FileSystem {
         char* _cmdline;
 };
 
-extern ramfs_mod_info_t ramfs_mod_info;
-FileSystem* create_ramfs(void*);
+FileSystem* create_ramfs(const void*);
 #endif

@@ -51,6 +51,7 @@ typedef int daddr_t;
 typedef long off_t;
 typedef unsigned char u_char;
 typedef unsigned short ushort;
+typedef int ssize_t;
 
 typedef struct { int quot,rem; } div_t;
 typedef struct { long quot,rem; } ldiv_t;

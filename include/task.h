@@ -5,11 +5,9 @@
 #include "vm.h"
 #include "vfs.h"
 #include "spinlock.h"
+#include <sos/limits.h>
 
-#define MAXPROCS 16
 #define PROC_NAME_LEN 31
-
-#define FILES_PER_PROC  16 // max filer per task
 
 typedef s32 pid_t;
 

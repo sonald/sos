@@ -6,8 +6,13 @@
 #include "spinlock.h"
 #include "disk.h"
 #include "ramfs.h"
+#include <dirent.h>
+#include <sos/limits.h>
 
 File cached_files[MAX_NR_FILE];
+inode_t cached_inodes[MAX_NR_INODE];
+dentry_t cached_dentries[MAX_NR_DENTRY];
+
 dev_t rootdev = DEVNO(IDE_MAJOR, 1); //default hda1
 
 VFSManager vfs;
@@ -23,7 +28,23 @@ static File* get_free_file()
     }
 
     if (i >= MAX_NR_FILE) return NULL;
+    memset(fp, 0, sizeof *fp);
     return fp;
+}
+
+static int fdalloc()
+{
+    int fd = -EINVAL;
+    for (fd = 0; fd < FILES_PER_PROC; fd++) {
+        if (!current->files[fd])
+            break;
+    }
+
+    if (fd >= FILES_PER_PROC) {
+        fd = -EINVAL;
+    }
+
+    return fd;
 }
 
 int sys_mount(const char *src, const char *target, 
@@ -39,7 +60,6 @@ int sys_unmount(const char *target)
     return vfs.unmount(target);
 }
 
-// no real mountpoints now, hardcoded for testing
 int sys_open(const char *path, int flags, int mode)
 {
     (void)flags;
@@ -47,15 +67,10 @@ int sys_open(const char *path, int flags, int mode)
 
     File* f = nullptr;
     inode_t* ip = nullptr;
-    int fd = 0;
+    int fd = -1;
     auto eflags = vfslock.lock();
-    for (fd = 0; fd < FILES_PER_PROC; fd++) {
-        if (!current->files[fd])
-            break;
-    }
-
-    if (fd >= FILES_PER_PROC) {
-        fd = -EINVAL;
+    if ((fd = fdalloc()) < 0) {
+        fd = -ENOMEM;
         goto _out;
     }
 
@@ -67,7 +82,7 @@ int sys_open(const char *path, int flags, int mode)
     
     f = get_free_file();
     if (!f) {
-        //free ip
+        vfs.dealloc_inode(ip);
         fd = -ENOMEM;
         goto _out;
     }
@@ -82,12 +97,22 @@ _out:
 
 int sys_close(int fd)
 {
-    (void)fd;
+    auto* filp = current->files[fd];
+    inode_t* ip = filp->inode();
+    kassert(filp && ip);
+
+    auto eflags = vfslock.lock();   
+    memset(filp, 0, sizeof *filp);
+    current->files[fd] = NULL;
+    vfs.dealloc_inode(ip); 
+
+    vfslock.release(eflags);
     return 0;
 }
 
 int sys_mmap(struct file *, struct vm_area_struct *)
 {
+    return 0;
 }
 
 int sys_write(int fd, const void *buf, size_t nbyte)
@@ -107,72 +132,58 @@ int sys_write(int fd, const void *buf, size_t nbyte)
 
 int sys_read(int fd, void *buf, size_t nbyte)
 {
-    (void)fd;
-    (void)buf;
-    (void)nbyte;
-    return 0;
+    auto* filp = current->files[fd];
+    inode_t* ip = filp->inode();
+
+    return ip->fs->read(filp, (char*)buf, nbyte, 0);
 }
 
-// count should be 1 now
-int sys_readdir(unsigned int fd, struct dirent *dirp,
-        unsigned int count)
+// ignore count, should only be 1 by now
+int sys_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
-}
+    // dir should be opened
+    auto* filp = current->files[fd];
+    inode_t* ip = filp->inode();
+    (void)count;
 
-int File::read(void* buf, size_t nbyte)
-{
-    (void)buf;
-    (void)nbyte;
-    return -EBADF;
-}
+    kassert(ip->type == FsNodeType::Dir);
 
-int File::write(void* buf, size_t nbyte)
-{
-    (void)buf;
-    (void)nbyte;
-    return -EBADF;
-}
-
-int File::open(int flags, int mode)
-{
-    (void)flags;
-    (void)mode;
-    return -EBADF;
-}
-
-int File::close()
-{
-    return -EBADF;
+    auto* fs = ip->fs;
+    auto* de = vfs.alloc_entry();
+    off_t off = filp->off();
+    int ret = fs->readdir(filp, de, 0);
+    if (ret == 0) {
+        dirp->d_ino = ip->ino;
+        dirp->d_off = off;
+        dirp->d_reclen = sizeof *dirp;
+        strncpy(dirp->d_name, de->name, NAMELEN);
+    }
+    vfs.dealloc_entry(de);
+    return ret;
 }
 
 // rootdev should be dev no for like /dev/hda1
 void VFSManager::init_root(dev_t rootdev)
 {
-    return;
     //DevFs* devfs = new Devfs;
     Disk* hd = new Disk;
     hd->init(DEVNO(MAJOR(rootdev), 0));
-    auto* part = hd->part(MINOR(rootdev));
+    auto* part = hd->part(MINOR(rootdev)-1);
     if (part->part_type == PartType::Fat32L) {
-        auto* fs = find_fs("fat32");
-        kassert(fs);
-        _rootfs = fs->spawn((void*)rootdev);        
+        mount("/dev/hda1", "/", "fat32", 0, 0);
     }
     delete hd;
-    
-    if (_rootfs) {
-        // debug list root dir
-    }
 }
 
 int VFSManager::mount(const char *src, const char *target,
         const char *fstype, unsigned long flags, const void *data)
 {
+    (void)flags;
+    (void)data;
+
     auto* fs = find_fs(fstype);
-    if (!fs) {
-        return -ENOSYS;
-    }
-    //TODO: check if mounted
+    if (!fs) { return -ENOSYS; }
+
     if (get_mount(target)) {
         kprintf("override mount to %s", target);
     }
@@ -186,11 +197,16 @@ int VFSManager::mount(const char *src, const char *target,
 
     if (strcmp(src, "dev") == 0) {
     } else if (strcmp(fstype, "ramfs") == 0) {
-        mnt->fs = fs->spawn((void*)&ramfs_mod_info);
+        mnt->fs = fs->spawn(data);
         kassert(get_mount(target) != NULL);
 
     } else if (strncmp(src, "/dev/hda", 8) == 0) {
-        //TODO: extract part num and mount
+        dev_t devno = DEVNO(IDE_MAJOR, src[8] - '0');
+        mnt->fs = fs->spawn((void*)devno);
+    }
+
+    if (target[0] == '/' && target[1] == 0) {
+        _rootfs = mnt->fs;
     }
     return 0;
 }
@@ -210,6 +226,7 @@ mount_info_t* VFSManager::get_mount(const char* target)
 
 int VFSManager::unmount(const char *target)
 {
+    (void)target;
     return 0;
 }
 
@@ -234,30 +251,146 @@ void VFSManager::register_fs(const char* fsname, CreateFsFunction func)
     _fs_types = fst;
 }
 
-//TODO: hierachy searching
+static char* parent_path(char* path) 
+{
+    for (int n = strlen(path), i = n-1; i >= 0; i--) {
+        if (i != 0 && path[i] == '/') {
+            path[i] = 0;
+            break;
+        }
+    }
+    return path;
+}
+
+static char* strip_parent(const char* path, const char* prefix)
+{
+    int n1 = strlen(prefix), n2 = strlen(path);
+
+    if (n1 == n2) {
+        auto* new_path = new char[2];
+        new_path[0] = '/';
+        new_path[1] = 0;
+        return new_path;
+    }
+
+    auto* new_path = new char[n2-n1+1];    
+    memcpy(new_path, path+n1, n2-n1+1);
+    return new_path;
+}
+
+static char* path_part(char** path)
+{
+    auto* p = *path;
+    p++;
+    while (*p && *p != '/') p++;
+    auto n = p - *path - 1;
+
+    auto* part = new char[n];
+    memcpy(part, *path+1, n);
+    part[n] = '\0';
+    *path = p;
+    return part;
+}
+
 inode_t* VFSManager::namei(const char* path)
 {
-    auto* mnt = get_mount("/");
-    return mnt->fs->dir_lookup(mnt->fs->root(), path);
+    auto eflags = vfslock.lock();
+
+    char* pth = new char[strlen(path)+1];
+    strcpy(pth, path);
+    mount_info_t* mnt = nullptr;
+    while (1) {
+        if ((mnt = get_mount(pth)) != NULL) {
+            break;
+        }
+        pth = parent_path(pth);
+        //kprintf("%s: up to %s\n", __func__, pth);
+    }
+    delete pth;
+
+    //TODO: recursively lookup
+    auto* new_path = strip_parent(path, mnt->mnt_point);
+    kprintf("get mount %s, new_path %s ", mnt->mnt_point, new_path);    
+    if (strcmp(new_path, "/") == 0) {
+        vfslock.release(eflags);
+        return mnt->fs->root();
+    }
+
+    auto* old = new_path;
+    auto* part = path_part(&new_path);
+    kprintf("%s: part %s, path %s\n", __func__, part, new_path);
+    auto* ip = dir_lookup(mnt->fs->root(), part);
+    delete part;
+    delete old;
+
+    vfslock.release(eflags);
+    return ip;
 }
 
-int VFSManager::read(inode_t* ip, void* buf, size_t nbyte, u32 offset)
+inode_t* VFSManager::dir_lookup(inode_t* dir, const char* name)
 {
-    return ip->fs->read(ip, buf, nbyte, offset);
+    auto* fs = dir->fs;
+    dentry_t* de = alloc_entry();
+
+    auto eflags = vfslock.lock();
+
+    strncpy(de->name, name, NAMELEN);
+    de->name[NAMELEN] = 0;
+    if (fs->lookup(dir, de)) {
+        inode_t* ip = alloc_inode();
+        ip->ino = de->ino;
+        fs->read_inode(ip);
+        dealloc_entry(de);
+        vfslock.release(eflags);
+        return ip;
+    }
+
+    vfslock.release(eflags);
+    return NULL;
 }
 
-int VFSManager::write(inode_t* ip, void* buf, size_t nbyte, u32 offset)
+dentry_t* VFSManager::alloc_entry()
 {
-    return ip->fs->write(ip, buf, nbyte, offset);
+    dentry_t* de = &cached_dentries[0];
+    int i;
+
+    auto eflags = vfslock.lock();    
+    for (i = 0; i < MAX_NR_DENTRY; i++, de++) {
+        if (de->ino == 0) 
+            break;
+    }
+    vfslock.release(eflags);
+
+    if (i >= MAX_NR_DENTRY) return NULL;
+    return de;
 }
 
-inode_t* VFSManager::dir_lookup(inode_t* ip, const char* name)
+void VFSManager::dealloc_entry(dentry_t* de)
 {
-    return ip->fs->dir_lookup(ip, name);
+    auto eflags = vfslock.lock();
+    memset(de, 0, sizeof *de);    
+    vfslock.release(eflags);  
 }
 
-dentry_t* VFSManager::dir_read(inode_t* ip, int id)
+inode_t* VFSManager::alloc_inode()
 {
-    return ip->fs->dir_read(ip, id);
+    inode_t* ip = &cached_inodes[0];
+    int i;
+
+    auto eflags = vfslock.lock();
+
+    for (i = 0; i < MAX_NR_INODE; i++, ip++) {
+        if (ip->ino == 0) break;
+    }
+    vfslock.release(eflags);
+
+    if (i >= MAX_NR_INODE) return NULL;
+    return ip;
 }
 
+void VFSManager::dealloc_inode(inode_t* ip)
+{
+    auto eflags = vfslock.lock();
+    memset(ip, 0, sizeof *ip);
+    vfslock.release(eflags);   
+}

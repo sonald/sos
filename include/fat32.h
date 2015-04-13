@@ -42,7 +42,7 @@ typedef struct fat_bs
 {
     unsigned char       bootjmp[3];
     unsigned char       oem_name[8];
-    unsigned short          bytes_per_sector;
+    unsigned short      bytes_per_sector;
     unsigned char       sectors_per_cluster;
     unsigned short      reserved_sector_count;
     unsigned char       table_count;
@@ -66,17 +66,68 @@ typedef struct fat_bs
 
 class Fat32Fs: public FileSystem {
     public:
+        enum class FatType {
+            Fat32,
+            Fat16,
+            Fat12
+        };
+
+        enum {
+            READ_ONLY=0x01,
+            HIDDEN=0x02, 
+            SYSTEM=0x04, 
+            VOLUME_ID=0x08, 
+            DIRECTORY=0x10, 
+            ARCHIVE=0x20,
+            LFN=READ_ONLY|HIDDEN|SYSTEM|VOLUME_ID 
+        };
+
+        union dirent {
+            struct {
+                char name[11]; // 8.3 name
+                uint8_t attr;
+                uint8_t reserved;
+                uint8_t create_tenth;
+                uint16_t create_time;
+                uint16_t create_date;
+                uint16_t access_date;
+                uint16_t start_cluster_hi; // for fat16/12 is 0
+                uint16_t mod_time;
+                uint16_t mod_date;
+                uint16_t start_cluster_lo; 
+                uint32_t size; // in bytes
+            } std;  // standard 8.3 format
+
+            struct {
+                uint8_t order;
+                char name1[10];
+                uint8_t attr;
+                uint8_t type; // 0
+                uint8_t checksum;
+                char name2[12];
+                uint16_t zeroed; // 0
+                char name3[4];
+            } lfn;  // long file names
+        } __attribute__((packed));
+
         void init(dev_t dev);
-        int read(inode_t* ip, void* buf, size_t nbyte, u32 offset) override;
-        int write(inode_t* ip, void* buf, size_t nbyte, u32 offset) override;
-        inode_t* dir_lookup(inode_t* ip, const char* name) override;
-        dentry_t* dir_read(inode_t* ip, int id) override;
 
     private:
         dev_t _dev;
+        fat_bs_t _fat_bs;
+        FatType _type;
+
+        uint32_t _total_sects;
+        uint32_t _fat_sects;
+        uint32_t _root_sects; // fat12/16
+        uint32_t _root_start_sect;
+        uint32_t _data_start_sect;
+        uint32_t _clusters;
+
+        uint32_t _lba_start; // start phy sector of filesystem in disk
 };
 
-FileSystem* create_fat32fs(void*);
+FileSystem* create_fat32fs(const void*);
 #endif
 
 

@@ -8,6 +8,8 @@
 #include "sched.h"
 #include "timer.h"
 #include <vfs.h>
+#include <sys.h>
+#include <sos/limits.h>
 
 extern "C" void trap_return();
 
@@ -167,7 +169,10 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     kassert(ip != NULL);
 
     char* buf = new char[ip->size];
-    int len = vfs.read(ip, buf, ip->size, 0);
+
+    int fd = sys_open(path, O_RDONLY, 0);
+    int len = sys_read(fd, buf, ip->size);
+    sys_close(fd);
     if (len < 0) {
         kprintf("load %s failed\n", path);
         tasklock.release(oldflags);
@@ -206,11 +211,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     current->entry = (void*)elf->e_entry;
     
     trapframe_t* regs = current->regs;
-    //memset(regs, 0, sizeof *regs);
-    //regs->ss = regs->es = regs->ds = regs->fs = regs->gs = 0x23;
-    //regs->cs = 0x1b;
     regs->eip = elf->e_entry;
-    //regs->eflags = 0x202;
     regs->useresp = USTACK_TOP;
 
     tasklock.release(oldflags);
@@ -319,4 +320,3 @@ proc_t* create_kthread(const char* name, kthread_t prog)
     kprintf("%s(%d, %s)\n", __func__, proc->pid, proc->name);
     return proc;
 }
-

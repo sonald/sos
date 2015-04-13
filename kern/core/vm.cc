@@ -417,7 +417,7 @@ void VirtualMemoryManager::split_block(VirtualMemoryManager::kheap_block_head* h
 void VirtualMemoryManager::kfree(void* ptr)
 {
     auto eflags = _lock.lock();
-    kprintf("[VMM] kfree 0x%x\n", ptr);
+    // kprintf("[VMM] kfree 0x%x\n", ptr);
     kheap_block_head* h = (kheap_block_head*)((char*)ptr - KHEAD_SIZE); 
     kassert(h->used);
     kassert(h->ptr == h->data);

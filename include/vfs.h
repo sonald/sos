@@ -1,12 +1,10 @@
 #ifndef _VFS_H
-#define _VFS_H 
+#define _VFS_H
 
-#include "types.h"
-#include "fcntl.h"
-#include "devices.h"
-
-#define NAMELEN 64
-#define MAX_NR_FILE   64      // max files to open system-wide
+#include <types.h>
+#include <fcntl.h>
+#include <devices.h>
+#include <sos/limits.h>
 
 class Disk;
 
@@ -30,7 +28,7 @@ typedef struct inode_s {
 } inode_t;
 
 typedef struct dentry_s {
-    char name[NAMELEN];
+    char name[NAMELEN+1];
     u32 ino;
 } dentry_t;
 
@@ -40,54 +38,74 @@ class File {
             None, Pipe, Inode
         };
 
-        File(): _ip(NULL), _off(0), _ref(0),_type(Type::None) {}
-
-        int read(void* buf, size_t nbyte);
-        int write(void* buf, size_t nbyte);
-        int open(int flags, int mode);
-        int close();
+        File(Type ty = Type::None): _ip(NULL), _off(0), _ref(0), _type(ty) {}
 
         int ref() const { return _ref; }
-        u32 off() const { return _off; }
+        off_t off() const { return _off; }
+        void set_off(off_t off) { _off = off; }
+        inode_t* inode() { return _ip; }
 
-        void set_inode(inode_t* ip) { _ip = ip; }
+        void set_inode(inode_t* ip) { 
+            _ref++;
+            _ip = ip; 
+            _type = Type::Inode;
+        }
 
     protected:
         inode_t *_ip;
-        u32 _off;
+        off_t _off;
         int _ref;
         Type _type;
 };
 
-struct fs_super_s {
+typedef struct fs_super_s {
     uint8_t mount_count;
-};
+} fs_super_t;
 
+typedef void* filldir_t;
 class FileSystem {
     public:
         friend class VFSManager;
 
         FileSystem(): _iroot(NULL) {}
-        //virtual void read_super();
 
-        virtual int read(inode_t* ip, void* buf, size_t nbyte, u32 offset);
-        virtual int write(inode_t* ip, void* buf, size_t nbyte, u32 offset);
+        virtual void read_inode(inode_t *) {}
+        virtual void dirty_inode(inode_t *) {}
+        virtual void write_inode(inode_t *, int) {}
+        virtual void put_inode(inode_t *) {}
+        virtual void drop_inode(inode_t *) {}
+        virtual void delete_inode(inode_t *) {}
 
-        virtual inode_t* dir_lookup(inode_t* ip, const char* name);
-        virtual dentry_t* dir_read(inode_t* ip, int id);
+        virtual int create(inode_t * dir, struct dentry *, int mode) {}
+        virtual int link(struct dentry * old, inode_t * dir, struct dentry *new_de) {}
+        virtual int unlink(inode_t * dir, dentry_t *) {}
+        virtual int mkdir(inode_t *, dentry_t *, int) {}
+        virtual int rmdir(inode_t *, dentry_t *) {}
+        virtual int mknod(inode_t *, dentry_t *, int, dev_t) {}
+        virtual int rename(inode_t *, dentry_t *, inode_t *, dentry_t *) {}
+        virtual int readlink(dentry_t *, char * buf,int len) {}
+        virtual int open(inode_t *, struct file *) {}
+        virtual int release(inode_t *, struct file *) {}        
+
+        virtual dentry_t * lookup(inode_t * dir, dentry_t *) {}
+
+        virtual off_t llseek(File *, off_t off, int whence) {}
+        virtual ssize_t read(File *, char * buf, size_t count, off_t* offset) {}
+        virtual ssize_t write(File *, const char * buf, size_t, off_t* offset) {}
+        virtual int readdir(File *, dentry_t *, filldir_t) {}
 
         inode_t* root() const { return _iroot; }
 
     protected:
         inode_t* _iroot;
-        fs_super_s* _sb;
+        fs_super_t* _sb;
 
         FileSystem* _prev, *_next;
 };
 
 /**
- * NOTE: mount point handling is extremely complex, I have observed 
- * linux 1.0 and linux 0.11 and modern linux, the schema evolves 
+ * NOTE: mount point handling is extremely complex, I have observed
+ * linux 1.0 and linux 0.11 and modern linux, the schema evolves
  * a lot! so I'll take a simple wrong way to do it first.
  * mnts ordered in stack
  */
@@ -97,7 +115,7 @@ typedef struct mount_info_s {
     struct mount_info_s *next;
 } mount_info_t;
 
-using CreateFsFunction = FileSystem* (*)(void*);
+using CreateFsFunction = FileSystem* (*)(const void*);
 typedef struct file_system_type_s {
     const char* fsname;
     CreateFsFunction spawn;
@@ -116,10 +134,13 @@ class VFSManager {
         mount_info_t* get_mount(const char* target);
 
         inode_t* namei(const char* path);
-        int read(inode_t* ip, void* buf, size_t nbyte, u32 offset);
-        int write(inode_t* ip, void* buf, size_t nbyte, u32 offset);
+        // wrapper for fs::lookup
         inode_t* dir_lookup(inode_t* ip, const char* name);
-        dentry_t* dir_read(inode_t* ip, int id);
+
+        dentry_t* alloc_entry();
+        void dealloc_entry(dentry_t*);
+        inode_t* alloc_inode();
+        void dealloc_inode(inode_t*);
 
     private:
         FileSystem* _fs_list {nullptr};

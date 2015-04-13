@@ -49,10 +49,10 @@ debug: kernel
 	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio \
 	-drive file=hd.img,format=raw -vga vmware
 
-run: kernel echo hd.img
+run: kernel echo hd.img initramfs.img
 	qemu-system-i386 -m 32 -s -monitor stdio -hda hd.img -vga vmware 
 
-hd.img: kernel 
+hd.img: kernel initramfs.img
 	hdiutil attach hd.img
 	cp kernel /Volumes/SOS
 	cp initramfs.img /Volumes/SOS
@@ -81,9 +81,10 @@ ramfs_gen: tools/ramfs_gen.c
 echo: user/echo.c user/libc.c lib/sprintf.cc user/user.ld 
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^ 
+
+initramfs.img: echo ramfs_gen	
 	./ramfs_gen README.md user/echo.c echo
 
-	
 .PHONY: clean
 
 clean:

@@ -21,22 +21,4 @@ void DevFs::init()
     }
 }
 
-int DevFs::read(inode_t* ip, void* buf, size_t nbyte, u32 offset)
-{
-}
-
-int DevFs::write(inode_t* ip, void* buf, size_t nbyte, u32 offset)
-{
-}
-
-inode_t* DevFs::dir_lookup(inode_t* ip, const char* name)
-{
-    if (strcmp(name, "hda") == 0) {
-    } else if (strcmp(name, "hda") == 0) {
-    }
-}
-
-dentry_t* DevFs::dir_read(inode_t* ip, int id)
-{
-}
 

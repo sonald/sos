@@ -4,16 +4,27 @@
 #include <unistd.h>
 #include <string.h>
 
-#define NAMELEN 64
 #define MAXFILES 64
-
+#define NAMELEN  64
 struct initrd_entry_header 
 {
    unsigned char magic; // The magic number is there to check for consistency.
-   char name[NAMELEN];
+   char name[NAMELEN+1];
    int32_t offset; // Offset in the initrd the file starts.
    int32_t length; // Length of the file.
 }__attribute__((packed));
+
+// ramfs don't support subdir, so change '/' into '_'
+static char* sanitize_name(const char* name)
+{
+    int n = strlen(name);
+    char* s = malloc(n+1);
+    for (int i = 0; i < n; i++) {
+        s[i] = name[i] == '/' ? '_': name[i];
+    }
+    s[n] = 0;
+    return s;
+}
 
 int main(int argc, char **argv)
 {
@@ -27,7 +38,10 @@ int main(int argc, char **argv)
     int i;
     for(i = 1; i <= nheaders; i++) {
         printf("writing file %s at 0x%x\n", argv[i], off);
-        strncpy(headers[i-1].name, argv[i], NAMELEN-1);
+        char* filename = sanitize_name(argv[i]);
+        strncpy(headers[i-1].name, filename, NAMELEN+1);
+        free(filename);
+        
         headers[i-1].offset = off;
         FILE *stream = fopen(argv[i], "r");
         if(stream == 0) {
