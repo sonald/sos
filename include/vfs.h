@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <devices.h>
 #include <sos/limits.h>
+#include <errno.h>
 
 class Disk;
 
@@ -19,17 +20,24 @@ enum class FsNodeType: uint8_t {
 class FileSystem;
 // in-memory inode
 typedef struct inode_s {
-    u32 dev;  // major and minor
-    u32 size;
+    dev_t dev;  // major and minor
+    u32 ino;    
+    loff_t size;  // size in bytes
+    loff_t blocks; 
+    size_t blksize;
+    time_t mtime;
+    time_t atime;
+    time_t ctime;
+    umode_t mode;
     FsNodeType type;
-    u32 ino;
-
+    void* data; // fs specific
     FileSystem* fs;
 } inode_t;
 
 typedef struct dentry_s {
     char name[NAMELEN+1];
-    u32 ino;
+    struct dentry_s *parent;
+    inode_t *ip; 
 } dentry_t;
 
 class File {
@@ -69,30 +77,29 @@ class FileSystem {
 
         FileSystem(): _iroot(NULL) {}
 
-        virtual void read_inode(inode_t *) {}
-        virtual void dirty_inode(inode_t *) {}
-        virtual void write_inode(inode_t *, int) {}
-        virtual void put_inode(inode_t *) {}
-        virtual void drop_inode(inode_t *) {}
-        virtual void delete_inode(inode_t *) {}
+        // virtual void dirty_inode(inode_t *) {}
+        // virtual void write_inode(inode_t *, int) {}
+        // virtual void put_inode(inode_t *) {}
+        // virtual void drop_inode(inode_t *) {}
+        // virtual void delete_inode(inode_t *) {}
 
-        virtual int create(inode_t * dir, struct dentry *, int mode) {}
-        virtual int link(struct dentry * old, inode_t * dir, struct dentry *new_de) {}
-        virtual int unlink(inode_t * dir, dentry_t *) {}
-        virtual int mkdir(inode_t *, dentry_t *, int) {}
-        virtual int rmdir(inode_t *, dentry_t *) {}
-        virtual int mknod(inode_t *, dentry_t *, int, dev_t) {}
-        virtual int rename(inode_t *, dentry_t *, inode_t *, dentry_t *) {}
-        virtual int readlink(dentry_t *, char * buf,int len) {}
-        virtual int open(inode_t *, struct file *) {}
-        virtual int release(inode_t *, struct file *) {}        
+        // virtual int create(inode_t * dir, struct dentry *, int mode) {}
+        // virtual int link(struct dentry * old, inode_t * dir, struct dentry *new_de) {}
+        // virtual int unlink(inode_t * dir, dentry_t *) {}
+        // virtual int mkdir(inode_t *, dentry_t *, int) {}
+        // virtual int rmdir(inode_t *, dentry_t *) {}
+        // virtual int mknod(inode_t *, dentry_t *, int, dev_t) {}
+        // virtual int rename(inode_t *, dentry_t *, inode_t *, dentry_t *) {}
+        // virtual int readlink(dentry_t *, char * buf,int len) {}
+        // virtual int open(inode_t *, struct file *) {}
+        // virtual int release(inode_t *, struct file *) {}        
 
-        virtual dentry_t * lookup(inode_t * dir, dentry_t *) {}
+        virtual dentry_t * lookup(inode_t*, dentry_t*) { return NULL; }
 
-        virtual off_t llseek(File *, off_t off, int whence) {}
-        virtual ssize_t read(File *, char * buf, size_t count, off_t* offset) {}
-        virtual ssize_t write(File *, const char * buf, size_t, off_t* offset) {}
-        virtual int readdir(File *, dentry_t *, filldir_t) {}
+        virtual off_t llseek(File *, off_t , int ) { return -EINVAL; }
+        virtual ssize_t read(File *, char * , size_t , off_t* ) { return -EINVAL; }
+        virtual ssize_t write(File *, const char * , size_t, off_t* ) { return -EINVAL; }
+        virtual int readdir(File *, dentry_t *, filldir_t) { return -EINVAL; }
 
         inode_t* root() const { return _iroot; }
 
@@ -132,6 +139,8 @@ class VFSManager {
                 unsigned long mountflags, const void *data);
         int unmount(const char *target);
         mount_info_t* get_mount(const char* target);
+        // find mount point for path, and return new_path by stripping mount prefix
+        mount_info_t* find_mount(const char* path, char**new_path);
 
         inode_t* namei(const char* path);
         // wrapper for fs::lookup
@@ -147,6 +156,7 @@ class VFSManager {
         file_system_type_t* _fs_types {nullptr};
         FileSystem* _rootfs {nullptr}; // fs for root mountpoint
         mount_info_t* _mounts {nullptr};
+
 
 };
 

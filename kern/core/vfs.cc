@@ -8,6 +8,7 @@
 #include "ramfs.h"
 #include <dirent.h>
 #include <sos/limits.h>
+#include <sprintf.h>
 
 File cached_files[MAX_NR_FILE];
 inode_t cached_inodes[MAX_NR_INODE];
@@ -134,8 +135,8 @@ int sys_read(int fd, void *buf, size_t nbyte)
 {
     auto* filp = current->files[fd];
     inode_t* ip = filp->inode();
-
-    return ip->fs->read(filp, (char*)buf, nbyte, 0);
+    off_t off = filp->off();
+    return ip->fs->read(filp, (char*)buf, nbyte, &off);
 }
 
 // ignore count, should only be 1 by now
@@ -170,7 +171,9 @@ void VFSManager::init_root(dev_t rootdev)
     hd->init(DEVNO(MAJOR(rootdev), 0));
     auto* part = hd->part(MINOR(rootdev)-1);
     if (part->part_type == PartType::Fat32L) {
-        mount("/dev/hda1", "/", "fat32", 0, 0);
+        char devname[NAMELEN+1];
+        sprintf(devname, NAMELEN, "/dev/hd%c%d", 'a', MINOR(rootdev));
+        mount(devname, "/", "fat32", 0, 0);
     }
     delete hd;
 }
@@ -251,14 +254,18 @@ void VFSManager::register_fs(const char* fsname, CreateFsFunction func)
     _fs_types = fst;
 }
 
+//assume path is normalized
 static char* parent_path(char* path) 
 {
-    for (int n = strlen(path), i = n-1; i >= 0; i--) {
-        if (i != 0 && path[i] == '/') {
-            path[i] = 0;
+    int n, i;
+    for (n = strlen(path), i = n-1; i >= 0; i--) {
+        if (i == 0 || path[i] == '/') {
             break;
         }
     }
+
+    if (i != 0) path[i] = 0;
+    else path[1] = 0;
     return path;
 }
 
@@ -292,10 +299,9 @@ static char* path_part(char** path)
     return part;
 }
 
-inode_t* VFSManager::namei(const char* path)
-{
-    auto eflags = vfslock.lock();
 
+mount_info_t* VFSManager::find_mount(const char* path, char**new_path)
+{
     char* pth = new char[strlen(path)+1];
     strcpy(pth, path);
     mount_info_t* mnt = nullptr;
@@ -304,13 +310,23 @@ inode_t* VFSManager::namei(const char* path)
             break;
         }
         pth = parent_path(pth);
-        //kprintf("%s: up to %s\n", __func__, pth);
     }
     delete pth;
 
+    if (new_path) 
+        *new_path = strip_parent(path, mnt->mnt_point);
+    kprintf("get mount %s, new_path %s ", mnt->mnt_point, *new_path);    
+    return mnt;
+}
+
+inode_t* VFSManager::namei(const char* path)
+{
+    auto eflags = vfslock.lock();
+
     //TODO: recursively lookup
-    auto* new_path = strip_parent(path, mnt->mnt_point);
-    kprintf("get mount %s, new_path %s ", mnt->mnt_point, new_path);    
+    char* new_path = nullptr;
+    auto* mnt = find_mount(path, &new_path);
+
     if (strcmp(new_path, "/") == 0) {
         vfslock.release(eflags);
         return mnt->fs->root();
@@ -337,10 +353,8 @@ inode_t* VFSManager::dir_lookup(inode_t* dir, const char* name)
     strncpy(de->name, name, NAMELEN);
     de->name[NAMELEN] = 0;
     if (fs->lookup(dir, de)) {
-        inode_t* ip = alloc_inode();
-        ip->ino = de->ino;
-        fs->read_inode(ip);
-        dealloc_entry(de);
+        auto* ip = de->ip;
+        dealloc_entry(de); // FIXME: no cache at all
         vfslock.release(eflags);
         return ip;
     }
@@ -356,7 +370,7 @@ dentry_t* VFSManager::alloc_entry()
 
     auto eflags = vfslock.lock();    
     for (i = 0; i < MAX_NR_DENTRY; i++, de++) {
-        if (de->ino == 0) 
+        if (de->ip == 0) 
             break;
     }
     vfslock.release(eflags);

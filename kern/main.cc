@@ -17,6 +17,7 @@
 #include "graphics.h"
 #include "display.h"
 #include "fat32.h"
+#include <sprintf.h>
 #include <dirent.h>
 #include <sys.h>
 #include <string.h>
@@ -249,7 +250,7 @@ static void load_module(u32 mods_count, u32 mods_base)
     info.size = mod_end - mod_start;
     info.cmdline = (char*)p2v(mod->string);
     vfs.mount("ramfs", "/ram", "ramfs", 0, (void*)&info);
-    // test_ramfs(true);
+    test_ramfs(false);
 }
 
 extern "C" int kernel_main(struct multiboot_info *mb)
@@ -320,7 +321,33 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     proc_t* proc = prepare_userinit((void*)&init_task);
     load_module(mb->mods_count, mb->mods_addr);
-    // for(;;) asm volatile ("hlt");
+    {
+        char filename[NAMELEN+1] = "/GRUB    .CFG";
+        int fd2 = sys_open(filename, O_RDONLY, 0);
+        if (fd2 >= 0) {
+            char buf[64];
+            int len = 0;
+            while ((len = sys_read(fd2, buf, sizeof buf - 1)) > 0) {
+                buf[len] = 0;
+                kputs(buf);
+            }                
+            sys_close(fd2); 
+        }            
+    }
+
+    for(;;) asm volatile ("hlt");   
+
+    auto fd = sys_open("/grub.cfg", O_RDONLY, 0);
+    if (fd >= 0) {
+        char buf[64];
+        int len = 0;
+        while ((len = sys_read(fd, buf, sizeof buf - 1)) > 0) {
+            buf[len] = 0;
+            kputs(buf);
+        }
+        sys_close(fd);
+    }
+ 
 
     create_kthread("kthread1", kthread1);
     create_kthread("kthread2", kthread2);

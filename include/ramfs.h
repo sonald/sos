@@ -15,8 +15,6 @@ class Ramfs: public FileSystem {
     public: 
         Ramfs(): FileSystem() {}
         void init(char* addr, size_t size, const char* cmdline);
-        void read_inode(inode_t *) override;
-
         dentry_t * lookup(inode_t * dir, dentry_t *) override;
 
         ssize_t read(File *, char * buf, size_t count, off_t * offset) override;
@@ -28,6 +26,8 @@ class Ramfs: public FileSystem {
         int _nr_nodes;
         initrd_header_t* _sb;
         char* _cmdline;
+
+        void read_inode(inode_t *);        
 };
 
 FileSystem* create_ramfs(const void*);

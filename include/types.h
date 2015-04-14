@@ -49,9 +49,11 @@ typedef unsigned short umode_t;
 typedef unsigned char nlink_t;
 typedef int daddr_t;
 typedef long off_t;
+typedef int64_t loff_t;
 typedef unsigned char u_char;
 typedef unsigned short ushort;
 typedef int ssize_t;
+typedef long time_t;
 
 typedef struct { int quot,rem; } div_t;
 typedef struct { long quot,rem; } ldiv_t;

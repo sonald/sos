@@ -59,8 +59,9 @@ void PATADevice::init(int bus, bool master)
     char model[41];
     char serial[21];
 
-    if (!ata_ready(_iobase)) { this->_valid = false; }
-    else {
+    if (!ata_ready(_iobase)) {
+        this->_valid = false; 
+    } else {
         uint16_t data[256];
         for (size_t i = 0; i < ARRAYLEN(data); i++) {
             data[i] = _inw(ATA_DATA_REG);
@@ -111,6 +112,8 @@ bool PATADevice::read(Buffer* bufp)
 
 bool PATADevice::write(Buffer* bufp)
 {
+    (void)bufp;
+    return true;
 }
 
 void ata_init()
