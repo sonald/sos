@@ -354,7 +354,6 @@ inode_t* VFSManager::namei(const char* path)
     }
     delete old;
 
-
     vfslock.release(eflags);
     return ip;
 }

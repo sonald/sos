@@ -65,6 +65,8 @@ fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
         // kprintf("%s, ", ip->std_name);
     }
     ip->size =std_dp->std.size;
+    ip->attr = std_dp->std.attr;
+
     if (_type == FatType::Fat32) {
         ip->start_cluster = std_dp->std.start_cluster_lo + (std_dp->std.start_cluster_hi << 16);
     } else {
@@ -256,7 +258,7 @@ inode_t* Fat32Fs::scan_non_root_dir(inode_t* dir, const char* name)
     auto start_sect = cluster2sector(cluster);
     inode_t* ip = NULL;
     while (scan_dir_cluster(dir, name, start_sect, &ip) > 0) {
-        if (ip) return ip;
+        if (ip) break;
 
         cluster = find_next_cluster(cluster);        
         if (cluster >= CLUSTER_DATA_END_16) break;
@@ -273,7 +275,7 @@ inode_t* Fat32Fs::scan_root_dir(inode_t* dir, const char* name)
     uint32_t n = 0;
     inode_t* ip = NULL;
     while (scan_dir_cluster(dir, name, _root_start_sect + n, &ip) > 0) {
-        if (ip) return ip;
+        if (ip) break;        
         if (n++ >= _root_sects) break;
     }
     return ip;
@@ -337,6 +339,8 @@ _out:
         (*ip)->fs = this;
 
         (*ip)->data = (void*)fat_ip;
+        kprintf("%s: found %s attr 0x%x type %s", __func__, fat_ip->std_name, 
+            fat_ip->attr, ((*ip)->type == FsNodeType::Dir ? "dir" : "file"));
     }
 
     return done ? 0:1;
@@ -378,8 +382,6 @@ ssize_t Fat32Fs::read(File *filp, char * buf, size_t count, off_t * offset)
     if (count + off >= ip->size) count = ip->size - off;
 
     uint32_t cluster_order = off / _blksize;
-    // kprintf("%s: cluster_order %d ", __func__, cluster_order);
-
     auto cluster = fat_ip->start_cluster;
     while (cluster_order-- > 0) {
         cluster = find_next_cluster(cluster);
@@ -419,12 +421,12 @@ ssize_t Fat32Fs::write(File *filp, const char * buf, size_t count, off_t *offset
 
 int Fat32Fs::readdir(File *filp, dentry_t *de, filldir_t)
 {
-    inode_t* ip = filp->inode();
+    inode_t* dir = filp->inode();
     int id = filp->off() / sizeof(union fat_dirent);
 
-    if (ip->type != FsNodeType::Dir) return -EINVAL;
+    if (dir->type != FsNodeType::Dir) return -EINVAL;
 
-    
+  
     de->ip = vfs.alloc_inode();
 
 

@@ -174,6 +174,7 @@ class Fat32Fs: public FileSystem {
         void read_inode(inode_t* ip); 
         inode_t* scan_non_root_dir(inode_t* dir, const char* name);
         inode_t* scan_root_dir(inode_t* dir, const char* name);    
+
         int scan_dir_cluster(inode_t* dir, const char* name, uint32_t start_sector, inode_t** ip);
         ssize_t read_file_cluster(char * buf, size_t count, uint32_t off, uint32_t cluster);
         fat_inode_t* build_fat_inode(union fat_dirent* dp, int dp_len);

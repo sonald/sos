@@ -205,32 +205,27 @@ static void apply_mmap(u32 mmap_length, u32 mmap_addr)
     }
 }
 
-static void test_ramfs(bool content) 
+static void test_fs_read(const char* filepath) 
+{       
+        int fd = sys_open(filepath, O_RDONLY, 0);
+        if (fd >= 0) {
+            char buf[64];
+            int len = 0;
+            while ((len = sys_read(fd, buf, sizeof buf - 1)) > 0) {
+                buf[len] = 0;
+                kputs(buf);
+            }                
+            sys_close(fd); 
+        }            
+}
+
+static void test_fs_readdir(const char* dir)
 {
-    int fd = sys_open("/ram", O_RDONLY, 0);
+    int fd = sys_open(dir, O_RDONLY, 0);
     kassert(fd >= 0);
     struct dirent dire;
-    bool shown = false;
     while (sys_readdir(fd, &dire, 1) >= 0) {
-        kprintf("file %s: ", dire.d_name);
-        if (content && !shown) {
-            char filename[NAMELEN+1+5] = "/ram/";
-            strcpy(filename + 5, dire.d_name);
-            int fd2 = sys_open(filename, O_RDONLY, 0);
-            if (fd2 >= 0) {
-                char buf[64];
-                int len = 0;
-                while ((len = sys_read(fd2, buf, sizeof buf - 1)) > 0) {
-                    buf[len] = 0;
-                    kputchar('[');
-                    kputs(buf);
-                    kputchar(']');
-                }                
-                sys_close(fd2); 
-                shown = true;    
-            }
-        }
-        kputchar('\n');
+        kprintf("%s, ", dire.d_name);        
     }
     sys_close(fd);
 }
@@ -250,7 +245,6 @@ static void load_module(u32 mods_count, u32 mods_base)
     info.size = mod_end - mod_start;
     info.cmdline = (char*)p2v(mod->string);
     vfs.mount("ramfs", "/ram", "ramfs", 0, (void*)&info);
-    test_ramfs(false);
 }
 
 extern "C" int kernel_main(struct multiboot_info *mb)
@@ -321,20 +315,12 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     proc_t* proc = prepare_userinit((void*)&init_task);
     load_module(mb->mods_count, mb->mods_addr);
-    {
-        char filename[NAMELEN+1] = "/BOOT/GRUB/GRUB.CFG";
-        int fd2 = sys_open(filename, O_RDONLY, 0);
-        if (fd2 >= 0) {
-            char buf[64];
-            int len = 0;
-            while ((len = sys_read(fd2, buf, sizeof buf - 1)) > 0) {
-                buf[len] = 0;
-                kputs(buf);
-            }                
-            sys_close(fd2); 
-        }            
-    }
-
+    test_fs_readdir("/");
+    for(;;) asm volatile ("hlt");
+ 
+    // char filename[NAMELEN+1] = "/boot/grub/grub.cfg";
+    // char filename[NAMELEN+1] = "/longnamedmsdosfile.txt";     
+    test_fs_read(filename);
     for(;;) asm volatile ("hlt");
  
 
