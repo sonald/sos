@@ -322,7 +322,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     proc_t* proc = prepare_userinit((void*)&init_task);
     load_module(mb->mods_count, mb->mods_addr);
     {
-        char filename[NAMELEN+1] = "/GRUB    .CFG";
+        char filename[NAMELEN+1] = "/BOOT/GRUB/GRUB.CFG";
         int fd2 = sys_open(filename, O_RDONLY, 0);
         if (fd2 >= 0) {
             char buf[64];
@@ -335,18 +335,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
         }            
     }
 
-    for(;;) asm volatile ("hlt");   
-
-    auto fd = sys_open("/grub.cfg", O_RDONLY, 0);
-    if (fd >= 0) {
-        char buf[64];
-        int len = 0;
-        while ((len = sys_read(fd, buf, sizeof buf - 1)) > 0) {
-            buf[len] = 0;
-            kputs(buf);
-        }
-        sys_close(fd);
-    }
+    for(;;) asm volatile ("hlt");
  
 
     create_kthread("kthread1", kthread1);

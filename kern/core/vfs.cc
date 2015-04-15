@@ -285,20 +285,25 @@ static char* strip_parent(const char* path, const char* prefix)
     return new_path;
 }
 
-static char* path_part(char** path)
+// Examples:
+//   path_part("a/bb/c", name) = "bb/c", setting name = "a"
+//   path_part("///a//bb", name) = "bb", setting name = "a"
+//   path_part("a", name) = "", setting name = "a"
+//   path_part("", name) = skipelem("////", name) = 0
+static char* path_part(char* path, char* part)
 {
-    auto* p = *path;
-    p++;
+    auto* p = path;
+    while (*p == '/') p++;
+    if (!*p) return NULL;
+
+    path = p;
     while (*p && *p != '/') p++;
-    auto n = p - *path - 1;
+    auto n = min(p - path, NAMELEN);
 
-    auto* part = new char[n];
-    memcpy(part, *path+1, n);
+    memcpy(part, path, n);
     part[n] = '\0';
-    *path = p;
-    return part;
+    return p;
 }
-
 
 mount_info_t* VFSManager::find_mount(const char* path, char**new_path)
 {
@@ -313,9 +318,14 @@ mount_info_t* VFSManager::find_mount(const char* path, char**new_path)
     }
     delete pth;
 
-    if (new_path) 
-        *new_path = strip_parent(path, mnt->mnt_point);
-    kprintf("get mount %s, new_path %s ", mnt->mnt_point, *new_path);    
+    auto* stripped = strip_parent(path, mnt->mnt_point);
+    kprintf("get mount %s, new_path %s ", mnt->mnt_point, stripped);    
+    if (new_path) {
+        *new_path = stripped;
+    } else {
+        delete stripped;
+    }
+
     return mnt;
 }
 
@@ -333,11 +343,17 @@ inode_t* VFSManager::namei(const char* path)
     }
 
     auto* old = new_path;
-    auto* part = path_part(&new_path);
-    kprintf("%s: part %s, path %s\n", __func__, part, new_path);
-    auto* ip = dir_lookup(mnt->fs->root(), part);
-    delete part;
+    char part[NAMELEN+1];
+    auto* ip = mnt->fs->root();
+    while ((new_path = path_part(new_path, part)) != NULL) {
+        kprintf("%s: part %s, path %s\n", __func__, part, new_path);
+        if ((ip = dir_lookup(ip, part)) == NULL) {
+            kprintf("%s failed to find %s\n", __func__, path);            
+            break;
+        }
+    }
     delete old;
+
 
     vfslock.release(eflags);
     return ip;
@@ -349,18 +365,16 @@ inode_t* VFSManager::dir_lookup(inode_t* dir, const char* name)
     dentry_t* de = alloc_entry();
 
     auto eflags = vfslock.lock();
-
+    inode_t* ip = NULL;
     strncpy(de->name, name, NAMELEN);
     de->name[NAMELEN] = 0;
     if (fs->lookup(dir, de)) {
-        auto* ip = de->ip;
-        dealloc_entry(de); // FIXME: no cache at all
-        vfslock.release(eflags);
-        return ip;
+        ip = de->ip;
     }
 
+    dealloc_entry(de);
     vfslock.release(eflags);
-    return NULL;
+    return ip;
 }
 
 dentry_t* VFSManager::alloc_entry()

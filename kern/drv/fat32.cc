@@ -34,11 +34,23 @@ fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
     auto* std_dp = &dp[dp_len-1];
     {
         char* name = ip->std_name;
-        strncpy(name, std_dp->std.name, 8);
-        name[8] = '.';
-        strncpy(name+9, std_dp->std.name+8, 3);
-        name[12] = 0;
-        kprintf("NRM: %s, ", ip->std_name);
+        int i = 0;
+        for (i = 0; i < 8; i++) {
+            if (std_dp->std.name[i] == ' ') break;
+            name[i] = std_dp->std.name[i];
+        }
+
+        int j = 0;
+        for (j = 0; j < 3; j++) {
+            if (std_dp->std.ext[j] == ' ') break;
+        }
+
+        if (j) {
+            name[i++] = '.';
+            strncpy(name+i, std_dp->std.ext, j);
+            name[i+3] = 0;
+        }
+        // kprintf("%s, ", ip->std_name);
     }
     ip->size =std_dp->std.size;
     if (_type == FatType::Fat32) {
@@ -47,7 +59,6 @@ fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
         ip->start_cluster = std_dp->std.start_cluster_lo;
         kassert(std_dp->std.start_cluster_hi == 0);
     }
-
 
     if (--dp_len) {
         char* lfn_name = new char[64 * 13];
@@ -68,8 +79,7 @@ fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
         strcpy(ip->long_name, lfn_name);        
         delete lfn_name;
 
-        kprintf("LFN: %s, ", ip->long_name);
-        
+        // kprintf("LFN: %s, ", ip->long_name);        
     }
 
     return ip;
@@ -127,6 +137,13 @@ void Fat32Fs::init(dev_t dev)
         _fat_bs.ebs16.fat_type_label[7] = 0;
     }
 
+    uint32_t fat_start_sect = _fat_bs.reserved_sector_count + _lba_start;
+    bufp = bio.read(_dev, fat_start_sect);
+    uint16_t* fat_data = (uint16_t*)&bufp->data;
+    kassert(*fat_data == (0xff00 | _fat_bs.media_type));
+    // kassert(*(fat_data + 1) >= 0x3fff);
+    bio.release(bufp);
+
     // kprintf("fat: oem %s, BPS: %d, SPC: %d, RSC: %d, "
     //         "TC: %d, REC: %d, total sect16: %d, total sect32: %d\n"
     //         "tbl sz16: %d, drive: %d, "
@@ -151,45 +168,6 @@ void Fat32Fs::init(dev_t dev)
     _iroot = vfs.alloc_inode();
     _iroot->ino = 1;
     read_inode(_iroot, 0);
-
-    if (_type == FatType::Fat16) {
-        // read root dir
-        int count = _root_sects;
-        union fat_dirent* dpp = (union fat_dirent*)vmm.kmalloc(sizeof(union fat_dirent) * 64, 1);
-        int dp_len = 0;
-        bool done = false;
-        while (count && !done) {
-            Buffer* bufp = bio.read(_dev, _lba_start + _root_start_sect + _root_sects - count);
-            int n = BYTES_PER_SECT / sizeof(union fat_dirent);
-            union fat_dirent * dp = (union fat_dirent *)&bufp->data;
-            for (int i = 0; i < n; i++) {
-                if (dp[i].lfn.lfn_seq == 0) {
-                    dp_len = 0;
-                    done = true;
-                    break;
-                }
-
-                if (dp[i].lfn.lfn_seq == 0xe5) { continue; }
-
-                if (dp[i].lfn.attr == LFN) {
-                    memcpy(dpp + dp_len++, dp + i, sizeof(union fat_dirent));
-                } else {
-                    memcpy(dpp + dp_len++, dp + i, sizeof(union fat_dirent));                    
-                    // assemble all info
-                    fat_inode_t* fat_ip = build_fat_inode(dpp, dp_len);
-                    delete fat_ip;
-                    dp_len = 0;
-                }
-            }
-            bio.release(bufp);
-        }
-        vmm.kfree(dpp);
-    }
-
-    auto* ip = vfs.dir_lookup(_iroot, "GRUB    .CFG");
-    kprintf("looked up inode : %s, start_cluster: %d ",
-     ((fat_inode_t*)ip->data)->std_name, ((fat_inode_t*)ip->data)->start_cluster);
-    vfs.dealloc_inode(ip);
 }
 
 uint32_t Fat32Fs::sector2cluster(uint32_t sect)
@@ -201,7 +179,6 @@ uint32_t Fat32Fs::cluster2sector(uint32_t cluster)
 {
     return _data_start_sect + (cluster - 2) * _fat_bs.sectors_per_cluster;
 }
-
 
 //how ino map to fat file: right now use dynamical map
 void Fat32Fs::read_inode(inode_t *ip, union fat_dirent* fat_de)
@@ -220,7 +197,7 @@ void Fat32Fs::read_inode(inode_t *ip, union fat_dirent* fat_de)
         // for fat12/16, this is invalid
         fat_ip->start_cluster = sector2cluster(_root_start_sect); // care about fat32
     } else {
-        kassert("can not used for other than root");
+        kassert("can not be used for other than root");
     }
 }
 
@@ -258,40 +235,70 @@ dentry_t* Fat32Fs::lookup(inode_t * dir, dentry_t *de)
 
     return de;
 }
+    
+//FIXME: fat16 only!
+//TODO: cache whole FAT in memory
+uint32_t Fat32Fs::find_next_cluster(uint32_t cluster)
+{
+    int cps = _fat_bs.bytes_per_sector / sizeof (uint16_t);
+    uint32_t fat_start_sect = _fat_bs.reserved_sector_count + _lba_start + cluster / cps;
+    auto* bufp = bio.read(_dev, fat_start_sect);
+    uint16_t* fat_data = (uint16_t*)&bufp->data;
+    uint32_t next = *(fat_data + cluster % cps);
+    bio.release(bufp);
+    return next;
+}
 
 inode_t* Fat32Fs::scan_non_root_dir(inode_t* dir, const char* name)
 {
+    kprintf("[%s: %s] ", __func__, name);
+
     auto cluster = ((fat_inode_t*)dir->data)->start_cluster;   
     auto start_sect = cluster2sector(cluster);
-    inode_t* ip;
-    while ((ip = scan_dir_cluster(dir, name, start_sect)) != NULL) {
+    inode_t* ip = NULL;
+    while (scan_dir_cluster(dir, name, start_sect, &ip) > 0) {
+        if (ip) return ip;
+
+        cluster = find_next_cluster(cluster);        
+        if (cluster >= CLUSTER_DATA_END_16) break;
+
+        kprintf("%s: next cluster: %d ", cluster);
+        start_sect = cluster2sector(cluster);
     }
-    return NULL;
+    return ip;
 }
 
 inode_t* Fat32Fs::scan_root_dir(inode_t* dir, const char* name)
 {
-    return scan_dir_cluster(dir, name, _root_start_sect);
+    kprintf("[%s: %s] ", __func__, name);
+    uint32_t n = 0;
+    inode_t* ip = NULL;
+    while (scan_dir_cluster(dir, name, _root_start_sect + n, &ip) > 0) {
+        if (ip) return ip;
+        if (n++ >= _root_sects) break;
+    }
+    return ip;
 }
 
-inode_t* Fat32Fs::scan_dir_cluster(inode_t* dir, const char* name, uint32_t start_sector)
+// return <= 0 end of dir
+int Fat32Fs::scan_dir_cluster(inode_t* dir, const char* name, uint32_t start_sector, inode_t** ip)
 {
+    kprintf("%s: %s sect %d ", __func__, name, start_sector);
     auto sect_abs = start_sector + _lba_start;
     int count = 0;
     union fat_dirent* dpp = (union fat_dirent*)vmm.kmalloc(sizeof(union fat_dirent) * 64, 1);
     int dp_len = 0;
-    bool done = false;
+    bool done = false; // end of dir
     int DPS = BYTES_PER_SECT / sizeof(union fat_dirent);
 
-    inode_t* ip = NULL;
     fat_inode_t* fat_ip = NULL;
 
     while (count < _fat_bs.sectors_per_cluster && !done) {
-        Buffer* bufp = bio.read(_dev, sect_abs + count);
+        Buffer* bufp = bio.read(_dev, sect_abs + count++);
 
         union fat_dirent * dp = (union fat_dirent *)&bufp->data;
         for (int i = 0; i < DPS; i++) {
-            if (dp[i].lfn.lfn_seq == 0) {
+            if (dp[i].lfn.lfn_seq == 0) { // end of dir
                 dp_len = 0;
                 done = true;
                 break;
@@ -311,6 +318,7 @@ inode_t* Fat32Fs::scan_dir_cluster(inode_t* dir, const char* name, uint32_t star
                 }
 
                 delete fat_ip;
+                fat_ip = 0;
                 dp_len = 0;
             }
         }
@@ -321,19 +329,21 @@ _out:
     vmm.kfree(dpp);
 
     if (fat_ip) {
-        ip = vfs.alloc_inode();
-        ip->dev = _dev;
-        ip->type = (fat_ip->attr & DIRECTORY) ? FsNodeType::Dir : FsNodeType::File;
-        ip->size = fat_ip->size; //FIXME: if dir, need traverse to do it !!
-        ip->blksize = _blksize; 
-        ip->blocks = (ip->size + _blksize - 1) / _blksize;
-        ip->fs = this;
+        *ip = vfs.alloc_inode();
+        (*ip)->dev = _dev;
+        (*ip)->type = (fat_ip->attr & DIRECTORY) ? FsNodeType::Dir : FsNodeType::File;
+        (*ip)->size = fat_ip->size; //FIXME: if dir, need traverse to do it !!
+        (*ip)->blksize = _blksize; 
+        (*ip)->blocks = ((*ip)->size + _blksize - 1) / _blksize;
+        (*ip)->fs = this;
 
-        ip->data = (void*)fat_ip;
+        (*ip)->data = (void*)fat_ip;
     }
-    return ip;
+
+    return done ? 0:1;
 }
 
+//this is wrong
 ssize_t Fat32Fs::read(File *filp, char * buf, size_t count, off_t * offset)
 {
     auto* ip = filp->inode();
@@ -344,6 +354,9 @@ ssize_t Fat32Fs::read(File *filp, char * buf, size_t count, off_t * offset)
     off_t off = *offset;
     if (off >= ip->size) return 0;
     if (count + off >= ip->size) count = ip->size - off;
+
+        // cluster = find_next_cluster(cluster);
+        // if (cluster >= CLUSTER_DATA_END_16) break;
 
     uint32_t sect_abs = cluster2sector(fat_ip->start_cluster) + _lba_start 
         + off / _fat_bs.bytes_per_sector;
