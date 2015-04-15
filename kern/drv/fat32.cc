@@ -27,6 +27,18 @@ _out:
     return j;
 }
 
+// need to handle other invalid chars
+static int sanity_name(const char* name, char* res) 
+{
+    int n = strlen(name);
+    for (int i = 0; i < n; i++) {
+        if (name[i] >= 'a' && name[i] <= 'z') {
+            res[i] = name[i] - 32;
+        } else res[i] = name[i];
+    }
+    return 0;
+}
+
 fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
 {
     auto* ip = new fat_inode_t;
@@ -54,7 +66,7 @@ fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
     }
     ip->size =std_dp->std.size;
     if (_type == FatType::Fat32) {
-        ip->start_cluster = std_dp->std.start_cluster_lo + std_dp->std.start_cluster_hi << 16;
+        ip->start_cluster = std_dp->std.start_cluster_lo + (std_dp->std.start_cluster_hi << 16);
     } else {
         ip->start_cluster = std_dp->std.start_cluster_lo;
         kassert(std_dp->std.start_cluster_hi == 0);
@@ -74,11 +86,10 @@ fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
 
         lfn_len = strlen(lfn_name);
         ip->long_name = new char[lfn_len+1];
+        sanity_name(lfn_name, ip->long_name);
         ip->lfn_len = lfn_len;
-
-        strcpy(ip->long_name, lfn_name);        
+        ip->long_name[lfn_len] = 0;
         delete lfn_name;
-
         // kprintf("LFN: %s, ", ip->long_name);        
     }
 
@@ -167,7 +178,7 @@ void Fat32Fs::init(dev_t dev)
     // create _iroot
     _iroot = vfs.alloc_inode();
     _iroot->ino = 1;
-    read_inode(_iroot, 0);
+    read_inode(_iroot);
 }
 
 uint32_t Fat32Fs::sector2cluster(uint32_t sect)
@@ -181,7 +192,7 @@ uint32_t Fat32Fs::cluster2sector(uint32_t cluster)
 }
 
 //how ino map to fat file: right now use dynamical map
-void Fat32Fs::read_inode(inode_t *ip, union fat_dirent* fat_de)
+void Fat32Fs::read_inode(inode_t *ip)
 {
     if (ip->ino == 1) {
         ip->dev = _dev;
@@ -199,18 +210,6 @@ void Fat32Fs::read_inode(inode_t *ip, union fat_dirent* fat_de)
     } else {
         kassert("can not be used for other than root");
     }
-}
-
-// need to handle other invalid chars
-static int sanity_name(const char* name, char* res) 
-{
-    int n = strlen(name);
-    for (int i = 0; i < n; i++) {
-        if (name[i] >= 'a' && name[i] <= 'z') {
-            res[i] = name[i] - 32;
-        } else res[i] = name[i];
-    }
-    return 0;
 }
 
 static bool name_equal(const char* name, fat_inode_t* fat_ip) 
@@ -343,7 +342,30 @@ _out:
     return done ? 0:1;
 }
 
-//this is wrong
+// off is relative to cluster,
+// if count > bytes per cluster, drop remaining
+ssize_t Fat32Fs::read_file_cluster(char * buf, size_t count, uint32_t off, uint32_t cluster)
+{
+    uint32_t sect_abs = cluster2sector(cluster) + _lba_start 
+        + off / _fat_bs.bytes_per_sector;
+
+    if (count > _blksize - off) count = _blksize - off;
+    off_t off_in_sect = off % _fat_bs.bytes_per_sector;
+    ssize_t len = count;
+    while (len > 0) {
+        auto* bufp = bio.read(_dev, sect_abs);
+        memcpy(buf, bufp->data + off_in_sect, min(len, _fat_bs.bytes_per_sector - off_in_sect));
+        bio.release(bufp);
+
+        len -= (_fat_bs.bytes_per_sector - off_in_sect);
+        buf += (_fat_bs.bytes_per_sector - off_in_sect);
+        sect_abs++;
+        off_in_sect = 0;
+    }
+
+    return count;
+}
+
 ssize_t Fat32Fs::read(File *filp, char * buf, size_t count, off_t * offset)
 {
     auto* ip = filp->inode();
@@ -355,25 +377,32 @@ ssize_t Fat32Fs::read(File *filp, char * buf, size_t count, off_t * offset)
     if (off >= ip->size) return 0;
     if (count + off >= ip->size) count = ip->size - off;
 
-        // cluster = find_next_cluster(cluster);
-        // if (cluster >= CLUSTER_DATA_END_16) break;
+    uint32_t cluster_order = off / _blksize;
+    // kprintf("%s: cluster_order %d ", __func__, cluster_order);
 
-    uint32_t sect_abs = cluster2sector(fat_ip->start_cluster) + _lba_start 
-        + off / _fat_bs.bytes_per_sector;
-    off_t off_in_sect = off % _fat_bs.bytes_per_sector;
-    ssize_t len = count; // need signed value
-    while (len > 0) {
-        auto* bufp = bio.read(_dev, sect_abs);
-        memcpy(buf, bufp->data + off_in_sect, _fat_bs.bytes_per_sector);        
-        len -= (_fat_bs.bytes_per_sector - off_in_sect);
-        buf += (_fat_bs.bytes_per_sector - off_in_sect);
-        sect_abs++;
-        bio.release(bufp);
-
-        off_in_sect = 0;
+    auto cluster = fat_ip->start_cluster;
+    while (cluster_order-- > 0) {
+        cluster = find_next_cluster(cluster);
+        if (cluster >= CLUSTER_DATA_END_16) 
+            break;
     }
 
-    filp->set_off(off + count);
+    uint32_t rel_off = off % _blksize;  // off in current cluster
+
+    ssize_t len = count;
+    uint32_t total_read = 0;
+    while (len >= 0) {
+        uint32_t nr_read = read_file_cluster(buf, len, rel_off, cluster);
+        total_read += nr_read;
+        rel_off = (off + total_read) % _blksize;
+        len -= nr_read;
+        buf += nr_read;
+        cluster = find_next_cluster(cluster);
+        if (cluster >= CLUSTER_DATA_END_16) 
+            break;
+    }
+
+    filp->set_off(filp->off() + count);
     if (offset) *offset = filp->off();
 
     return count;
@@ -395,12 +424,9 @@ int Fat32Fs::readdir(File *filp, dentry_t *de, filldir_t)
 
     if (ip->type != FsNodeType::Dir) return -EINVAL;
 
-    // initrd_entry_header_t* ieh = &_sb->files[id];
-    // strcpy(de->name, ieh->name);
     
     de->ip = vfs.alloc_inode();
-    // de->ip->ino = id+2;
-    // read_inode(de->ip);
+
 
     filp->set_off((id+1)*sizeof(union fat_dirent));
     return 0;
