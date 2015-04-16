@@ -140,6 +140,7 @@ int sys_read(int fd, void *buf, size_t nbyte)
 }
 
 // ignore count, should only be 1 by now
+// ret > 0 success, = 0 end of dir, < 0 error
 int sys_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
     // dir should be opened
@@ -153,8 +154,8 @@ int sys_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
     auto* de = vfs.alloc_entry();
     off_t off = filp->off();
     int ret = fs->readdir(filp, de, 0);
-    if (ret == 0) {
-        dirp->d_ino = ip->ino;
+    if (ret > 0) {
+        dirp->d_ino = de->ip->ino;
         dirp->d_off = off;
         dirp->d_reclen = sizeof *dirp;
         strncpy(dirp->d_name, de->name, NAMELEN);
@@ -369,6 +370,7 @@ inode_t* VFSManager::dir_lookup(inode_t* dir, const char* name)
     de->name[NAMELEN] = 0;
     if (fs->lookup(dir, de)) {
         ip = de->ip;
+        de->ip = NULL;
     }
 
     dealloc_entry(de);
@@ -383,19 +385,21 @@ dentry_t* VFSManager::alloc_entry()
 
     auto eflags = vfslock.lock();    
     for (i = 0; i < MAX_NR_DENTRY; i++, de++) {
-        if (de->ip == 0) 
+        if (de->ip == 0 && de->name[0] == 0) 
             break;
     }
     vfslock.release(eflags);
 
-    if (i >= MAX_NR_DENTRY) return NULL;
+    if (i >= MAX_NR_DENTRY) 
+        panic("no mem for dentry");
     return de;
 }
 
 void VFSManager::dealloc_entry(dentry_t* de)
 {
     auto eflags = vfslock.lock();
-    memset(de, 0, sizeof *de);    
+    if (de->ip) dealloc_inode(de->ip);
+    memset(de, 0, sizeof *de); 
     vfslock.release(eflags);  
 }
 
@@ -407,17 +411,19 @@ inode_t* VFSManager::alloc_inode()
     auto eflags = vfslock.lock();
 
     for (i = 0; i < MAX_NR_INODE; i++, ip++) {
-        if (ip->ino == 0) break;
+        if (ip->ino == 0 && ip->dev == 0 && ip->blksize == 0) break;
     }
     vfslock.release(eflags);
 
-    if (i >= MAX_NR_INODE) return NULL;
+    if (i >= MAX_NR_INODE) 
+        panic("no mem for inode");
     return ip;
 }
 
 void VFSManager::dealloc_inode(inode_t* ip)
 {
     auto eflags = vfslock.lock();
+    if (ip->data) delete ip->data;
     memset(ip, 0, sizeof *ip);
     vfslock.release(eflags);   
 }

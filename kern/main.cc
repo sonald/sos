@@ -224,7 +224,7 @@ static void test_fs_readdir(const char* dir)
     int fd = sys_open(dir, O_RDONLY, 0);
     kassert(fd >= 0);
     struct dirent dire;
-    while (sys_readdir(fd, &dire, 1) >= 0) {
+    while (sys_readdir(fd, &dire, 1) > 0) {
         kprintf("%s, ", dire.d_name);        
     }
     sys_close(fd);
@@ -315,11 +315,11 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     proc_t* proc = prepare_userinit((void*)&init_task);
     load_module(mb->mods_count, mb->mods_addr);
-    test_fs_readdir("/");
+    test_fs_readdir("/boot/grub/i386-pc");
     for(;;) asm volatile ("hlt");
  
     // char filename[NAMELEN+1] = "/boot/grub/grub.cfg";
-    // char filename[NAMELEN+1] = "/longnamedmsdosfile.txt";     
+    char filename[NAMELEN+1] = "/longnamedmsdosfile.txt";     
     test_fs_read(filename);
     for(;;) asm volatile ("hlt");
  

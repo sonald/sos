@@ -140,6 +140,11 @@ enum ClusterStatus {
     CLUSTER_DATA_END_32     = 0x0ffffff7, 
 };
 
+typedef struct scan_dir_option_s {
+    const char* name;
+    int target_id; 
+} scan_dir_option_t;
+
 class Fat32Fs: public FileSystem {
     public:
         enum class FatType {
@@ -172,10 +177,7 @@ class Fat32Fs: public FileSystem {
         uint32_t sector2cluster(uint32_t);
         uint32_t cluster2sector(uint32_t);
         void read_inode(inode_t* ip); 
-        inode_t* scan_non_root_dir(inode_t* dir, const char* name);
-        inode_t* scan_root_dir(inode_t* dir, const char* name);    
-
-        int scan_dir_cluster(inode_t* dir, const char* name, uint32_t start_sector, inode_t** ip);
+        int scan_dir(inode_t* dir, scan_dir_option_t* opt, inode_t** ip);
         ssize_t read_file_cluster(char * buf, size_t count, uint32_t off, uint32_t cluster);
         fat_inode_t* build_fat_inode(union fat_dirent* dp, int dp_len);
         uint32_t find_next_cluster(uint32_t cluster);        

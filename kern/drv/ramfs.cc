@@ -80,7 +80,7 @@ int Ramfs::readdir(File* filp, dentry_t * de, filldir_t)
     int id = filp->off() / sizeof(initrd_entry_header_t);
 
     if (ip->type != FsNodeType::Dir) return -EINVAL;
-    if (id >= _nr_nodes) return -ENOENT;
+    if (id >= _nr_nodes) return 0;
 
     initrd_entry_header_t* ieh = &_sb->files[id];
     strcpy(de->name, ieh->name);
@@ -90,7 +90,7 @@ int Ramfs::readdir(File* filp, dentry_t * de, filldir_t)
     read_inode(de->ip);
 
     filp->set_off((id+1)*sizeof(initrd_entry_header_t));
-    return 0;
+    return 1;
 }
 
 dentry_t * Ramfs::lookup(inode_t * dir, dentry_t *de) 
