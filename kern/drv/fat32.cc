@@ -1,4 +1,5 @@
 #include <fat32.h>
+#include <common.h>
 #include <disk.h>
 #include <devices.h>
 #include <string.h>
@@ -114,7 +115,7 @@ void Fat32Fs::init(dev_t dev)
     Buffer* bufp = bio.read(_dev, _lba_start);
     delete hd;
 
-    _fat_bs = *(fat_bs_t*)&bufp->data;
+    memcpy(&_fat_bs, &bufp->data, sizeof _fat_bs);
     bio.release(bufp);
 
     _total_sects = _fat_bs.total_sectors_16 == 0 ?
@@ -182,6 +183,9 @@ void Fat32Fs::init(dev_t dev)
     _iroot = vfs.alloc_inode();
     _iroot->ino = 1;
     read_inode(_iroot);
+
+    _icache_size = 0;
+    memset(_icaches, 0, sizeof _icaches);
 }
 
 uint32_t Fat32Fs::sector2cluster(uint32_t sect)
@@ -195,7 +199,7 @@ uint32_t Fat32Fs::cluster2sector(uint32_t cluster)
 }
 
 //how ino map to fat file: right now use dynamical map
-void Fat32Fs::read_inode(inode_t *ip)
+void Fat32Fs::read_inode(inode_t *ip, fat_inode_t* fat_ip)
 {
     if (ip->ino == 1) {
         ip->dev = _dev;
@@ -211,7 +215,14 @@ void Fat32Fs::read_inode(inode_t *ip)
         // for fat12/16, this is invalid
         fat_ip->start_cluster = sector2cluster(_root_start_sect); // care about fat32
     } else {
-        kassert("can not be used for other than root");
+        ip->dev = _dev;
+        ip->type = (fat_ip->attr & DIRECTORY) ? FsNodeType::Dir : FsNodeType::File;
+        ip->size = fat_ip->size; //FIXME: if dir, need traverse to do it !!
+        ip->blksize = _blksize; 
+        ip->blocks = (ip->size + _blksize - 1) / _blksize;
+        ip->fs = this;
+
+        ip->data = (void*)fat_ip;
     }
 }
 
@@ -230,10 +241,10 @@ dentry_t* Fat32Fs::lookup(inode_t * dir, dentry_t *de)
     name[0] = 0;
     sanity_name(de->name, name);
 
-    kprintf("[%s: name %s] ", __func__, name);
+    // kprintf("[%s: name %s] ", __func__, name);
     scan_dir_option_t opt = { .name = name, .target_id = -1 };
     scan_dir(dir, &opt, &de->ip);
-    kprintf("[%s: get entry for %s] ", __func__, name);
+    // kprintf("[%s: get entry for %s] ", __func__, name);
     delete name;
     return de;
 }
@@ -291,8 +302,11 @@ int Fat32Fs::scan_dir(inode_t* dir, scan_dir_option_t* opt, inode_t** ip)
                     memcpy(dpp + dp_len++, dp + i, sizeof(union fat_dirent));
                 } else {
                     memcpy(dpp + dp_len++, dp + i, sizeof(union fat_dirent)); 
+
                     // assemble all info
                     fat_ip = build_fat_inode(dpp, dp_len);
+                    fat_ip->dir_id = entry_id;
+                    fat_ip->dir_start = ((fat_inode_t*)dir->data)->start_cluster;
                     if (opt->name) {
                         if (name_equal(opt->name, fat_ip)) {
                             bio.release(bufp);
@@ -320,7 +334,7 @@ int Fat32Fs::scan_dir(inode_t* dir, scan_dir_option_t* opt, inode_t** ip)
             if (start_sector - _root_start_sect >= _root_sects) break;
 
         } else {
-            cluster = find_next_cluster(cluster);        
+            cluster = find_next_cluster(cluster);
             if (cluster >= CLUSTER_DATA_END_16) break;
 
             // kprintf("%s: next cluster: %d ", __func__, cluster);
@@ -333,14 +347,8 @@ _out:
 
     if (fat_ip) {
         *ip = vfs.alloc_inode();
-        (*ip)->dev = _dev;
-        (*ip)->type = (fat_ip->attr & DIRECTORY) ? FsNodeType::Dir : FsNodeType::File;
-        (*ip)->size = fat_ip->size; //FIXME: if dir, need traverse to do it !!
-        (*ip)->blksize = _blksize; 
-        (*ip)->blocks = ((*ip)->size + _blksize - 1) / _blksize;
-        (*ip)->fs = this;
-
-        (*ip)->data = (void*)fat_ip;
+        (*ip)->ino = fat_ip->start_cluster;
+        read_inode(*ip, fat_ip);
         // kprintf("[%s: found %s attr 0x%x type %s]", __func__, fat_ip->std_name, 
         //     fat_ip->attr, ((*ip)->type == FsNodeType::Dir ? "dir" : "file"));
 
@@ -422,6 +430,25 @@ ssize_t Fat32Fs::write(File *filp, const char * buf, size_t count, off_t *offset
     return -EINVAL;
 }
 
+fat_inode_t* Fat32Fs::find_in_cache(inode_t* dir, int id)
+{
+    uint32_t dir_start = ((fat_inode_t*)dir->data)->start_cluster;
+    for (int i = 0; i < _icache_size; i++) {
+        if (_icaches[i].dir_id == id && _icaches[i].dir_start == dir_start) {
+            // kprintf("   CACHE     ");
+            return &_icaches[i];
+        }
+    }
+
+    return NULL;
+}
+
+void Fat32Fs::push_cache(inode_t* dir, fat_inode_t* fat_ip)
+{
+    memcpy(&_icaches[_icache_size], fat_ip, sizeof *fat_ip);
+    _icache_size = (_icache_size + 1) % 256;
+}
+
 // this is very inefficent
 int Fat32Fs::readdir(File *filp, dentry_t *de, filldir_t)
 {
@@ -430,15 +457,26 @@ int Fat32Fs::readdir(File *filp, dentry_t *de, filldir_t)
     int ret = 1;
     if (dir->type != FsNodeType::Dir) return -EINVAL;
 
-    // kprintf(" [%s: off %d, id %d] ", __func__, filp->off(), id);
-    scan_dir_option_t opt = { .name = NULL, .target_id = id };
-    if (scan_dir(dir, &opt, &de->ip) == 0) {
-        ret = 0;
+    fat_inode_t* fat_ip = find_in_cache(dir, id);
+    if (fat_ip) {
+        de->ip = vfs.alloc_inode();
+        de->ip->ino = fat_ip->start_cluster;
+        fat_inode_t* new_fip = new fat_inode_t;
+        memcpy(new_fip, fat_ip, sizeof *new_fip);
+        read_inode(de->ip, new_fip);
+
+    } else {
+        // kprintf(" [%s: off %d, id %d] ", __func__, filp->off(), id);
+        scan_dir_option_t opt = { .name = NULL, .target_id = id };
+        if (scan_dir(dir, &opt, &de->ip) == 0) {
+            ret = 0;
+        }
     }
     filp->set_off((id+1)*sizeof(union fat_dirent));
 
     if (de->ip) {
         auto* fat_ip = (fat_inode_t*)de->ip->data;
+        push_cache(dir, fat_ip);        
         if (fat_ip->long_name) {
             strncpy(de->name, fat_ip->long_name, NAMELEN);
         } else {

@@ -12,26 +12,26 @@ Spinlock biolock("bio");
 
 void BlockIOManager::init()
 {
-    memset(_cache, 0, sizeof _cache);
+    _cache = (Buffer*)vmm.kmalloc(sizeof(Buffer) * NR_BUFFERS, 1);
+    memset(_cache, 0, sizeof(Buffer) * NR_BUFFERS);
     Buffer& p = _cache[0];
     p.next = &p;
     p.prev = &p;
     for (int i = 1; i  <NR_BUFFERS; i++) {
         auto& q = _cache[i];
-        q.flags = BUF_EMPTY;
+        q.flags = 0;
         q.next = p.next;
         p.next = &q;
         q.next->prev = &q;
         q.prev = &p;
     }
-
 }
 
 Buffer* BlockIOManager::allocBuffer(dev_t dev, sector_t sect)
 {
     auto oldflags = biolock.lock();
 recheck:
-    for (int i = 0; i  <NR_BUFFERS; i++) {
+    for (int i = 0; i < NR_BUFFERS; i++) {
         if (_cache[i].dev == dev && _cache[i].sector == sect) {
             if (!(_cache[i].flags & BUF_BUSY)) {
                 _cache[i].flags |= BUF_BUSY;
@@ -46,12 +46,12 @@ recheck:
         }
     }
 
-    for (int i = 0; i  <NR_BUFFERS; i++) {
+    for (int i = 0; i < NR_BUFFERS; i++) {
         Buffer* bp = &_cache[i];
         if ((bp->flags & BUF_BUSY) == 0 && (bp->flags & BUF_DIRTY) == 0) {
             bp->dev = dev;
             bp->sector = sect;
-            bp->flags |= BUF_BUSY;
+            bp->flags = BUF_BUSY | ~BUF_FULL;
             biolock.release(oldflags);
             return bp;
         }
@@ -64,9 +64,13 @@ recheck:
 Buffer* BlockIOManager::read(dev_t dev, sector_t sect)
 {
     Buffer* bp = allocBuffer(dev, sect);
+    if (bp->flags & BUF_FULL) {
+        return bp;
+    }
     auto* device = blk_device_get(dev);
     kassert(device != nullptr);
     device->read(bp);
+    bp->flags |= BUF_FULL;
     return bp;
 }
 

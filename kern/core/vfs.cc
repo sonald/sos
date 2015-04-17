@@ -423,7 +423,7 @@ inode_t* VFSManager::alloc_inode()
 void VFSManager::dealloc_inode(inode_t* ip)
 {
     auto eflags = vfslock.lock();
-    if (ip->data) delete ip->data;
+    if (ip->data) delete (char*)ip->data;
     memset(ip, 0, sizeof *ip);
     vfslock.release(eflags);   
 }

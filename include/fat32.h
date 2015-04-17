@@ -114,9 +114,13 @@ union fat_dirent {
 // inode_t.ino to start_cluster of itself.
 // root inode is special 1
 // inode_t.data part
+// dir_id and dir_start are for cache purpose, dir_id locates node at dir position
+// dir_start is used to identify dir
 typedef struct fat_inode_s {
     uint32_t start_cluster;
     uint32_t size;
+    int dir_id;  
+    uint32_t dir_start;
     char* long_name;
     uint8_t attr;
     int lfn_len;
@@ -174,13 +178,19 @@ class Fat32Fs: public FileSystem {
         uint32_t _blksize;
         uint32_t _lba_start; // start phy sector of filesystem in disk
 
+        fat_inode_t _icaches[256];
+        int _icache_size;
+
         uint32_t sector2cluster(uint32_t);
         uint32_t cluster2sector(uint32_t);
-        void read_inode(inode_t* ip); 
+        void read_inode(inode_t* ip, fat_inode_t* fat_ip = NULL); 
         int scan_dir(inode_t* dir, scan_dir_option_t* opt, inode_t** ip);
         ssize_t read_file_cluster(char * buf, size_t count, uint32_t off, uint32_t cluster);
         fat_inode_t* build_fat_inode(union fat_dirent* dp, int dp_len);
         uint32_t find_next_cluster(uint32_t cluster);        
+
+        fat_inode_t* find_in_cache(inode_t* dir, int id);
+        void push_cache(inode_t* dir, fat_inode_t* fat_ip);
 };
 
 FileSystem* create_fat32fs(const void*);

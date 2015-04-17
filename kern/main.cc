@@ -135,7 +135,7 @@ void kthread2()
 
 void init_task()
 {
-    char init_name[] = "/ram/echo";
+    char init_name[] = "/echo";
     u8 step = 0;
     char buf[2] = "";
     int logo = 'A';
@@ -260,10 +260,6 @@ extern "C" int kernel_main(struct multiboot_info *mb)
         current_display->set_text_color(LIGHT_RED);
     }
 
-    //if (mb->flags & MULTIBOOT_INFO_MEM_MAP) {
-        //apply_mmap(mb->mmap_length, mb->mmap_addr);
-    //}
-
     void* last_address = NULL;
     if (mb->flags & MULTIBOOT_INFO_MODS) {
         module_t* mod = (module_t*)p2v(mb->mods_addr);
@@ -315,13 +311,14 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     proc_t* proc = prepare_userinit((void*)&init_task);
     load_module(mb->mods_count, mb->mods_addr);
-    test_fs_readdir("/boot/grub/i386-pc");
+
+    test_fs_readdir("/boot/grub/i386-pc");    
     for(;;) asm volatile ("hlt");
  
     // char filename[NAMELEN+1] = "/boot/grub/grub.cfg";
     char filename[NAMELEN+1] = "/longnamedmsdosfile.txt";     
     test_fs_read(filename);
-    for(;;) asm volatile ("hlt");
+    // for(;;) asm volatile ("hlt");
  
 
     create_kthread("kthread1", kthread1);
