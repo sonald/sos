@@ -8,6 +8,7 @@ mnt
 objs
 kernel
 echo
+init
 initramfs.img
 ramfs_gen
 *.img

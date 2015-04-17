@@ -109,7 +109,7 @@ void kthread1()
         kprintf(" <KT1 %d> ", count++);
         current_display->set_cursor(cur);
 
-        busy_wait(2000);
+        sys_sleep(2000);
         if (!released) {
             bio.release(mbr);
             released = true;
@@ -121,7 +121,7 @@ void kthread2()
 {
     int count = 0;
     while (1) {
-        busy_wait(2000);
+        sys_sleep(2000);
         auto cur = current_display->get_cursor();
         current_display->set_cursor({0, 20});
         kprintf(" |KT2 %d| ", count++);
@@ -135,50 +135,12 @@ void kthread2()
 
 void init_task()
 {
-    char init_name[] = "/echo";
-    u8 step = 0;
-    char buf[2] = "";
-    int logo = 'A';
-    pid_t pid;
-    asm volatile ( "int $0x80 \n" :"=a"(pid) :"a"(SYS_fork) :"cc", "memory");
-
-    if (pid == 0) { 
-        asm volatile ( "int $0x80 \n"
-                :"=a"(pid) 
-                :"a"(SYS_exec), "b"(init_name), "c"(0), "d"(0)
-                :"cc", "memory");
-        for(;;);
-        return;
-    }
-
-    asm volatile ( "int $0x80 \n" :"=a"(pid) :"0"(SYS_getpid) :"cc", "memory");
-
-    for(;;) {
-        int ret = 0;
-        buf[0] = logo;
-        asm volatile ( "int $0x80 \n"
-                :"=a"(ret)
-                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
-                :"cc", "memory");
-        buf[0] = '0'+pid;
-        asm volatile ( "int $0x80 \n"
-                :"=a"(ret)
-                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
-                :"cc", "memory");
-
-        buf[0] = '0'+(step%10);
-        asm volatile ( "int $0x80 \n"
-                :"=a"(ret)
-                :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
-                :"cc", "memory");
-
-         asm volatile ( "int $0x80 \n"
-                :"=a"(ret)
-                :"a"(SYS_sleep), "b"(10000)
-                :"cc", "memory");
-
-        step++;
-    }
+    char init_name[] = "/init";
+    asm volatile ( "int $0x80 \n"
+            :
+            :"a"(SYS_exec), "b"(init_name), "c"(0), "d"(0)
+            :"cc", "memory");
+    panic("should never come here");
 }
 
 static void apply_mmap(u32 mmap_length, u32 mmap_addr) 
@@ -308,7 +270,6 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     // char filename[NAMELEN+1] = "/longnamedmsdosfile.txt";     
     // test_fs_read(filename);
     // for(;;) asm volatile ("hlt");
- 
 
     create_kthread("kthread1", kthread1);
     create_kthread("kthread2", kthread2);

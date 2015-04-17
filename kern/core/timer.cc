@@ -16,7 +16,7 @@ extern "C" void flush_tss();
 Spinlock schedlock("sched");
 
 void scheduler()
-{
+{    
     //NOTE: should never spin in interrupt context! so check IF flag 
     //to determine if in irq context. this is not a good way.
     auto oldflags = schedlock.lock();
@@ -24,7 +24,7 @@ void scheduler()
         if (current->need_resched) current->need_resched = false;
         
         auto* old = current;
-        bool rewind = old->next != NULL;
+        bool rewind = true;
         proc_t* tsk = old->next ? old->next: &tasks[0];
         while (tsk) {
             if (old != tsk && tsk->state == TASK_READY) {
@@ -38,10 +38,11 @@ void scheduler()
             }
         }
 
-        if (old == current) goto out;
+        kassert(current->state == TASK_READY);
+        kassert( old != current );
 
-        //kprintf("(sched: %s(%d) -> %s(%d)) ", old->name, old->pid,
-                //current->name, current->pid);
+        // kprintf("(sched: %s(%d) -> %s(%d)) ", old->name, old->pid,
+        //         current->name, current->pid);
         //very tricky!
         setup_tss(current->kern_esp);
         flush_tss();
@@ -67,7 +68,6 @@ timeout_t* add_timeout(int millisecs)
     tm->end_tick = timer_ticks + millisecs * HZ / 1000;
     tm->next = tm_head;
     tm_head = tm;
-
     return tm;
 }
 

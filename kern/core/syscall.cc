@@ -23,9 +23,14 @@ static struct syscall_info_s {
 
 } syscalls[NR_SYSCALL]; 
 
+Spinlock syscallock {"syscall"};
+
 static void syscall_handler(trapframe_t* regs)
 {
+    auto oflags = syscallock.lock();
     current->regs = regs;
+    syscallock.release(oflags); 
+
     if (regs->eax >= NR_SYSCALL) {
         kprintf("invalid syscall number: %d\n", regs->eax);
         regs->eax = -1;

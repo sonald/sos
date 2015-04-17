@@ -5,10 +5,11 @@
 #ifdef __cplusplus
 extern "C" 
 #endif
+
 void _start()
 {
     int logo = 'C';
-    char buf[] = "this is the initial content of buffer";
+    char buf[32] = "";
 
     pid_t pid = fork();
     if (pid == 0) {
@@ -21,7 +22,8 @@ void _start()
         int len = sprintf(buf, sizeof buf - 1, "{%c%d %d} ", logo, pid, step);
         write(0, buf, len);
 
-        sleep(3000);
+        sleep(2000);
         step++;
     }
 }
+

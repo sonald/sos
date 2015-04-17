@@ -40,7 +40,7 @@ void wakeup(void* chan)
         if (tsk->state == TASK_SLEEP && tsk->channel == chan) {
             tsk->state = TASK_READY;
             tsk->channel = NULL;
-            kprintf("wakeup %s(%d)\n", tsk->name, tsk->pid);
+            // kprintf("wakeup %s(%d)  ", tsk->name, tsk->pid);
         }
         tsk = tsk->next;
     }
@@ -61,6 +61,7 @@ repeat:
     for (int i = 0; i < MAXPROCS; ++i) {
         if (tasks[i].state == TASK_UNUSED) {
             p = &tasks[i];
+            p->state = TASK_CREATE;
             break;
         }
     }
@@ -90,7 +91,8 @@ int sys_sleep(int millisecs)
     current->need_resched = true;
     current->channel = add_timeout(millisecs);
     tasklock.release(oldflags);
-    scheduler();
+
+    if (current->need_resched) scheduler();
     return 0;
 }
 
@@ -238,6 +240,7 @@ proc_t* prepare_userinit(void* prog)
 
     kassert(current == NULL);
     current = proc;
+    kassert(proc == &tasks[0]);
 
     page_directory_t* pdir = vmm.create_address_space();
 
@@ -272,6 +275,7 @@ proc_t* prepare_userinit(void* prog)
     memset(proc->kctx, 0, sizeof(*proc->kctx));
     proc->kctx->eip = A2I(trap_return);
 
+    proc->ppid = 0;
     proc->pid = next_pid;
     proc->state = TASK_READY;
     kprintf("%s(%d, 0x%x) @0x%x, ustack: 0x%x, kesp: 0x%x\n", 

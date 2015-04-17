@@ -29,7 +29,7 @@
 #define SYS_mount      22
 #define SYS_umount     23
 #define SYS_getppid    24
-#define SYS_mmap       26
+#define SYS_mmap       25
 
 #define NR_SYSCALL     26
 

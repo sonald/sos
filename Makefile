@@ -49,12 +49,14 @@ debug: kernel
 	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio \
 	-drive file=hd.img,format=raw -vga vmware
 
-run: kernel echo hd.img initramfs.img
+run: kernel hd.img initramfs.img
 	qemu-system-i386 -m 32 -s -monitor stdio -hda hd.img -vga vmware 
 
-hd.img: kernel initramfs.img
+hd.img: kernel init initramfs.img
 	hdiutil attach hd.img
 	cp kernel /Volumes/SOS
+	cp init /Volumes/SOS
+	cp echo /Volumes/SOS
 	cp initramfs.img /Volumes/SOS
 	#hdiutil detach disk2
 
@@ -82,7 +84,11 @@ echo: user/echo.c user/libc.c lib/sprintf.cc user/user.ld
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^ 
 
-initramfs.img: echo ramfs_gen	
+init: user/init.c user/libc.c lib/sprintf.cc user/user.ld 
+	@mkdir -p $(@D)
+	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^ 
+
+initramfs.img: echo ramfs_gen
 	./ramfs_gen README.md user/echo.c echo
 
 .PHONY: clean
@@ -97,5 +103,6 @@ clean:
 	-rm $(OBJS_DIR)/kern/core/*.d 
 	-rm $(OBJS_DIR)/kern/runtime/*.d 
 	-rm $(OBJS_DIR)/kern/drv/*.d
-	-rm $(OBJS_DIR)/lib/*.d 
+	-rm $(OBJS_DIR)/lib/*.d
+	-rm echo init
 	-rm kernel

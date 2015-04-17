@@ -110,7 +110,6 @@ void irq_handler(trapframe_t* regs)
     }
 
     if (regs->isrno == IRQ_TIMER || current->need_resched) {
-        if (current->need_resched) kprintf("  resched  ");
         scheduler();
     }
 }
