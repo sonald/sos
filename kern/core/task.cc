@@ -40,6 +40,7 @@ void wakeup(void* chan)
         if (tsk->state == TASK_SLEEP && tsk->channel == chan) {
             tsk->state = TASK_READY;
             tsk->channel = NULL;
+            kprintf("wakeup %s(%d)\n", tsk->name, tsk->pid);
         }
         tsk = tsk->next;
     }
@@ -80,13 +81,16 @@ int sys_getpid()
     return current->pid;
 }
 
-int sys_sleep()
+int sys_sleep(int millisecs)
 {
     auto oldflags = tasklock.lock();
     kassert(current);
+    kassert(current->channel == NULL);
     current->state = TASK_SLEEP;
     current->need_resched = true;
+    current->channel = add_timeout(millisecs);
     tasklock.release(oldflags);
+    scheduler();
     return 0;
 }
 

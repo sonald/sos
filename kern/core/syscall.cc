@@ -88,7 +88,7 @@ void init_syscall()
     syscalls[SYS_write] = { (void*)sys_write, 3 };
     syscalls[SYS_read] = { (void*)sys_read, 3 };
     syscalls[SYS_fork] = { (void*)sys_fork, 0 };
-    syscalls[SYS_sleep] = { (void*)sys_sleep, 0 };
+    syscalls[SYS_sleep] = { (void*)sys_sleep, 1 };
     syscalls[SYS_getpid] = { (void*)sys_getpid, 0 };
     syscalls[SYS_getppid] = { (void*)sys_getppid, 0 };
     syscalls[SYS_exec] = { (void*)sys_execve, 3 };

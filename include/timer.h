@@ -8,4 +8,7 @@
 void init_timer();
 void busy_wait(int millisecs);
 
+typedef struct timeout_s timeout_t;
+timeout_t* add_timeout(int millisecs);
+
 #endif

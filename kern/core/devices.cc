@@ -1,5 +1,5 @@
 #include "devices.h"
-
+#include <common.h>
 
 struct BlockDevice* block_devices = nullptr;
 struct CharDevice* char_devices = nullptr;

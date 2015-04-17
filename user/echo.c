@@ -21,13 +21,7 @@ void _start()
         int len = sprintf(buf, sizeof buf - 1, "{%c%d %d} ", logo, pid, step);
         write(0, buf, len);
 
-        volatile int r = 0;
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 0x7fffff; ++j) {
-                r += j;
-            }
-        }
-
+        sleep(3000);
         step++;
     }
 }

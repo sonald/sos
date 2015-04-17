@@ -12,6 +12,8 @@ _syscall1(int, close, int, fd);
 _syscall3(int, read, int, fildes, void*, buf, size_t, nbyte);
 _syscall3(int, exec, const char*, path, char *const*, argv, char *const*, envp);
 
+_syscall1(int, sleep, int, millisecs);
+
 int execve(const char *path, char *const argv[], char *const envp[])
 {
     return exec(path, argv, envp);

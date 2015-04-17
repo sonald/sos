@@ -39,6 +39,7 @@ void scheduler()
         }
 
         if (old == current) goto out;
+
         //kprintf("(sched: %s(%d) -> %s(%d)) ", old->name, old->pid,
                 //current->name, current->pid);
         //very tricky!
@@ -53,6 +54,23 @@ out:
     schedlock.release(oldflags);
 }
 
+struct timeout_s {
+    uint32_t end_tick;
+    struct timeout_s* next;
+};
+
+static timeout_t* tm_head = NULL;
+
+timeout_t* add_timeout(int millisecs)
+{
+    timeout_t* tm = new timeout_t;
+    tm->end_tick = timer_ticks + millisecs * HZ / 1000;
+    tm->next = tm_head;
+    tm_head = tm;
+
+    return tm;
+}
+
 static void timer_interrupt(trapframe_t* regs)
 {
     (void)regs;
@@ -62,6 +80,16 @@ static void timer_interrupt(trapframe_t* regs)
     auto cur = current_display->get_cursor();
     current_display->set_cursor({70, 0});
 
+    timeout_t** tm = &tm_head;
+    while (*tm) {
+        if ((*tm)->end_tick <= timer_ticks) {
+            wakeup((void*)tm);
+            auto* p = *tm;
+            wakeup(p);
+            *tm = (*tm)->next;
+            delete p;
+        } else tm = &(*tm)->next;
+    }
     kprintf("T: %d", timer_ticks/HZ);
 
     current_display->set_cursor(cur);

@@ -12,7 +12,7 @@
 typedef s32 pid_t;
 
 enum proc_state {
-    TASK_UNUSED,
+    TASK_UNUSED = 1,
     TASK_CREATE,
     TASK_READY,
     TASK_RUNNING,

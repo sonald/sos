@@ -5,7 +5,7 @@
 
 extern int sys_getppid();
 extern int sys_fork(); 
-extern int sys_sleep();
+extern int sys_sleep(int);
 extern int sys_getpid();
 extern int sys_execve(const char *path, char *const argv[],
         char *const envp[]);

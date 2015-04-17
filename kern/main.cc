@@ -142,15 +142,6 @@ void init_task()
     pid_t pid;
     asm volatile ( "int $0x80 \n" :"=a"(pid) :"a"(SYS_fork) :"cc", "memory");
 
-    {
-        volatile int r = 0;
-        for (int i = 0; i < 1; i++) {
-            for (int j = 0; j < 0x7fffff; ++j) {
-                r += j;
-            }
-        }
-    }
-
     if (pid == 0) { 
         asm volatile ( "int $0x80 \n"
                 :"=a"(pid) 
@@ -181,12 +172,10 @@ void init_task()
                 :"a"(SYS_write), "b"(0), "c"(buf), "d"(1)
                 :"cc", "memory");
 
-        volatile int r = 0;
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 0x7fffff; ++j) {
-                r += j;
-            }
-        }
+         asm volatile ( "int $0x80 \n"
+                :"=a"(ret)
+                :"a"(SYS_sleep), "b"(10000)
+                :"cc", "memory");
 
         step++;
     }
@@ -312,12 +301,12 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     proc_t* proc = prepare_userinit((void*)&init_task);
     load_module(mb->mods_count, mb->mods_addr);
 
-    test_fs_readdir("/boot/grub/i386-pc");    
-    for(;;) asm volatile ("hlt");
+    // test_fs_readdir("/boot/grub/i386-pc");
+    // for(;;) asm volatile ("hlt");
  
     // char filename[NAMELEN+1] = "/boot/grub/grub.cfg";
-    char filename[NAMELEN+1] = "/longnamedmsdosfile.txt";     
-    test_fs_read(filename);
+    // char filename[NAMELEN+1] = "/longnamedmsdosfile.txt";     
+    // test_fs_read(filename);
     // for(;;) asm volatile ("hlt");
  
 

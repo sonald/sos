@@ -70,6 +70,7 @@ int fork();
 int exec(const char *path, char *const argv[], char *const envp[]);
 int execve(const char *path, char *const argv[], char *const envp[]);
 int getpid();
+int sleep(int);
 
 #ifdef __cplusplus
 }
