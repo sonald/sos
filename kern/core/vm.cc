@@ -190,6 +190,16 @@ page_t* VirtualMemoryManager::walk(page_directory_t* pgdir, void* vaddr, bool cr
     return &ptable->pages[PAGE_TABLE_IDX(vaddr)];
 }
 
+bool VirtualMemoryManager::mapped(page_directory_t* pgdir, void* vaddr)
+{
+    char* v = (char*)PGROUNDDOWN(vaddr);
+    auto eflags = _lock.lock();
+    auto* pte = walk(pgdir, vaddr, false);
+    _lock.release(eflags);
+
+    return pte && pte->present;
+}
+
 void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr, 
         u32 size, u32 paddr, u32 flags)
 {

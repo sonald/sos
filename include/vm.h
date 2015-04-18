@@ -17,6 +17,8 @@ class VirtualMemoryManager
                 u32 paddr, u32 flags);
         void unmap_pages(page_directory_t* pgdir, void *vaddr, u32 size,
                 u32 paddr, bool free_mem);
+
+        bool mapped(page_directory_t* pgdir, void* vaddr);
         page_t* walk(page_directory_t* pgdir, void* vaddr, bool create = false);
         /**
          * Causes the specified page directory to be loaded into the

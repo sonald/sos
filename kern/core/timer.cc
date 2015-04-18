@@ -51,7 +51,6 @@ void scheduler()
         switch_to(&old->kctx, current->kctx);
     }
 
-out:
     schedlock.release(oldflags);
 }
 

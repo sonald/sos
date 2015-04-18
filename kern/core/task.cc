@@ -148,18 +148,23 @@ int sys_fork()
     return proc->pid;
 }
 
-static int load_proc(proc_t* proc, void* code, size_t size, int flags)
-{
-    void* vaddr = (void*)UCODE; 
-    if (size < PGSIZE) size = PGSIZE;
+//FIXME: check every page if mapped, not only the first one
+static int load_proc(proc_t* proc, void* code, elf_prog_header_t* ph)
+{    
+    u32 flags = PDE_USER;
+    if (ph->p_flags & ELF_PROG_FLAG_WRITE) flags |= PDE_WRITABLE;
+
+    void* vaddr = (void*)ph->p_va;
+    size_t size = PGROUNDUP(ph->p_memsz);
     void* tmp = vmm.kmalloc(size, PGSIZE);
     u32 paddr = v2p(tmp);
-    vmm.unmap_pages(proc->pgdir, vaddr, size, paddr, false);
+    if (vmm.mapped(proc->pgdir, vaddr))
+        vmm.unmap_pages(proc->pgdir, vaddr, size, paddr, false);
     vmm.map_pages(proc->pgdir, vaddr, size, paddr, flags);
     // copy from tmp avoid a page directory switch 
-    //kprintf("  %s: copy code %x to %x \n", __func__, code, tmp);
-    memcpy(tmp, code, size);
-
+    memcpy(tmp, code, ph->p_filesz);
+    // make sure bss inited to zero
+    memset(tmp+ph->p_filesz, 0, size - ph->p_filesz);
     return 0;
 }
 
@@ -169,7 +174,6 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     (void)envp;
 
     auto oldflags = tasklock.lock();
-    kprintf("path(0x%x): %s\n", path, path);
 
     inode_t* ip = vfs.namei(path);
     kassert(ip != NULL);
@@ -181,6 +185,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     sys_close(fd);
     if (len < 0) {
         kprintf("load %s failed\n", path);
+        delete buf;
         tasklock.release(oldflags);
         return -ENOENT;
     }
@@ -188,6 +193,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     elf_header_t* elf = (elf_header_t*)buf;
     if (elf->e_magic != ELF_MAGIC) {
         kprintf("invalid elf file\n");
+        delete buf;
         tasklock.release(oldflags);
         return -EINVAL;
     }
@@ -204,12 +210,13 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
         char* prog = (char*)elf + ph[i].p_offset;
         if (ph[i].p_filesz > ph[i].p_memsz) {
             kprintf("warning: size doesn't fit.\n");
-            continue; 
+            continue;
         }
 
-        load_proc(current, prog, ph[i].p_memsz, PDE_USER);
-        break;
+        load_proc(current, prog, &ph[i]);
     }
+
+    delete buf;
 
     strncpy(current->name, path, sizeof current->name - 1);
     kprintf("execv task(%d, %s)\n", current->pid, path);

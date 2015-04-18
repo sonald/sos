@@ -80,11 +80,11 @@ ramfs_gen: tools/ramfs_gen.c
 	gcc -o $@ $^
 
 # user prog
-echo: user/echo.c user/libc.c lib/sprintf.cc user/user.ld 
+echo: user/echo.c user/libc.c lib/sprintf.cc lib/string.cc user/user.ld 
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^ 
 
-init: user/init.c user/libc.c lib/sprintf.cc user/user.ld 
+init: user/init.c user/libc.c lib/sprintf.cc lib/string.cc user/user.ld 
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^ 
 

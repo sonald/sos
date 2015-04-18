@@ -1,6 +1,12 @@
 #include <unistd.h>
 #include <sprintf.h>
+#include <string.h>
 #include <fcntl.h>
+
+
+char buf[32] = "";
+int logo;
+char undef[128] = "inited string";
 
 #ifdef __cplusplus
 extern "C" 
@@ -8,12 +14,12 @@ extern "C"
 
 void _start()
 {
-    int logo = 'C';
-    char buf[32] = "";
+    logo = 'C';
 
     pid_t pid = fork();
     if (pid == 0) {
         logo = 'D';
+        write(0, undef, strlen(undef));
     } 
     pid = getpid();
 
