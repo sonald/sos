@@ -15,7 +15,7 @@ void _start()
 {
     logo = 'C';
     pid_t pid = fork();
-    if (pid == 0) {
+    if (pid > 0) {
         logo = 'D';
         write(0, undef, strlen(undef));
 
@@ -29,8 +29,8 @@ void _start()
             sleep(2000);
             step++;
         }
-    } else if (pid > 0) {
-        sleep(3000);
+    } else if (pid == 0) {
+        logo = 'B';
         pid = getpid();
 
         int len = sprintf(buf, sizeof buf - 1, "{%c%d going to exit} ", logo, pid);

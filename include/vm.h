@@ -1,12 +1,12 @@
 #ifndef _VM_H
-#define _VM_H 
+#define _VM_H
 
 #include "mm.h"
 #include "memlayout.h"
 #include "mmu.h"
 #include <spinlock.h>
 
-class VirtualMemoryManager 
+class VirtualMemoryManager
 {
     public:
         VirtualMemoryManager();
@@ -29,10 +29,11 @@ class VirtualMemoryManager
         void dump_page_directory(page_directory_t* pgdir);
         page_directory_t* create_address_space();
         void release_address_space(page_directory_t* pgdir);
+
         page_directory_t* copy_page_directory(page_directory_t* pgdir);
         page_directory_t* kernel_page_directory();
 
-        // alloc one kernel page and return vaddr 
+        // alloc one kernel page and return vaddr
         void* alloc_page();
         void free_page(void* vaddr);
 
@@ -68,7 +69,7 @@ class VirtualMemoryManager
         bool aligned(void* ptr, int align);
         void* ksbrk(size_t size);
 
-        void flush_tlb_entry(u32 vaddr); 
+        void flush_tlb_entry(u32 vaddr);
         void test_malloc();
 
 };

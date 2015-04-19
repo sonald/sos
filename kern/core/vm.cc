@@ -283,15 +283,14 @@ page_directory_t* VirtualMemoryManager::create_address_space()
 }
 
 /**
- * used by execv, shallow copy of user-part address space for text and data.
- * user stack should be newly allocated.
- * TODO: shallow copy code, deep copy data, bypass user stack
+ * used by execv: copy of user-part address space for text and data.
+ * semantic: deep copy code, data and user stack now. shallow copy is difficult right now
  */
 page_directory_t* VirtualMemoryManager::copy_page_directory(page_directory_t* pgdir)
 {
     auto* new_pgdir = create_address_space();
     char* v = (char*)UCODE;
-    char* end = (char*)USTACK;
+    char* end = (char*)USTACK_TOP;
 
     auto eflags = _lock.lock();
     while (v < end) {
@@ -300,7 +299,9 @@ page_directory_t* VirtualMemoryManager::copy_page_directory(page_directory_t* pg
             u32 paddr = pte->frame * _pmm->frame_size;
             int flags = pde_get_flags(*(u32*)pte);
 
-            map_pages(new_pgdir, v, PGSIZE, paddr, flags);
+            void* new_pg = vmm.alloc_page();
+            map_pages(new_pgdir, v, PGSIZE, v2p(new_pg), flags);
+            memcpy(new_pg, p2v(paddr), PGSIZE);
         }
 
         v += PGSIZE;
@@ -329,6 +330,7 @@ void VirtualMemoryManager::release_address_space(page_directory_t* pgdir)
     }
 
     //release user space maps
+    //FIXME: what about fored and not execed child. these are shallow copies
     v = (char*)UCODE;
     end = (char*)USTACK_TOP;
     while (v < end) {

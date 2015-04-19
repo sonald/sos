@@ -1,5 +1,5 @@
 #ifndef _MEM_LAYOUT_H
-#define _MEM_LAYOUT_H 
+#define _MEM_LAYOUT_H
 
 #include "types.h"
 // Memory layout
@@ -18,7 +18,7 @@
 #define USTACK_TOP (USTACK+PGSIZE)
 #define UCODE   0x08000000
 
-/* p2v /v2p is only possible in kernel space, 
+/* p2v /v2p is only possible in kernel space,
  * since I know the rule of mapping */
 #ifndef __ASSEMBLER__
 // wont used by nasm

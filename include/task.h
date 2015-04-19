@@ -1,5 +1,5 @@
 #ifndef _TASK_H
-#define _TASK_H 
+#define _TASK_H
 
 #include "isr.h"
 #include "vm.h"

@@ -107,6 +107,7 @@ int sys_exit()
             sys_close(fd);
         }
     }
+    memset(current->files, 0, sizeof current->files);
 
     // parent probably waiting
     wakeup(current->parent);
@@ -116,6 +117,7 @@ int sys_exit()
     proc_t* p = task_init;
     while (p) {
         if (p->parent == current) {
+            // kprintf("reparent %s(%d) to init", p->name, p->pid);
             p->parent = task_init;
             p->ppid = task_init->pid;
             if (p->state == TASK_ZOMBIE) {
@@ -156,13 +158,9 @@ int sys_wait()
                     // remove from list
                     *pp = p->next;
                     p->next = NULL;
+                    p->state == TASK_UNUSED;
 
-                    // vmm.free_page((char*)(p->kern_esp - PGSIZE));
-
-                    // void* task_usr_stack0 = (void*)USTACK;
-                    // page_t* pte = vmm.walk(p->pgdir, task_usr_stack0, false);
-                    // kassert(pte && pte->present && pte->user);
-                    // vmm.free_page(p2v(pte->frame * PGSIZE));
+                    vmm.free_page((char*)(p->kern_esp - PGSIZE));
 
                     vmm.release_address_space(p->pgdir);
                     p->pgdir = NULL;
@@ -177,14 +175,6 @@ int sys_wait()
         if (!has_child) return -1;
 
         sleep(&tasklock, (void*)current);
-        // oldflags = tasklock.lock();
-        // kassert(current->channel == NULL);
-        // current->state = TASK_SLEEP;
-        // current->need_resched = true;
-        // current->channel = (void*)current;
-        // tasklock.release(oldflags);
-
-        // if (current->need_resched) scheduler();
     }
     return -1;
 }
@@ -217,23 +207,8 @@ int sys_fork()
     *(proc->kctx) = *(current->kctx);
     proc->kctx->eip = A2I(trap_return);
 
-    // setup user stack (only one-page, will and should expand at PageFault)
-    void* task_usr_stack0 = (void*)USTACK;
-    page_t* pte = vmm.walk(proc->pgdir, task_usr_stack0, false);
-    kassert(pte == NULL);
-    void* new_stack = vmm.alloc_page();
-    vmm.map_pages(proc->pgdir, task_usr_stack0, PGSIZE,
-            v2p(new_stack), PDE_USER|PDE_WRITABLE);
-
-    // user stack copied
-    pte = vmm.walk(current->pgdir, task_usr_stack0, false);
-    kassert(pte && pte->present && pte->user);
-    void* old_stack = p2v(pte->frame * PGSIZE);
-    memcpy(new_stack, old_stack, PGSIZE);
-
     kprintf("fork %d -> %d\n", current->pid, next_pid);
     kassert(proc->regs->useresp == current->regs->useresp);
-    //kprintf("RET: uesp: 0x%x, eip: 0x%x\n", proc->regs->useresp, proc->regs->eip);
     proc->state = TASK_READY;
     tasklock.release(oldflags);
     return proc->pid;
@@ -242,21 +217,27 @@ int sys_fork()
 //FIXME: check every page if mapped, not only the first one
 static int load_proc(proc_t* proc, void* code, elf_prog_header_t* ph)
 {
+    bool is_data = false;
     u32 flags = PDE_USER;
-    if (ph->p_flags & ELF_PROG_FLAG_WRITE) flags |= PDE_WRITABLE;
+    if (ph->p_flags & ELF_PROG_FLAG_WRITE) {
+        flags |= PDE_WRITABLE;
+        is_data = true;
+    }
 
     void* vaddr = (void*)ph->p_va;
     size_t size = PGROUNDUP(ph->p_memsz);
     char* tmp = (char*)vmm.kmalloc(size, PGSIZE);
     u32 paddr = v2p(tmp);
+
+    //FIXME: unmap all user space mapping
     if (vmm.mapped(proc->pgdir, vaddr))
-        vmm.unmap_pages(proc->pgdir, vaddr, size, false);
+        vmm.unmap_pages(proc->pgdir, vaddr, size, true);
     vmm.map_pages(proc->pgdir, vaddr, size, paddr, flags);
     // copy from tmp avoid a page directory switch
     memcpy(tmp, code, ph->p_filesz);
-    //FIXME: old mapped frames not freed!
 
-    if (size > ph->p_filesz && (flags & PDE_WRITABLE)) {
+
+    if (size > ph->p_filesz && is_data) {
     // make sure bss inited to zero
         memset(tmp+ph->p_filesz, 0, size - ph->p_filesz);
 
