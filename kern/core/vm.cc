@@ -15,16 +15,16 @@ extern char _data[];
 // current process's page table during system calls and interrupts;
 // page protection bits prevent user code from using the kernel's
 // mappings.
-// 
+//
 // setupkvm() and exec() set up every page table like this:
 //
 //   0..KERNEL_VIRTUAL_BASE: user memory (text+data+stack+heap), mapped to
 //                  phys memory allocated by the kernel
-//   KERNEL_VIRTUAL_BASE..KERNEL_VIRTUAL_BASE+EXTMEM: 
+//   KERNEL_VIRTUAL_BASE..KERNEL_VIRTUAL_BASE+EXTMEM:
 //                  mapped to 0..EXTMEM (for I/O space)
 //   KERNEL_VIRTUAL_BASE+EXTMEM..data: mapped to EXTMEM..V2P(data)
 //                  for the kernel's instructions and r/o data
-//   data..KERNEL_VIRTUAL_BASE+PHYSTOP: mapped to V2P(data)..PHYSTOP, 
+//   data..KERNEL_VIRTUAL_BASE+PHYSTOP: mapped to V2P(data)..PHYSTOP,
 //                                  rw data + free physical memory
 //   0xfe000000..0: mapped direct (devices such as ioapic)
 //
@@ -55,7 +55,7 @@ static void page_fault(trapframe_t* regs)
 
     kprintf("regs: ds: 0x%x, edi: 0x%x, esi: 0x%x, ebp: 0x%x, esp: 0x%x\n"
             "eip: 0x%x, cs: 0x%x, eflags: 0b%b, useresp: 0x%x, ss: 0x%x\n",
-            regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, 
+            regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp,
             regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
 
     kprintf("PF: addr 0x%x, %s, %c, %c, %s\n", fault_addr,
@@ -110,7 +110,7 @@ bool VirtualMemoryManager::init(PhysicalMemoryManager* pmm)
 
 
     //kmap is kernel side mapping for VAS, and is big enough for kernel usage,
-    //and won't consume more than 4MB memories (which is setupped by 
+    //and won't consume more than 4MB memories (which is setupped by
     //boot_kernel_directory).
     _kernel_page_directory = create_address_space();
     switch_page_directory(_kernel_page_directory);
@@ -130,7 +130,7 @@ void VirtualMemoryManager::dump_page_directory(page_directory_t* pgdir)
     if (!pgdir) return;
     kputs("DIRS: \n");
     for (int i = 0; i < 1024; ++i) {
-        // show only non-empty 
+        // show only non-empty
         u32 pde = pgdir->tables[i];
         if (pde & PDE_PRESENT) {
             page_table_t* ptable = (page_table_t*)p2v(PDE_GET_TABLE_PHYSICAL(pde));
@@ -139,7 +139,7 @@ void VirtualMemoryManager::dump_page_directory(page_directory_t* pgdir)
                 if (ptable->pages[j].present) {
                     count++;
                 }
-            } 
+            }
 
             if (count > 0) {
                 kprintf("%d: 0x%x, ", i, pgdir->tables[i]);
@@ -194,20 +194,20 @@ bool VirtualMemoryManager::mapped(page_directory_t* pgdir, void* vaddr)
 {
     char* v = (char*)PGROUNDDOWN(vaddr);
     auto eflags = _lock.lock();
-    auto* pte = walk(pgdir, vaddr, false);
+    auto* pte = walk(pgdir, v, false);
     _lock.release(eflags);
 
     return pte && pte->present;
 }
 
-void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr, 
+void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr,
         u32 size, u32 paddr, u32 flags)
 {
     char* v = (char*)PGROUNDDOWN(vaddr);
     char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
 
     auto eflags = _lock.lock();
-    //kprintf("mapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr, 
+    //kprintf("mapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr,
             //size / _pmm->frame_size);
     while (v <= end) {
         page_t* pte = walk(pgdir, v, true);
@@ -225,15 +225,13 @@ void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr,
     _lock.release(eflags);
 }
 
-void VirtualMemoryManager::unmap_pages(page_directory_t* pgdir, void *vaddr, 
-        u32 size, u32 paddr, bool free_mem)
+void VirtualMemoryManager::unmap_pages(page_directory_t* pgdir, void *vaddr,
+        u32 size, bool free_mem)
 {
     char* v = (char*)PGROUNDDOWN(vaddr);
     char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
 
     auto eflags = _lock.lock();
-    //kprintf("unmapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr, 
-            //size / _pmm->frame_size);
     while (v <= end) {
         page_t* pte = walk(pgdir, v, false);
         kassert(pte != NULL);
@@ -246,7 +244,6 @@ void VirtualMemoryManager::unmap_pages(page_directory_t* pgdir, void *vaddr,
         flush_tlb_entry((u32)v);
 
         v += _pmm->frame_size;
-        paddr += _pmm->frame_size;
     }
     _lock.release(eflags);
 }
@@ -260,7 +257,7 @@ page_directory_t* VirtualMemoryManager::create_address_space()
     kprintf("create_address_space: pdir = 0x%x(0x%x)\n", pdir, v2p(pdir));
     memset(pdir, 0x0, sizeof(page_directory_t));
     for (int i = 0, len = sizeof(kmap)/sizeof(kmap[0]); i < len; i++) {
-        map_pages(pdir, kmap[i].vaddr, kmap[i].phys_end - kmap[i].phys_start, 
+        map_pages(pdir, kmap[i].vaddr, kmap[i].phys_end - kmap[i].phys_start,
                 kmap[i].phys_start, kmap[i].perm);
     }
 
@@ -285,7 +282,7 @@ page_directory_t* VirtualMemoryManager::create_address_space()
     return pdir;
 }
 
-/** 
+/**
  * used by execv, shallow copy of user-part address space for text and data.
  * user stack should be newly allocated.
  * TODO: shallow copy code, deep copy data, bypass user stack
@@ -311,6 +308,47 @@ page_directory_t* VirtualMemoryManager::copy_page_directory(page_directory_t* pg
 
     _lock.release(eflags);
     return new_pgdir;
+}
+
+void VirtualMemoryManager::release_address_space(page_directory_t* pgdir)
+{
+    auto eflags = _lock.lock();
+    // shallow copies of kernel part do not release
+    for (int i = 0, len = sizeof(kmap)/sizeof(kmap[0]); i < len; i++) {
+        unmap_pages(pgdir, kmap[i].vaddr, kmap[i].phys_end - kmap[i].phys_start, false);
+    }
+
+    char* v = (char*)0xE0000000;
+    char* end = (char*)0xF0000000;
+    while (v < end) {
+        page_t* pte = walk(pgdir, v, false);
+        if (pte && pte->present) {
+            unmap_pages(pgdir, v, PGSIZE, false);
+        }
+        v += PGSIZE;
+    }
+
+    //release user space maps
+    v = (char*)UCODE;
+    end = (char*)USTACK_TOP;
+    while (v < end) {
+        page_t* pte = walk(pgdir, v, false);
+        if (pte && pte->present) {
+            unmap_pages(pgdir, v, PGSIZE, true);
+        }
+        v += PGSIZE;
+    }
+
+    for (int i = 0; i < 1024; i++) {
+        auto pde = pgdir->tables[i];
+        if (pde & PDE_PRESENT) {
+            auto* ptable = (page_table_t*)p2v(PDE_GET_TABLE_PHYSICAL(pde));
+            free_page(ptable);
+        }
+    }
+
+    free_page(pgdir);
+    _lock.release(eflags);
 }
 
 void* VirtualMemoryManager::alloc_page()
@@ -408,7 +446,7 @@ VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::align_block(
     return newh;
 }
 
-void VirtualMemoryManager::split_block(VirtualMemoryManager::kheap_block_head* h, 
+void VirtualMemoryManager::split_block(VirtualMemoryManager::kheap_block_head* h,
         size_t size)
 {
     kheap_block_head *b = (kheap_block_head*)(h->data + size);
@@ -428,7 +466,7 @@ void VirtualMemoryManager::kfree(void* ptr)
 {
     auto eflags = _lock.lock();
     // kprintf("[VMM] kfree 0x%x\n", ptr);
-    kheap_block_head* h = (kheap_block_head*)((char*)ptr - KHEAD_SIZE); 
+    kheap_block_head* h = (kheap_block_head*)((char*)ptr - KHEAD_SIZE);
     kassert(h->used);
     kassert(h->ptr == h->data);
 
@@ -488,7 +526,7 @@ void VirtualMemoryManager::dump_heap(int limit)
     h = _kheap_ptr;
     while (h) {
         if (n++ >= start) {
-            kprintf("[@0x%x(U: %d): S: 0x%x, N: 0x%x, P: 0x%x]\n", 
+            kprintf("[@0x%x(U: %d): S: 0x%x, N: 0x%x, P: 0x%x]\n",
                     h, h->used, h->size, h->next, h->prev);
             kassert(h->next != _kheap_ptr);
         }

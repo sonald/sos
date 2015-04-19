@@ -1,5 +1,5 @@
 #ifndef _UNISTD_H
-#define _UNISTD_H 
+#define _UNISTD_H
 
 #include <syscall.h>
 #include <types.h>
@@ -71,6 +71,10 @@ int exec(const char *path, char *const argv[], char *const envp[]);
 int execve(const char *path, char *const argv[], char *const envp[]);
 int getpid();
 int sleep(int);
+int exit();
+
+// return -1 if no child, or pid of any of children exited
+int wait();
 
 #ifdef __cplusplus
 }

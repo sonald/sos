@@ -30,7 +30,7 @@ extern int sys_write(int fildes, const void *buf, size_t nbyte);
 
 
 /*
- * gets called before Global constructor 
+ * gets called before Global constructor
  */
 extern "C" void kernel_init()
 {
@@ -70,7 +70,7 @@ static void debug_print(Keyboard* kb)
 
 void tty_thread()
 {
-    
+
     while (1) {
         if (!kbd.msbuf().empty()) {
             mouse_packet_t pkt = kbd.msbuf().read();
@@ -143,21 +143,21 @@ void init_task()
     panic("should never come here");
 }
 
-static void apply_mmap(u32 mmap_length, u32 mmap_addr) 
+static void apply_mmap(u32 mmap_length, u32 mmap_addr)
 {
     memory_map_t* map = (memory_map_t*)p2v(mmap_addr);
     int len = mmap_length / sizeof(memory_map_t);
     kprintf("mmap(%d entries) at 0x%x: \n", len, mmap_addr);
     for (int i = 0; i < len; ++i) {
         kprintf("size: %d, base: 0x%x%x, len: 0x%x%x, type: %d\n",
-                map[i].size, map[i].base_addr_high, 
+                map[i].size, map[i].base_addr_high,
                 map[i].base_addr_low, map[i].length_high, map[i].length_low,
                 map[i].type);
     }
 }
 
-static void test_fs_read(const char* filepath) 
-{       
+static void test_fs_read(const char* filepath)
+{
         int fd = sys_open(filepath, O_RDONLY, 0);
         if (fd >= 0) {
             char buf[64];
@@ -165,9 +165,9 @@ static void test_fs_read(const char* filepath)
             while ((len = sys_read(fd, buf, sizeof buf - 1)) > 0) {
                 buf[len] = 0;
                 kputs(buf);
-            }                
-            sys_close(fd); 
-        }            
+            }
+            sys_close(fd);
+        }
 }
 
 static void test_fs_readdir(const char* dir)
@@ -176,7 +176,7 @@ static void test_fs_readdir(const char* dir)
     kassert(fd >= 0);
     struct dirent dire;
     while (sys_readdir(fd, &dire, 1) > 0) {
-        kprintf("%s, ", dire.d_name);        
+        kprintf("%s, ", dire.d_name);
     }
     sys_close(fd);
 }
@@ -190,7 +190,7 @@ static void load_module(u32 mods_count, u32 mods_base)
     char* mod_end = (char*)p2v(mod->mod_end);
     kprintf("load initrd at [0x%x, 0x%x], cmdline: %s\n", mod_start, mod_end,
             p2v(mod->string));
-    
+
     ramfs_mod_info_t info;
     info.addr = mod_start;
     info.size = mod_end - mod_start;
@@ -265,9 +265,9 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     // test_fs_readdir("/boot/grub/i386-pc");
     // for(;;) asm volatile ("hlt");
- 
+
     // char filename[NAMELEN+1] = "/boot/grub/grub.cfg";
-    // char filename[NAMELEN+1] = "/longnamedmsdosfile.txt";     
+    // char filename[NAMELEN+1] = "/longnamedmsdosfile.txt";
     // test_fs_read(filename);
     // for(;;) asm volatile ("hlt");
 

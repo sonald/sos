@@ -12,11 +12,12 @@
 typedef s32 pid_t;
 
 enum proc_state {
-    TASK_UNUSED = 1,
+    TASK_UNUSED = 0,
     TASK_CREATE,
     TASK_READY,
     TASK_RUNNING,
     TASK_SLEEP,
+    TASK_ZOMBIE,
 };
 
 typedef struct proc_s {
@@ -39,9 +40,11 @@ typedef struct proc_s {
 
     void* channel; // sleep on
     struct proc_s* next;
+    struct proc_s* parent;
 } proc_t;
 
 extern proc_t* current;
+extern proc_t* task_init;
 extern proc_t tasks[MAXPROCS];
 void tasks_init();
 

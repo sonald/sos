@@ -21,7 +21,7 @@ static struct syscall_info_s {
     void* call;
     int nr_args;
 
-} syscalls[NR_SYSCALL]; 
+} syscalls[NR_SYSCALL];
 
 Spinlock syscallock {"syscall"};
 
@@ -29,18 +29,18 @@ static void syscall_handler(trapframe_t* regs)
 {
     auto oflags = syscallock.lock();
     current->regs = regs;
-    syscallock.release(oflags); 
+    syscallock.release(oflags);
 
     if (regs->eax >= NR_SYSCALL) {
         kprintf("invalid syscall number: %d\n", regs->eax);
         regs->eax = -1;
         return;
     }
-    
+
     struct syscall_info_s info = syscalls[regs->eax];
     if (!info.call) {
         return;
-    } 
+    }
 
     switch(info.nr_args) {
         case 0:
@@ -50,7 +50,7 @@ static void syscall_handler(trapframe_t* regs)
                 break;
             }
 
-        case 1: 
+        case 1:
             {
                 syscall1_t fn = (syscall1_t)info.call;
                 regs->eax = do_syscall1(fn, regs->ebx);
@@ -67,7 +67,7 @@ static void syscall_handler(trapframe_t* regs)
         case 3:
             {
                 syscall3_t fn = (syscall3_t)info.call;
-                regs->eax = do_syscall3(fn, regs->ebx, regs->ecx, 
+                regs->eax = do_syscall3(fn, regs->ebx, regs->ecx,
                         regs->edx);
                 break;
             }
@@ -97,6 +97,8 @@ void init_syscall()
     syscalls[SYS_getpid] = { (void*)sys_getpid, 0 };
     syscalls[SYS_getppid] = { (void*)sys_getppid, 0 };
     syscalls[SYS_exec] = { (void*)sys_execve, 3 };
+    syscalls[SYS_wait] = { (void*)sys_wait, 0 };
+    syscalls[SYS_exit] = { (void*)sys_exit, 0 };
     syscalls[SYS_mount] = { (void*)sys_mount, 5 };
     syscalls[SYS_umount] = { (void*)sys_unmount, 1 };
 

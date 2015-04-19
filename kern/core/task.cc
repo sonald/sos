@@ -19,6 +19,8 @@ Spinlock tasklock("task");
 proc_t tasks[MAXPROCS];
 
 proc_t* current = NULL;
+proc_t* task_init = NULL;
+
 static int next_pid = 0;
 
 void sleep(Spinlock* lk, void* chan)
@@ -27,7 +29,7 @@ void sleep(Spinlock* lk, void* chan)
     current->state = TASK_SLEEP;
     //kprintf(" (%s:sleep) ", current->name);
     lk->release();
-    scheduler(); 
+    scheduler();
     lk->lock();
     //kprintf(" (%s:awaked) ", current->name);
 }
@@ -35,7 +37,7 @@ void sleep(Spinlock* lk, void* chan)
 void wakeup(void* chan)
 {
     auto oldflags = tasklock.lock();
-    auto* tsk = &tasks[0];
+    auto* tsk = task_init;
     while (tsk) {
         if (tsk->state == TASK_SLEEP && tsk->channel == chan) {
             tsk->state = TASK_READY;
@@ -53,7 +55,7 @@ static proc_t* find_free_process()
 repeat:
     if ((++next_pid) < 0) next_pid = 1; // wrapped
     for (int i = 0; i < MAXPROCS; ++i) {
-        if (tasks[i].state != TASK_UNUSED && tasks[i].pid == next_pid) 
+        if (tasks[i].state != TASK_UNUSED && tasks[i].pid == next_pid)
             goto repeat;
     }
 
@@ -96,7 +98,98 @@ int sys_sleep(int millisecs)
     return 0;
 }
 
-int sys_fork() 
+int sys_exit()
+{
+    kassert(current != task_init);
+
+    for (int fd = 0; fd < FILES_PER_PROC; fd++) {
+        if (current->files[fd]) {
+            sys_close(fd);
+        }
+    }
+
+    // parent probably waiting
+    wakeup(current->parent);
+
+    auto oldflags = tasklock.lock();
+    //reparent orphan children to init
+    proc_t* p = task_init;
+    while (p) {
+        if (p->parent == current) {
+            p->parent = task_init;
+            p->ppid = task_init->pid;
+            if (p->state == TASK_ZOMBIE) {
+                wakeup(task_init);
+            }
+        }
+        p = p->next;
+    }
+    tasklock.release(oldflags);
+
+    current->state = TASK_ZOMBIE;
+
+    scheduler();
+    panic("sys_exit never return");
+    return 0;
+}
+
+// > 0 pid of exited child, < 0 no child
+int sys_wait()
+{
+    while (1) {
+        pid_t pid = -1;
+        bool has_child = false;
+        proc_t** pp = &task_init;
+
+        auto oldflags = tasklock.lock();
+        while (*pp) {
+            auto* p = *pp;
+            if (p->parent == current) {
+                has_child = true;
+                if (p->state == TASK_ZOMBIE) {
+                    pid = p->pid;
+
+                    // reclaim p now
+                    p->ppid = 0;
+                    p->pid = 0;
+                    p->parent = NULL;
+                    // remove from list
+                    *pp = p->next;
+                    p->next = NULL;
+
+                    // vmm.free_page((char*)(p->kern_esp - PGSIZE));
+
+                    // void* task_usr_stack0 = (void*)USTACK;
+                    // page_t* pte = vmm.walk(p->pgdir, task_usr_stack0, false);
+                    // kassert(pte && pte->present && pte->user);
+                    // vmm.free_page(p2v(pte->frame * PGSIZE));
+
+                    vmm.release_address_space(p->pgdir);
+                    p->pgdir = NULL;
+                    tasklock.release(oldflags);
+                    return pid;
+                }
+            }
+            pp = &(*pp)->next;
+        }
+        tasklock.release(oldflags);
+
+        if (!has_child) return -1;
+
+        sleep(&tasklock, (void*)current);
+        // oldflags = tasklock.lock();
+        // kassert(current->channel == NULL);
+        // current->state = TASK_SLEEP;
+        // current->need_resched = true;
+        // current->channel = (void*)current;
+        // tasklock.release(oldflags);
+
+        // if (current->need_resched) scheduler();
+    }
+    return -1;
+}
+
+int sys_fork()
 {
     proc_t* proc = find_free_process();
     if (!proc) return -1;
@@ -108,11 +201,9 @@ int sys_fork()
     proc->ppid = current->pid;
     proc->pid = next_pid;
 
-    if (!current) current = proc;
-    else { 
-        proc->next = current->next;
-        current->next = proc;
-    }
+    proc->parent = current;
+    proc->next = current->next;
+    current->next = proc;
 
     proc->pgdir = vmm.copy_page_directory(current->pgdir);
 
@@ -127,7 +218,7 @@ int sys_fork()
     proc->kctx->eip = A2I(trap_return);
 
     // setup user stack (only one-page, will and should expand at PageFault)
-    void* task_usr_stack0 = (void*)USTACK; 
+    void* task_usr_stack0 = (void*)USTACK;
     page_t* pte = vmm.walk(proc->pgdir, task_usr_stack0, false);
     kassert(pte == NULL);
     void* new_stack = vmm.alloc_page();
@@ -150,21 +241,26 @@ int sys_fork()
 
 //FIXME: check every page if mapped, not only the first one
 static int load_proc(proc_t* proc, void* code, elf_prog_header_t* ph)
-{    
+{
     u32 flags = PDE_USER;
     if (ph->p_flags & ELF_PROG_FLAG_WRITE) flags |= PDE_WRITABLE;
 
     void* vaddr = (void*)ph->p_va;
     size_t size = PGROUNDUP(ph->p_memsz);
-    void* tmp = vmm.kmalloc(size, PGSIZE);
+    char* tmp = (char*)vmm.kmalloc(size, PGSIZE);
     u32 paddr = v2p(tmp);
     if (vmm.mapped(proc->pgdir, vaddr))
-        vmm.unmap_pages(proc->pgdir, vaddr, size, paddr, false);
+        vmm.unmap_pages(proc->pgdir, vaddr, size, false);
     vmm.map_pages(proc->pgdir, vaddr, size, paddr, flags);
-    // copy from tmp avoid a page directory switch 
+    // copy from tmp avoid a page directory switch
     memcpy(tmp, code, ph->p_filesz);
+    //FIXME: old mapped frames not freed!
+
+    if (size > ph->p_filesz && (flags & PDE_WRITABLE)) {
     // make sure bss inited to zero
-    memset(tmp+ph->p_filesz, 0, size - ph->p_filesz);
+        memset(tmp+ph->p_filesz, 0, size - ph->p_filesz);
+
+    }
     return 0;
 }
 
@@ -177,6 +273,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
 
     inode_t* ip = vfs.namei(path);
     kassert(ip != NULL);
+    strncpy(current->name, path, sizeof current->name - 1);
 
     char* buf = new char[ip->size];
 
@@ -201,7 +298,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     kprintf("elf: 0x%x, entry: 0x%x, ph: %d\n", elf, elf->e_entry, elf->e_phnum);
     elf_prog_header_t* ph = (elf_prog_header_t*)((char*)elf + elf->e_phoff);
     for (int i = 0; i < elf->e_phnum; ++i) {
-        kprintf("off: 0x%x, pa: 0x%x, va: 0x%x, fsz: 0x%x, msz: 0x%x\n", 
+        kprintf("off: 0x%x, pa: 0x%x, va: 0x%x, fsz: 0x%x, msz: 0x%x\n",
                 ph[i].p_offset, ph[i].p_pa, ph[i].p_va, ph[i].p_filesz, ph[i].p_memsz);
         if (ph[i].p_type != ELF_PROG_LOAD) {
             continue;
@@ -218,11 +315,9 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
 
     delete buf;
 
-    strncpy(current->name, path, sizeof current->name - 1);
-    kprintf("execv task(%d, %s)\n", current->pid, path);
-
+    kprintf("execv task(%d, %s)\n", current->pid, current->name);
     current->entry = (void*)elf->e_entry;
-    
+
     trapframe_t* regs = current->regs;
     regs->eip = elf->e_entry;
     regs->useresp = USTACK_TOP;
@@ -252,14 +347,14 @@ proc_t* prepare_userinit(void* prog)
     page_directory_t* pdir = vmm.create_address_space();
 
     proc->pgdir = pdir;
-    void* vaddr = (void*)UCODE; 
+    void* vaddr = (void*)UCODE;
     void* tmp = vmm.alloc_page();
     u32 paddr = v2p(tmp);
     vmm.map_pages(pdir, vaddr, PGSIZE, paddr, PDE_USER);
-    // copy from tmp avoid a page directory switch 
+    // copy from tmp avoid a page directory switch
     memcpy(tmp, prog, PGSIZE);
 
-    void* task_usr_stack0 = (void*)USTACK; 
+    void* task_usr_stack0 = (void*)USTACK;
     u32 paddr_stack0 = v2p(vmm.alloc_page());
     vmm.map_pages(pdir, task_usr_stack0, PGSIZE, paddr_stack0, PDE_USER|PDE_WRITABLE);
 
@@ -268,7 +363,7 @@ proc_t* prepare_userinit(void* prog)
     proc->entry = vaddr;
     proc->kern_esp = A2I(task_kern_stack) + PGSIZE;
     proc->user_esp = USTACK_TOP;
-    
+
     trapframe_t* regs = (trapframe_t*)((char*)proc->kern_esp - sizeof(trapframe_t));
     memset(regs, 0, sizeof regs);
     regs->useresp = proc->user_esp;
@@ -285,9 +380,10 @@ proc_t* prepare_userinit(void* prog)
     proc->ppid = 0;
     proc->pid = next_pid;
     proc->state = TASK_READY;
-    kprintf("%s(%d, 0x%x) @0x%x, ustack: 0x%x, kesp: 0x%x\n", 
+    kprintf("%s(%d, 0x%x) @0x%x, ustack: 0x%x, kesp: 0x%x\n",
             __func__, proc->pid, proc, paddr, paddr_stack0, proc->kern_esp);
 
+    task_init = proc;
     return proc;
 }
 
@@ -302,11 +398,10 @@ proc_t* create_kthread(const char* name, kthread_t prog)
     proc->ppid = current->pid;
     proc->pid = next_pid;
 
-    if (!current) current = proc;
-    else { 
-        proc->next = current->next;
-        current->next = proc;
-    }
+    proc->parent = current;
+    proc->next = current->next;
+    current->next = proc;
+
     strncpy(proc->name, name, sizeof proc->name - 1);
 
     proc->pgdir = vmm.kernel_page_directory();
@@ -317,7 +412,7 @@ proc_t* create_kthread(const char* name, kthread_t prog)
     proc->entry = (void*)prog;
     proc->kern_esp = A2I(task_kern_stack) + PGSIZE;
     proc->user_esp = 0;
-    
+
     trapframe_t* regs = (trapframe_t*)((char*)proc->kern_esp - sizeof(trapframe_t));
     memset(regs, 0, sizeof regs);
     regs->useresp = proc->user_esp;

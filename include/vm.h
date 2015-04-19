@@ -15,8 +15,7 @@ class VirtualMemoryManager
 
         void map_pages(page_directory_t* pgdir, void *vaddr, u32 size,
                 u32 paddr, u32 flags);
-        void unmap_pages(page_directory_t* pgdir, void *vaddr, u32 size,
-                u32 paddr, bool free_mem);
+        void unmap_pages(page_directory_t* pgdir, void *vaddr, u32 size, bool free_mem);
 
         bool mapped(page_directory_t* pgdir, void* vaddr);
         page_t* walk(page_directory_t* pgdir, void* vaddr, bool create = false);
@@ -29,6 +28,7 @@ class VirtualMemoryManager
 
         void dump_page_directory(page_directory_t* pgdir);
         page_directory_t* create_address_space();
+        void release_address_space(page_directory_t* pgdir);
         page_directory_t* copy_page_directory(page_directory_t* pgdir);
         page_directory_t* kernel_page_directory();
 

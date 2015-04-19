@@ -9,25 +9,25 @@ Spinlock videolock("video");
 
 VideoMode videoMode;
 Rgb colormap[] = {
-    0x000000,  
-    0x0000ff,  
-    0x00ff00,  
-    0x00ffff,  
-    0xff0000,  
-    0xff00ff,  
-    0xa52a2a,  
-    0xd3d3d3,  
-    0xbebebe,  
-    0xadd8e6,  
-    0x90ee90,  
-    0xe0ffff,  
+    0x000000,
+    0x0000ff,
+    0x00ff00,
+    0x00ffff,
+    0xff0000,
+    0xff00ff,
+    0xa52a2a,
+    0xd3d3d3,
+    0xbebebe,
+    0xadd8e6,
+    0x90ee90,
+    0xe0ffff,
     0xcd5c5c,
-    0xee00ee,  
-    0xff4040,  
-    0xffffff,  
-    0xffff00,  
-    0xfafad2,  
-    0x800080   
+    0xee00ee,
+    0xff4040,
+    0xffffff,
+    0xffff00,
+    0xfafad2,
+    0x800080
 };
 
 void VideoMode::init(ModeInfoBlock_t* modeinfo)
@@ -40,7 +40,6 @@ void VideoMode::init(ModeInfoBlock_t* modeinfo)
     _pitch = modeinfo->pitch;
     _width = modeinfo->Xres;
     _height = modeinfo->Yres;
-    //vmm.switch_page_directory(vmm.kernel_page_directory());
 }
 
 void VideoMode::drawLine(int x0, int y0, int x1, int y1, Rgb rgb)
@@ -185,7 +184,7 @@ void VideoMode::blitCopy(position_t dst, position_t src, int width, int height)
         expand *= height;
         memmove(start, old, expand);
         return;
-    } 
+    }
     // slow version
     for (int j = 0; j < height; j++) {
         memcpy(start, old, expand);

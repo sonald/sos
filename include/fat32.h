@@ -190,7 +190,7 @@ class Fat32Fs: public FileSystem {
         uint32_t find_next_cluster(uint32_t cluster);        
 
         fat_inode_t* find_in_cache(inode_t* dir, int id);
-        void push_cache(inode_t* dir, fat_inode_t* fat_ip);
+        void push_cache(fat_inode_t* fat_ip);
 };
 
 FileSystem* create_fat32fs(const void*);

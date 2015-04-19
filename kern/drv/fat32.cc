@@ -443,7 +443,7 @@ fat_inode_t* Fat32Fs::find_in_cache(inode_t* dir, int id)
     return NULL;
 }
 
-void Fat32Fs::push_cache(inode_t* dir, fat_inode_t* fat_ip)
+void Fat32Fs::push_cache(fat_inode_t* fat_ip)
 {
     memcpy(&_icaches[_icache_size], fat_ip, sizeof *fat_ip);
     _icache_size = (_icache_size + 1) % 256;
@@ -476,7 +476,7 @@ int Fat32Fs::readdir(File *filp, dentry_t *de, filldir_t)
 
     if (de->ip) {
         auto* fat_ip = (fat_inode_t*)de->ip->data;
-        push_cache(dir, fat_ip);        
+        push_cache(fat_ip);        
         if (fat_ip->long_name) {
             strncpy(de->name, fat_ip->long_name, NAMELEN);
         } else {

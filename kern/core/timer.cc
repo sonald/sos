@@ -25,7 +25,7 @@ void scheduler()
         
         auto* old = current;
         bool rewind = true;
-        proc_t* tsk = old->next ? old->next: &tasks[0];
+        proc_t* tsk = old->next ? old->next: task_init;
         while (tsk) {
             if (old != tsk && tsk->state == TASK_READY) {
                 current = tsk;
