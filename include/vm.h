@@ -6,6 +6,7 @@
 #include "mmu.h"
 #include <spinlock.h>
 
+typedef struct proc_s proc_t;
 class VirtualMemoryManager
 {
     public:
@@ -28,7 +29,7 @@ class VirtualMemoryManager
 
         void dump_page_directory(page_directory_t* pgdir);
         page_directory_t* create_address_space();
-        void release_address_space(page_directory_t* pgdir);
+        void release_address_space(proc_t* proc, page_directory_t* pgdir);
 
         page_directory_t* copy_page_directory(page_directory_t* pgdir);
         page_directory_t* kernel_page_directory();
@@ -62,7 +63,7 @@ class VirtualMemoryManager
         u32* _kern_heap_limit;
         Spinlock _lock {"vmm"};
 
-        kheap_block_head* find_block(kheap_block_head** last, size_t size);
+        kheap_block_head* find_block(kheap_block_head** last, size_t size, int align);
         void split_block(kheap_block_head* h, size_t size);
         kheap_block_head* merge_block(kheap_block_head* h);
         kheap_block_head* align_block(kheap_block_head* h, int align);

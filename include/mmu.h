@@ -1,9 +1,9 @@
 #ifndef _MMU_H
-#define _MMU_H 
+#define _MMU_H
 
 #include "types.h"
 
-// This file contains definitions for the 
+// This file contains definitions for the
 // x86 memory management unit (MMU).
 
 // Control Register flags
@@ -22,7 +22,7 @@
 #define CR4_PSE         0x00000010      // Page size extension
 
 // GDT Segment index
-#define SEG_NULL  0  // NULL 
+#define SEG_NULL  0  // NULL
 #define SEG_KCODE 1  // kernel code
 #define SEG_KDATA 2  // kernel data+stack
 #define SEG_UCODE 3  // user code
@@ -36,7 +36,7 @@
 // | Page Directory |   Page Table   | Offset within Page  |
 // |      Index     |      Index     |                     |
 // +----------------+----------------+---------------------+
-//  \--- PDX(va) --/ \--- PTX(va) --/ 
+//  \--- PDX(va) --/ \--- PTX(va) --/
 
 
 typedef struct page_s {
@@ -55,15 +55,15 @@ typedef struct page_table_s {
 
 // for PDE and PTE
 enum PAGE_PDE_FLAGS {
-    PDE_PRESENT     = 0x01,      
-    PDE_WRITABLE    = 0x02,      
-    PDE_USER        = 0x04,      
-    PDE_PWT         = 0x08,      
-    PDE_PCD         = 0x10,       
-    PDE_ACCESSED    = 0x20,       
-    PDE_DIRTY       = 0x40,       
-    PDE_4MB         = 0x80,       
-    PDE_FRAME       = 0xFFFFF000  
+    PDE_PRESENT     = 0x01,
+    PDE_WRITABLE    = 0x02,
+    PDE_USER        = 0x04,
+    PDE_PWT         = 0x08,
+    PDE_PCD         = 0x10,
+    PDE_ACCESSED    = 0x20,
+    PDE_DIRTY       = 0x40,
+    PDE_4MB         = 0x80,
+    PDE_FRAME       = 0xFFFFF000
 };
 
 #define pde_set_flag(pde, flag) ((pde) |= (flag))

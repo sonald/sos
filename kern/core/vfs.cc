@@ -23,10 +23,12 @@ static File* get_free_file()
 {
     File* fp = &cached_files[0];
     int i;
+    auto oflags = vfslock.lock();
     for (i = 0; i < MAX_NR_FILE; i++, fp++) {
-        if (fp->ref() == 0) 
+        if (fp->ref() == 0)
             break;
     }
+    vfslock.release(oflags);
 
     if (i >= MAX_NR_FILE) return NULL;
     memset(fp, 0, sizeof *fp);
@@ -36,10 +38,12 @@ static File* get_free_file()
 static int fdalloc()
 {
     int fd = -EINVAL;
+    auto oflags = vfslock.lock();
     for (fd = 0; fd < FILES_PER_PROC; fd++) {
         if (!current->files[fd])
             break;
     }
+    vfslock.release(oflags);
 
     if (fd >= FILES_PER_PROC) {
         fd = -EINVAL;
@@ -48,7 +52,7 @@ static int fdalloc()
     return fd;
 }
 
-int sys_mount(const char *src, const char *target, 
+int sys_mount(const char *src, const char *target,
         const char *fstype, unsigned long mountflags, const void *data)
 {
     //FIXME: TODO: copy user space string into kernel
@@ -80,7 +84,7 @@ int sys_open(const char *path, int flags, int mode)
         fd = -ENOENT;
         goto _out;
     }
-    
+
     f = get_free_file();
     if (!f) {
         vfs.dealloc_inode(ip);
@@ -102,10 +106,10 @@ int sys_close(int fd)
     inode_t* ip = filp->inode();
     kassert(filp && ip);
 
-    auto eflags = vfslock.lock();   
+    auto eflags = vfslock.lock();
     memset(filp, 0, sizeof *filp);
     current->files[fd] = NULL;
-    vfs.dealloc_inode(ip); 
+    vfs.dealloc_inode(ip);
 
     vfslock.release(eflags);
     return 0;
@@ -136,7 +140,10 @@ int sys_read(int fd, void *buf, size_t nbyte)
     auto* filp = current->files[fd];
     inode_t* ip = filp->inode();
     off_t off = filp->off();
-    return ip->fs->read(filp, (char*)buf, nbyte, &off);
+    auto eflags = vfslock.lock();
+    auto ret = ip->fs->read(filp, (char*)buf, nbyte, &off);
+    vfslock.release(eflags);
+    return ret;
 }
 
 // ignore count, should only be 1 by now
@@ -218,12 +225,15 @@ int VFSManager::mount(const char *src, const char *target,
 mount_info_t* VFSManager::get_mount(const char* target)
 {
     auto* p = _mounts;
+    auto oflags = vfslock.lock();
     while (p) {
         if (strcmp(p->mnt_point, target) == 0) {
+            vfslock.release(oflags);
             return p;
         }
         p = p->next;
     }
+    vfslock.release(oflags);
 
     return nullptr;
 }
@@ -237,12 +247,16 @@ int VFSManager::unmount(const char *target)
 file_system_type_t* VFSManager::find_fs(const char* fsname)
 {
     auto* p = _fs_types;
+    auto oflags = vfslock.lock();
     while (p) {
         if (strcmp(fsname, p->fsname) == 0) {
+            vfslock.release(oflags);
             return p;
         }
         p = p->next;
     }
+    vfslock.release(oflags);
+
     return nullptr;
 }
 
@@ -256,7 +270,7 @@ void VFSManager::register_fs(const char* fsname, CreateFsFunction func)
 }
 
 //assume path is normalized
-static char* parent_path(char* path) 
+static char* parent_path(char* path)
 {
     int n, i;
     for (n = strlen(path), i = n-1; i >= 0; i--) {
@@ -281,7 +295,7 @@ static char* strip_parent(const char* path, const char* prefix)
         return new_path;
     }
 
-    auto* new_path = new char[n2-n1+1];    
+    auto* new_path = new char[n2-n1+1];
     memcpy(new_path, path+n1, n2-n1+1);
     return new_path;
 }
@@ -320,7 +334,7 @@ mount_info_t* VFSManager::find_mount(const char* path, char**new_path)
     delete pth;
 
     auto* stripped = strip_parent(path, mnt->mnt_point);
-    kprintf("get mount %s, new_path %s ", mnt->mnt_point, stripped);    
+    kprintf("get mount %s, new_path %s ", mnt->mnt_point, stripped);
     if (new_path) {
         *new_path = stripped;
     } else {
@@ -349,7 +363,7 @@ inode_t* VFSManager::namei(const char* path)
     while ((new_path = path_part(new_path, part)) != NULL) {
         kprintf("%s: part %s, path %s\n", __func__, part, new_path);
         if ((ip = dir_lookup(ip, part)) == NULL) {
-            kprintf("%s failed to find %s\n", __func__, path);            
+            kprintf("%s failed to find %s\n", __func__, path);
             break;
         }
     }
@@ -383,14 +397,14 @@ dentry_t* VFSManager::alloc_entry()
     dentry_t* de = &cached_dentries[0];
     int i;
 
-    auto eflags = vfslock.lock();    
+    auto eflags = vfslock.lock();
     for (i = 0; i < MAX_NR_DENTRY; i++, de++) {
-        if (de->ip == 0 && de->name[0] == 0) 
+        if (de->ip == 0 && de->name[0] == 0)
             break;
     }
     vfslock.release(eflags);
 
-    if (i >= MAX_NR_DENTRY) 
+    if (i >= MAX_NR_DENTRY)
         panic("no mem for dentry");
     return de;
 }
@@ -399,8 +413,8 @@ void VFSManager::dealloc_entry(dentry_t* de)
 {
     auto eflags = vfslock.lock();
     if (de->ip) dealloc_inode(de->ip);
-    memset(de, 0, sizeof *de); 
-    vfslock.release(eflags);  
+    memset(de, 0, sizeof *de);
+    vfslock.release(eflags);
 }
 
 inode_t* VFSManager::alloc_inode()
@@ -415,7 +429,7 @@ inode_t* VFSManager::alloc_inode()
     }
     vfslock.release(eflags);
 
-    if (i >= MAX_NR_INODE) 
+    if (i >= MAX_NR_INODE)
         panic("no mem for inode");
     return ip;
 }
@@ -425,5 +439,5 @@ void VFSManager::dealloc_inode(inode_t* ip)
     auto eflags = vfslock.lock();
     if (ip->data) delete (char*)ip->data;
     memset(ip, 0, sizeof *ip);
-    vfslock.release(eflags);   
+    vfslock.release(eflags);
 }

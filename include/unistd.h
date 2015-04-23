@@ -72,6 +72,7 @@ int execve(const char *path, char *const argv[], char *const envp[]);
 int getpid();
 int sleep(int);
 int exit();
+int readdir(unsigned int fd, struct dirent *dirp, unsigned int count);
 
 // return -1 if no child, or pid of any of children exited
 int wait();

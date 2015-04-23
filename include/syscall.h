@@ -1,5 +1,5 @@
 #ifndef _SYSCALL_H
-#define _SYSCALL_H 
+#define _SYSCALL_H
 
 #include <types.h>
 
@@ -30,7 +30,8 @@
 #define SYS_umount     23
 #define SYS_getppid    24
 #define SYS_mmap       25
+#define SYS_readdir    26
 
-#define NR_SYSCALL     26
+#define NR_SYSCALL     27
 
 #endif

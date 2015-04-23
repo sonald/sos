@@ -92,6 +92,7 @@ void init_syscall()
     syscalls[SYS_close] = { (void*)sys_close, 1 };
     syscalls[SYS_write] = { (void*)sys_write, 3 };
     syscalls[SYS_read] = { (void*)sys_read, 3 };
+    syscalls[SYS_readdir] = { (void*)sys_readdir, 3 };
     syscalls[SYS_fork] = { (void*)sys_fork, 0 };
     syscalls[SYS_sleep] = { (void*)sys_sleep, 1 };
     syscalls[SYS_getpid] = { (void*)sys_getpid, 0 };

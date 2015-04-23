@@ -1,5 +1,5 @@
 #ifndef _ISR_H
-#define _ISR_H 
+#define _ISR_H
 
 #include "common.h"
 #include "gdt.h"
@@ -29,7 +29,7 @@
 #define IRQ_ATA1 46 // ATA HD1
 #define IRQ_ATA2 47 // ATA HD2
 
-#define ISR_SYSCALL 0x80 
+#define ISR_SYSCALL 0x80
 
 typedef struct trapframe_s {
     u32 fs, gs, es, ds;

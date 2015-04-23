@@ -158,11 +158,11 @@ int sys_wait()
                     // remove from list
                     *pp = p->next;
                     p->next = NULL;
-                    p->state == TASK_UNUSED;
+                    p->state = TASK_UNUSED;
 
                     vmm.free_page((char*)(p->kern_esp - PGSIZE));
 
-                    vmm.release_address_space(p->pgdir);
+                    vmm.release_address_space(p, p->pgdir);
                     p->pgdir = NULL;
                     tasklock.release(oldflags);
                     return pid;
@@ -207,6 +207,7 @@ int sys_fork()
     *(proc->kctx) = *(current->kctx);
     proc->kctx->eip = A2I(trap_return);
 
+    kprintf("%s: old eip %x, new eip %x  ", __func__, current->regs->eip, proc->regs->eip);
     kprintf("fork %d -> %d\n", current->pid, next_pid);
     kassert(proc->regs->useresp == current->regs->useresp);
     proc->state = TASK_READY;
@@ -214,8 +215,7 @@ int sys_fork()
     return proc->pid;
 }
 
-//FIXME: check every page if mapped, not only the first one
-static int load_proc(proc_t* proc, void* code, elf_prog_header_t* ph)
+static int load_proc(void* code, elf_prog_header_t* ph)
 {
     bool is_data = false;
     u32 flags = PDE_USER;
@@ -224,24 +224,20 @@ static int load_proc(proc_t* proc, void* code, elf_prog_header_t* ph)
         is_data = true;
     }
 
-    void* vaddr = (void*)ph->p_va;
-    size_t size = PGROUNDUP(ph->p_memsz);
-    char* tmp = (char*)vmm.kmalloc(size, PGSIZE);
-    u32 paddr = v2p(tmp);
+    int mid = is_data ? 1 : 0;
+    current->mmap[mid].start = (void*)ph->p_va;
+    current->mmap[mid].size = PGROUNDUP(ph->p_memsz);
 
-    //FIXME: unmap all user space mapping
-    if (vmm.mapped(proc->pgdir, vaddr))
-        vmm.unmap_pages(proc->pgdir, vaddr, size, true);
-    vmm.map_pages(proc->pgdir, vaddr, size, paddr, flags);
-    // copy from tmp avoid a page directory switch
+    char* tmp = (char*)vmm.kmalloc(current->mmap[mid].size, PGSIZE);
     memcpy(tmp, code, ph->p_filesz);
-
-
-    if (size > ph->p_filesz && is_data) {
-    // make sure bss inited to zero
-        memset(tmp+ph->p_filesz, 0, size - ph->p_filesz);
-
+    if (ph->p_memsz > ph->p_filesz && is_data) {
+        // make sure bss inited to zero
+        memset(tmp+ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
     }
+
+    vmm.map_pages(current->pgdir, current->mmap[mid].start,
+        current->mmap[mid].size, v2p(tmp), flags);
+
     return 0;
 }
 
@@ -261,6 +257,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     int fd = sys_open(path, O_RDONLY, 0);
     int len = sys_read(fd, buf, ip->size);
     sys_close(fd);
+
     if (len < 0) {
         kprintf("load %s failed\n", path);
         delete buf;
@@ -274,6 +271,15 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
         delete buf;
         tasklock.release(oldflags);
         return -EINVAL;
+    }
+
+    // only release code and data, leave stack unchanged
+    for (int i = 0; i < 2; i++) {
+        if (current->mmap[i].start == 0) continue;
+
+        address_mapping_t m = current->mmap[i];
+        vmm.unmap_pages(current->pgdir, m.start, m.size, true);
+        current->mmap[i] = {0, 0};
     }
 
     kprintf("elf: 0x%x, entry: 0x%x, ph: %d\n", elf, elf->e_entry, elf->e_phnum);
@@ -291,14 +297,17 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
             continue;
         }
 
-        load_proc(current, prog, &ph[i]);
+        load_proc(prog, &ph[i]);
+            page_t* pte = vmm.walk(current->pgdir, (void*)UCODE, false);
+
+        kprintf("pgdir: %x, pte: %x \n", (void*)current->pgdir, *(u32*)pte);
+
     }
 
     delete buf;
 
     kprintf("execv task(%d, %s)\n", current->pid, current->name);
     current->entry = (void*)elf->e_entry;
-
     trapframe_t* regs = current->regs;
     regs->eip = elf->e_entry;
     regs->useresp = USTACK_TOP;
@@ -327,6 +336,10 @@ proc_t* prepare_userinit(void* prog)
 
     page_directory_t* pdir = vmm.create_address_space();
 
+    // one page of code, not data, one page of ustack
+    proc->mmap[0].start = (void*)UCODE;
+    proc->mmap[0].size = PGSIZE;
+
     proc->pgdir = pdir;
     void* vaddr = (void*)UCODE;
     void* tmp = vmm.alloc_page();
@@ -334,6 +347,9 @@ proc_t* prepare_userinit(void* prog)
     vmm.map_pages(pdir, vaddr, PGSIZE, paddr, PDE_USER);
     // copy from tmp avoid a page directory switch
     memcpy(tmp, prog, PGSIZE);
+
+    proc->mmap[2].start = (void*)USTACK;
+    proc->mmap[2].size = PGSIZE;
 
     void* task_usr_stack0 = (void*)USTACK;
     u32 paddr_stack0 = v2p(vmm.alloc_page());

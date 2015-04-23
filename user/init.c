@@ -4,7 +4,7 @@
 
 #define NAME_MAX 128
 
-static char* prompt = "> ";
+static const char* prompt = "> ";
 static char cmd_name[NAME_MAX] = "/echo";
 
 #ifdef __cplusplus

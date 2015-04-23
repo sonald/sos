@@ -47,13 +47,13 @@ mboot:
     dd  0, 0, 0, 0, 0
     dd  0 ; 0 = set graphics mode
     dd  800, 600, 24 ; Width, height, depth
-    
+
 [section .text]
 ; physical address for _start, need it before paing enabled.
-start equ (_start - KERNEL_VIRTUAL_BASE) 
+start equ (_start - KERNEL_VIRTUAL_BASE)
 
 _start:
-    push ebx ; save mbinfo 
+    push ebx ; save mbinfo
 
     call is_cpuid_capable
     test eax, eax
@@ -66,7 +66,7 @@ _start:
 
     ; enable PSE
     mov ecx, cr4
-    or ecx, 0x00000010 
+    or ecx, 0x00000010
     mov cr4, ecx
 
     mov ecx, (_boot_page_directory_4m - KERNEL_VIRTUAL_BASE)
@@ -87,7 +87,7 @@ _pse:
     jmp ecx
 
 higher_half_entry:
-    pop ebx ; restore mbinfo, must before invalidating first PDE, 
+    pop ebx ; restore mbinfo, must before invalidating first PDE,
             ; cause after invalidation, esp point to invalid low-end mem vaddr
 
     ; invalidate all PTEs for PDE 0
@@ -103,8 +103,8 @@ higher_half_entry:
 
 
     mov esp, kern_stack_top
-    
-    call kernel_init 
+
+    call kernel_init
     call _init
 
     ; cdecl, ebx will keep as it was
@@ -127,14 +127,14 @@ is_cpuid_capable:
     pushfd
     pop eax
     mov ecx, eax
-    xor eax, 0x200000 ; flip ID 
+    xor eax, 0x200000 ; flip ID
     push eax
     popfd
 
     ; test if modify success
     pushfd
     pop eax
-    xor eax, ecx 
+    xor eax, ecx
     shr eax, 21
     and eax, 1
     push ecx

@@ -20,6 +20,11 @@ enum proc_state {
     TASK_ZOMBIE,
 };
 
+typedef struct address_mapping_s {
+    void* start;
+    uint32_t size;
+} address_mapping_t;
+
 typedef struct proc_s {
     trapframe_t* regs;
     kcontext_t* kctx;
@@ -30,6 +35,8 @@ typedef struct proc_s {
 
     u32 kern_esp;
     u32 user_esp;
+    address_mapping_t mmap[3]; // for code, text, stack
+
     void* entry;
     enum proc_state state;
     bool need_resched;

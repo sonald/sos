@@ -156,31 +156,6 @@ static void apply_mmap(u32 mmap_length, u32 mmap_addr)
     }
 }
 
-static void test_fs_read(const char* filepath)
-{
-        int fd = sys_open(filepath, O_RDONLY, 0);
-        if (fd >= 0) {
-            char buf[64];
-            int len = 0;
-            while ((len = sys_read(fd, buf, sizeof buf - 1)) > 0) {
-                buf[len] = 0;
-                kputs(buf);
-            }
-            sys_close(fd);
-        }
-}
-
-static void test_fs_readdir(const char* dir)
-{
-    int fd = sys_open(dir, O_RDONLY, 0);
-    kassert(fd >= 0);
-    struct dirent dire;
-    while (sys_readdir(fd, &dire, 1) > 0) {
-        kprintf("%s, ", dire.d_name);
-    }
-    sys_close(fd);
-}
-
 // only care about 1 module
 static void load_module(u32 mods_count, u32 mods_base)
 {
@@ -263,12 +238,6 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     proc_t* proc = prepare_userinit((void*)&init_task);
     load_module(mb->mods_count, mb->mods_addr);
 
-    // test_fs_readdir("/boot/grub/i386-pc");
-    // for(;;) asm volatile ("hlt");
-
-    // char filename[NAMELEN+1] = "/boot/grub/grub.cfg";
-    // char filename[NAMELEN+1] = "/longnamedmsdosfile.txt";
-    // test_fs_read(filename);
     // for(;;) asm volatile ("hlt");
 
     create_kthread("kthread1", kthread1);

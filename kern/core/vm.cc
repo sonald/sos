@@ -61,7 +61,7 @@ static void page_fault(trapframe_t* regs)
     kprintf("PF: addr 0x%x, %s, %c, %c, %s\n", fault_addr,
             (present?"P":"NP"), (rw?'W':'R'), (us?'U':'S'), (rsvd?"RSVD":""));
     if (current) {
-        kprintf("current: %s, regs: 0x%x\n", current->name, current->regs);
+        kprintf("current: %s(%d), regs: 0x%x\n", current->name, current->pid, current->regs);
     }
     panic("");
 }
@@ -74,7 +74,7 @@ VirtualMemoryManager::VirtualMemoryManager()
 }
 
 #define KHEAD_SIZE  20  // ignore data field
-#define ALIGN(sz, align) ((((u32)(sz)-1)/align)*align+align)
+#define ALIGN(sz, align) ((((u32)(sz)-1)/(align))*(align)+(align))
 
 void VirtualMemoryManager::test_malloc()
 {
@@ -82,11 +82,11 @@ void VirtualMemoryManager::test_malloc()
     void* p1 = kmalloc(0x80-3, 4);
     void* p2 = kmalloc(0x100, 8);
     void* p3 = kmalloc(0x400, PGSIZE/2);
-    kprintf("p1 = 0x%x, p2 = 0x%x, p3 = 0x%x\n", p1, p2, p3);
+    // kprintf("p1 = 0x%x, p2 = 0x%x, p3 = 0x%x\n", p1, p2, p3);
 
     void* p4 = kmalloc(PGSIZE-1, PGSIZE);
     void* p5 = kmalloc(PGSIZE);
-    kprintf("p4 = 0x%x\n", p4);
+    // kprintf("p4 = 0x%x\n", p4);
     kfree(p3);
     kfree(p2);
     kfree(p4);
@@ -96,8 +96,17 @@ void VirtualMemoryManager::test_malloc()
     kfree(p5);
     kfree(p1);
 
+    {
+        kmalloc(PGSIZE, PGSIZE);
+        kmalloc(3000, PGSIZE);
+        void* pg2 = kmalloc(PGSIZE+3000, 1);
+        kmalloc(PGSIZE, PGSIZE);
+        kmalloc(PGSIZE*2, PGSIZE);
+        kfree(pg2);
+        kmalloc(PGSIZE, PGSIZE);
+    }
     dump_heap();
-    for(;;);
+    for(;;) asm("cli; hlt");
 }
 
 //TODO: set mapping according to mmap from grub
@@ -116,7 +125,7 @@ bool VirtualMemoryManager::init(PhysicalMemoryManager* pmm)
     switch_page_directory(_kernel_page_directory);
 
     register_isr_handler(PAGE_FAULT, page_fault);
-    //test_malloc();
+    // test_malloc();
     return true;
 }
 
@@ -193,10 +202,7 @@ page_t* VirtualMemoryManager::walk(page_directory_t* pgdir, void* vaddr, bool cr
 bool VirtualMemoryManager::mapped(page_directory_t* pgdir, void* vaddr)
 {
     char* v = (char*)PGROUNDDOWN(vaddr);
-    auto eflags = _lock.lock();
     auto* pte = walk(pgdir, v, false);
-    _lock.release(eflags);
-
     return pte && pte->present;
 }
 
@@ -207,29 +213,34 @@ void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr,
     char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
 
     auto eflags = _lock.lock();
-    //kprintf("mapping v(0x%x: 0x%x) -> (0x%x), count: %d\n", v, end, paddr,
-            //size / _pmm->frame_size);
+    if ((u32)vaddr < KERNEL_VIRTUAL_BASE) {
+        kprintf("mapping dir %x v(0x%x: 0x%x), count: %d\n", pgdir, v, end,
+                size / _pmm->frame_size);
+    }
     while (v <= end) {
         page_t* pte = walk(pgdir, v, true);
-        if (pte == NULL) break;
-
+        kassert(pte != NULL);
         if (pte->present) panic("map_pages: remap 0x%x\n", vaddr);
+
+        *(u32*)pte = 0;
         pte->present = 1;
         pte->rw = ((flags & PDE_WRITABLE) ? 1: 0);
         pte->user = ((flags & PDE_USER) ? 1 : 0);
         pte->frame = paddr / _pmm->frame_size;
-
         v += _pmm->frame_size;
         paddr += _pmm->frame_size;
     }
     _lock.release(eflags);
 }
 
+// this should free a whole address area like described in address_mapping_t struct
 void VirtualMemoryManager::unmap_pages(page_directory_t* pgdir, void *vaddr,
         u32 size, bool free_mem)
 {
     char* v = (char*)PGROUNDDOWN(vaddr);
     char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
+    void* backing_mem = NULL;
+    kprintf("unmapping v(0x%x: 0x%x) count: %d   ", v, end, size / _pmm->frame_size);
 
     auto eflags = _lock.lock();
     while (v <= end) {
@@ -237,14 +248,16 @@ void VirtualMemoryManager::unmap_pages(page_directory_t* pgdir, void *vaddr,
         kassert(pte != NULL);
         if (!pte->present) panic("%s: 0x%x should be present\n", __func__, vaddr);
 
-        if (free_mem) {
-            free_page(p2v(pte->frame * _pmm->frame_size));
+        if (free_mem && !backing_mem) {
+            backing_mem = p2v(pte->frame * _pmm->frame_size);
         }
         *(u32*)pte = 0;
-        flush_tlb_entry((u32)v);
+        if (pgdir == current->pgdir) flush_tlb_entry((u32)v);
 
         v += _pmm->frame_size;
     }
+    // kprintf("%s: free %x\n", __func__, backing_mem);
+    kfree(backing_mem);
     _lock.release(eflags);
 }
 
@@ -289,57 +302,55 @@ page_directory_t* VirtualMemoryManager::create_address_space()
 page_directory_t* VirtualMemoryManager::copy_page_directory(page_directory_t* pgdir)
 {
     auto* new_pgdir = create_address_space();
-    char* v = (char*)UCODE;
-    char* end = (char*)USTACK_TOP;
 
     auto eflags = _lock.lock();
-    while (v < end) {
-        page_t* pte = walk(pgdir, v, false);
-        if (pte && pte->present) {
-            u32 paddr = pte->frame * _pmm->frame_size;
-            int flags = pde_get_flags(*(u32*)pte);
+    for (int i = 0; i < 3; i++) {
+        if (current->mmap[i].start == 0) continue;
 
-            void* new_pg = vmm.alloc_page();
-            map_pages(new_pgdir, v, PGSIZE, v2p(new_pg), flags);
-            memcpy(new_pg, p2v(paddr), PGSIZE);
-        }
+        address_mapping_t m = current->mmap[i];;
+        page_t* pte = walk(pgdir, m.start, false);
+        kassert(pte && pte->present);
 
-        v += PGSIZE;
+        u32 paddr = pte->frame * _pmm->frame_size;
+        int flags = pde_get_flags(*(u32*)pte);
+
+        void* new_pg = kmalloc(m.size, PGSIZE);
+        memcpy(new_pg, p2v(paddr), m.size);
+
+        map_pages(new_pgdir, m.start, m.size, v2p(new_pg), flags);
     }
 
     _lock.release(eflags);
     return new_pgdir;
 }
 
-void VirtualMemoryManager::release_address_space(page_directory_t* pgdir)
+void VirtualMemoryManager::release_address_space(proc_t *proc, page_directory_t* pgdir)
 {
     auto eflags = _lock.lock();
-    // shallow copies of kernel part do not release
-    for (int i = 0, len = sizeof(kmap)/sizeof(kmap[0]); i < len; i++) {
-        unmap_pages(pgdir, kmap[i].vaddr, kmap[i].phys_end - kmap[i].phys_start, false);
-    }
-
-    char* v = (char*)0xE0000000;
-    char* end = (char*)0xF0000000;
-    while (v < end) {
-        page_t* pte = walk(pgdir, v, false);
-        if (pte && pte->present) {
-            unmap_pages(pgdir, v, PGSIZE, false);
-        }
-        v += PGSIZE;
-    }
+    kprintf("[%s] \n", __func__);
 
     //release user space maps
-    //FIXME: what about fored and not execed child. these are shallow copies
-    v = (char*)UCODE;
-    end = (char*)USTACK_TOP;
-    while (v < end) {
-        page_t* pte = walk(pgdir, v, false);
-        if (pte && pte->present) {
-            unmap_pages(pgdir, v, PGSIZE, true);
-        }
-        v += PGSIZE;
+    for (int i = 0; i < 3; i++) {
+        if (proc->mmap[i].start == 0) continue;
+
+        address_mapping_t m = proc->mmap[i];;
+        unmap_pages(pgdir, m.start, m.size, true);
     }
+
+    // shallow copies of kernel part do not release
+    // for (int i = 0, len = sizeof(kmap)/sizeof(kmap[0]); i < len; i++) {
+    //     unmap_pages(pgdir, kmap[i].vaddr, kmap[i].phys_end - kmap[i].phys_start, false);
+    // }
+
+    // char* v = (char*)0xE0000000;
+    // char* end = (char*)0xF0000000;
+    // while (v < end) {
+    //     page_t* pte = walk(pgdir, v, false);
+    //     if (pte && pte->present) {
+    //         unmap_pages(pgdir, v, PGSIZE, false);
+    //     }
+    //     v += PGSIZE;
+    // }
 
     for (int i = 0; i < 1024; i++) {
         auto pde = pgdir->tables[i];
@@ -385,14 +396,17 @@ void* VirtualMemoryManager::ksbrk(size_t size)
 
 void* VirtualMemoryManager::kmalloc(size_t size, int align)
 {
-    size_t realsize = ALIGN(size, align);
-    //kprintf("kmalloc: size = %d, realsize = %d, align = %d\n", size, realsize, align);
+    size_t realsize = size; //ALIGN(size, align);
+    // kprintf("kmalloc: size = %d, realsize = %d, align = %d\n", size, realsize, align);
 
     auto eflags = _lock.lock();
     kheap_block_head* last = NULL;
-    kheap_block_head* h = find_block(&last, realsize);
+    kheap_block_head* h = find_block(&last, realsize, align);
     if (!h) {
-        h = (kheap_block_head*)ksbrk(PGROUNDUP(realsize+KHEAD_SIZE));
+        char* end = (char*)last->data + last->size;
+        realsize += ALIGN(end + KHEAD_SIZE, align) - (u32)end;
+        // kprintf("%s: size %x, align %x, realsize %x,  ", __func__, size, align, realsize);
+        h = (kheap_block_head*)ksbrk(PGROUNDUP(realsize));
         if (!h) panic("[VMM] kmalloc: no free memory\n");
 
         kassert(last->next == NULL);
@@ -414,6 +428,7 @@ void* VirtualMemoryManager::kmalloc(size_t size, int align)
 
     h->used = 1;
     kassert(aligned(h->data, align));
+    // kprintf("(%s: v %x size %x) \n", __func__, h->data, h->size);
     _lock.release(eflags);
     return h->data;
 }
@@ -423,7 +438,7 @@ VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::align_block(
 {
     auto newh = (kheap_block_head*)(ALIGN(&h->data, align)-KHEAD_SIZE);
     int gap = (char*)newh - (char*)h;
-    //kprintf("aligned to 0x%x, gap = %d\n", newh, gap);
+    // kprintf("aligned %x to 0x%x, gap = %d\n", h, newh, gap);
     if (gap >= KHEAD_SIZE+4) {
         split_block(h, gap-KHEAD_SIZE);
         h = h->next;
@@ -467,7 +482,7 @@ void VirtualMemoryManager::split_block(VirtualMemoryManager::kheap_block_head* h
 void VirtualMemoryManager::kfree(void* ptr)
 {
     auto eflags = _lock.lock();
-    // kprintf("[VMM] kfree 0x%x\n", ptr);
+    // kprintf("(kfree 0x%x)   ", ptr);
     kheap_block_head* h = (kheap_block_head*)((char*)ptr - KHEAD_SIZE);
     kassert(h->used);
     kassert(h->ptr == h->data);
@@ -483,6 +498,7 @@ void VirtualMemoryManager::kfree(void* ptr)
     _lock.release(eflags);
 }
 
+// merge h with next
 VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::merge_block(
         VirtualMemoryManager::kheap_block_head* h)
 {
@@ -491,6 +507,11 @@ VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::merge_block(
 
     auto next = h->next;
     //kprintf("merge 0x%x with 0x%x\n", h, h->next);
+    uint32_t real_gap = (char*)next - (char*)h->data;
+    if (real_gap > h->size) {
+        panic("%s: find hole between %x and %x, real %x, size %x, gap %x\n", __func__,
+            h, next, real_gap, h->size, real_gap - h->size);
+    }
     h->size += KHEAD_SIZE + next->size;
     h->next = next->next;
     if (h->next) h->next->prev = h;
@@ -498,10 +519,10 @@ VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::merge_block(
 }
 
 VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::find_block(
-        VirtualMemoryManager::kheap_block_head** last, size_t size)
+        VirtualMemoryManager::kheap_block_head** last, size_t size, int align)
 {
     kheap_block_head* p = _kheap_ptr;
-    while (p && !(p->used == 0 && p->size >= size)) {
+    while (p && !(p->used == 0 && p->size >= size + (ALIGN(p->data, align) - (u32)p->data))) {
         *last = p;
         p = p->next;
     }

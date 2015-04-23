@@ -21,9 +21,9 @@ class FileSystem;
 // in-memory inode
 typedef struct inode_s {
     dev_t dev;  // major and minor
-    u32 ino;    
+    u32 ino;
     loff_t size;  // size in bytes
-    loff_t blocks; 
+    loff_t blocks;
     size_t blksize;
     time_t mtime;
     time_t atime;
@@ -37,7 +37,7 @@ typedef struct inode_s {
 typedef struct dentry_s {
     char name[NAMELEN+1];
     struct dentry_s *parent;
-    inode_t *ip; 
+    inode_t *ip;
 } dentry_t;
 
 class File {
@@ -53,9 +53,9 @@ class File {
         void set_off(off_t off) { _off = off; }
         inode_t* inode() { return _ip; }
 
-        void set_inode(inode_t* ip) { 
+        void set_inode(inode_t* ip) {
             _ref++;
-            _ip = ip; 
+            _ip = ip;
             _type = Type::Inode;
         }
 
@@ -92,7 +92,7 @@ class FileSystem {
         // virtual int rename(inode_t *, dentry_t *, inode_t *, dentry_t *) {}
         // virtual int readlink(dentry_t *, char * buf,int len) {}
         // virtual int open(inode_t *, struct file *) {}
-        // virtual int release(inode_t *, struct file *) {}        
+        // virtual int release(inode_t *, struct file *) {}
 
         virtual dentry_t * lookup(inode_t*, dentry_t*) { return NULL; }
 

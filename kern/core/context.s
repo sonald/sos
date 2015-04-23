@@ -26,7 +26,7 @@ switch_to_usermode:
     pop eax
     xor eax, 0x200 ;; enable IF
     push eax
-    
+
     push 0x1b  ; GDT entry 3, RPL = 3
     push dword [ebp + 12] ;; eip
     iretd
@@ -49,7 +49,7 @@ flush_tss:
 ;; [esp+8] next kctx
 switch_to:
     mov eax, [esp+4]
-    mov edx, [esp+8] 
+    mov edx, [esp+8]
 
     ;; eip is right at esp, no need to push
     push ebp
@@ -58,7 +58,7 @@ switch_to:
     push ebx
 
     mov [eax], esp ;; save kctx at old
-    mov esp, edx 
+    mov esp, edx
 
     pop ebx
     pop esi

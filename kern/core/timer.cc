@@ -16,13 +16,13 @@ extern "C" void flush_tss();
 Spinlock schedlock("sched");
 
 void scheduler()
-{    
-    //NOTE: should never spin in interrupt context! so check IF flag 
+{
+    //NOTE: should never spin in interrupt context! so check IF flag
     //to determine if in irq context. this is not a good way.
     auto oldflags = schedlock.lock();
     if (current) {
         if (current->need_resched) current->need_resched = false;
-        
+
         auto* old = current;
         bool rewind = true;
         proc_t* tsk = old->next ? old->next: task_init;
@@ -47,7 +47,7 @@ void scheduler()
         setup_tss(current->kern_esp);
         flush_tss();
         vmm.switch_page_directory(current->pgdir);
-        
+
         switch_to(&old->kctx, current->kctx);
     }
 
@@ -118,5 +118,5 @@ void busy_wait(int millisecs)
         asm volatile ("hlt");
         asm volatile ("nop");
     }
-       
+
 }

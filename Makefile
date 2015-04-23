@@ -3,7 +3,7 @@ CXX = $(CROSS_PATH)/i686-elf-g++
 CPP = $(CROSS_PATH)/i686-elf-cpp
 CC = $(CROSS_PATH)/i686-elf-gcc
 CXXFLAGS = -std=c++11 -I./include -ffreestanding  \
-		 -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG
+		 -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG -fno-strict-aliasing
 
 USER_FLAGS = -std=c++11 -I./include -ffreestanding  \
 	   -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG
@@ -34,11 +34,11 @@ all: run ramfs_gen
 
 -include $(DEPFILES)
 
-$(OBJS_DIR)/kern/%.d: kern/%.cc 
+$(OBJS_DIR)/kern/%.d: kern/%.cc
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
-$(OBJS_DIR)/lib/%.d: lib/%.cc 
+$(OBJS_DIR)/lib/%.d: lib/%.cc
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
@@ -50,7 +50,7 @@ debug: kernel
 	-drive file=hd.img,format=raw -vga vmware
 
 run: kernel hd.img initramfs.img
-	qemu-system-i386 -m 32 -s -monitor stdio -hda hd.img -vga vmware 
+	qemu-system-i386 -m 32 -s -monitor stdio -hda hd.img -vga vmware
 
 hd.img: kernel init initramfs.img
 	hdiutil attach hd.img
@@ -63,15 +63,15 @@ hd.img: kernel init initramfs.img
 kernel: $(kern_objs) kern/kernel.ld
 	$(CXX) -T kern/kernel.ld -O2 -nostdlib -o $@ $^ -lgcc
 
-$(OBJS_DIR)/kern/%.o: kern/%.cc 
+$(OBJS_DIR)/kern/%.o: kern/%.cc
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
-			
+
 $(OBJS_DIR)/kern/%.o: kern/%.s
 	@mkdir -p $(@D)
 	nasm -f elf32 -o $@ $<
 
-$(OBJS_DIR)/lib/%.o: lib/%.cc 
+$(OBJS_DIR)/lib/%.o: lib/%.cc
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
@@ -80,13 +80,13 @@ ramfs_gen: tools/ramfs_gen.c
 	gcc -o $@ $^
 
 # user prog
-echo: user/echo.c user/libc.c lib/sprintf.cc lib/string.cc user/user.ld 
+echo: user/echo.c user/libc.c lib/sprintf.cc lib/string.cc user/user.ld
 	@mkdir -p $(@D)
-	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^ 
+	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^
 
-init: user/init.c user/libc.c lib/sprintf.cc lib/string.cc user/user.ld 
+init: user/init.c user/libc.c lib/sprintf.cc lib/string.cc user/user.ld
 	@mkdir -p $(@D)
-	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^ 
+	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^
 
 initramfs.img: echo ramfs_gen
 	./ramfs_gen README.md user/echo.c echo
@@ -94,14 +94,14 @@ initramfs.img: echo ramfs_gen
 .PHONY: clean
 
 clean:
-	-rm $(OBJS_DIR)/kern/*.o 
-	-rm $(OBJS_DIR)/lib/*.o 
-	-rm $(OBJS_DIR)/kern/core/*.o 
-	-rm $(OBJS_DIR)/kern/runtime/*.o 
-	-rm $(OBJS_DIR)/kern/drv/*.o 
+	-rm $(OBJS_DIR)/kern/*.o
+	-rm $(OBJS_DIR)/lib/*.o
+	-rm $(OBJS_DIR)/kern/core/*.o
+	-rm $(OBJS_DIR)/kern/runtime/*.o
+	-rm $(OBJS_DIR)/kern/drv/*.o
 	-rm $(OBJS_DIR)/kern/*.d
-	-rm $(OBJS_DIR)/kern/core/*.d 
-	-rm $(OBJS_DIR)/kern/runtime/*.d 
+	-rm $(OBJS_DIR)/kern/core/*.d
+	-rm $(OBJS_DIR)/kern/runtime/*.d
 	-rm $(OBJS_DIR)/kern/drv/*.d
 	-rm $(OBJS_DIR)/lib/*.d
 	-rm echo init

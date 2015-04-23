@@ -3,7 +3,7 @@
 
 #include <types.h>
 #include <sos/limits.h>
-	
+
 struct dirent {
 	long		d_ino;
 	off_t		d_off;
