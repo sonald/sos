@@ -213,10 +213,10 @@ void VirtualMemoryManager::map_pages(page_directory_t* pgdir, void *vaddr,
     char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
 
     auto eflags = _lock.lock();
-    if ((u32)vaddr < KERNEL_VIRTUAL_BASE) {
-        kprintf("mapping dir %x v(0x%x: 0x%x), count: %d\n", pgdir, v, end,
-                size / _pmm->frame_size);
-    }
+    // if ((u32)vaddr < KERNEL_VIRTUAL_BASE) {
+    //     kprintf("mapping dir %x v(0x%x: 0x%x), count: %d\n", pgdir, v, end,
+    //             size / _pmm->frame_size);
+    // }
     while (v <= end) {
         page_t* pte = walk(pgdir, v, true);
         kassert(pte != NULL);
@@ -240,7 +240,7 @@ void VirtualMemoryManager::unmap_pages(page_directory_t* pgdir, void *vaddr,
     char* v = (char*)PGROUNDDOWN(vaddr);
     char* end = (char*)PGROUNDDOWN((u32)vaddr + size - 1);
     void* backing_mem = NULL;
-    kprintf("unmapping v(0x%x: 0x%x) count: %d   ", v, end, size / _pmm->frame_size);
+    // kprintf("unmapping v(0x%x: 0x%x) count: %d   ", v, end, size / _pmm->frame_size);
 
     auto eflags = _lock.lock();
     while (v <= end) {
@@ -267,7 +267,7 @@ page_directory_t* VirtualMemoryManager::create_address_space()
     if (!pdir) panic("oom");
 
     auto eflags = _lock.lock();
-    kprintf("create_address_space: pdir = 0x%x(0x%x)\n", pdir, v2p(pdir));
+    // kprintf("create_address_space: pdir = 0x%x(0x%x)\n", pdir, v2p(pdir));
     memset(pdir, 0x0, sizeof(page_directory_t));
     for (int i = 0, len = sizeof(kmap)/sizeof(kmap[0]); i < len; i++) {
         map_pages(pdir, kmap[i].vaddr, kmap[i].phys_end - kmap[i].phys_start,
@@ -327,7 +327,7 @@ page_directory_t* VirtualMemoryManager::copy_page_directory(page_directory_t* pg
 void VirtualMemoryManager::release_address_space(proc_t *proc, page_directory_t* pgdir)
 {
     auto eflags = _lock.lock();
-    kprintf("[%s] \n", __func__);
+    // kprintf("[%s] \n", __func__);
 
     //release user space maps
     for (int i = 0; i < 3; i++) {

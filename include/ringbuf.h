@@ -1,5 +1,5 @@
 #ifndef _SOS_LIB_RINGBUF_H
-#define _SOS_LIB_RINGBUF_H 
+#define _SOS_LIB_RINGBUF_H
 
 #include "types.h"
 #include "common.h"

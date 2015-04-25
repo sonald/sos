@@ -1,5 +1,5 @@
 #ifndef _ATA_H
-#define _ATA_H 
+#define _ATA_H
 
 #include "types.h"
 #include "blkio.h"
@@ -28,7 +28,7 @@ enum ATA_STATUS {
     ATA_ERR = 0x01
 };
 
-/* 
+/*
  * BBK (Bad Block)
  * UNC (Uncorrectable data error)
  * MC (Media Changed)
@@ -87,7 +87,7 @@ enum ATAFlags {
 class PATADevice: public BlockDevice {
     public:
         PATADevice();
-        
+
         bool valid() const { return _valid; }
         void init(int bus, bool master);
 
@@ -104,7 +104,7 @@ class PATADevice: public BlockDevice {
 
         uint32_t _sectors; // lba28 sectors total
 
-        
+
         void _outb(u16 port, u8 val);
         u8 _inb(u16 port);
         u16 _inw(u16 port);

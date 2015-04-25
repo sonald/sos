@@ -63,11 +63,12 @@ recheck:
 
 Buffer* BlockIOManager::read(dev_t dev, sector_t sect)
 {
-    Buffer* bp = allocBuffer(dev, sect);
+    dev_t rdev = DEVNO(MAJOR(dev), 0);
+    Buffer* bp = allocBuffer(rdev, sect);
     if (bp->flags & BUF_FULL) {
         return bp;
     }
-    auto* device = blk_device_get(dev);
+    auto* device = blk_device_get(rdev);
     kassert(device != nullptr);
     device->read(bp);
     bp->flags |= BUF_FULL;

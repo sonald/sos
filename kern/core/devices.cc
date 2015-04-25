@@ -6,6 +6,7 @@ struct CharDevice* char_devices = nullptr;
 
 void chr_device_register(dev_t dev, CharDevice* chrdev)
 {
+    chrdev->dev = dev;
     if (!char_devices) {
         char_devices = chrdev;
         chrdev->next = chrdev;
@@ -17,9 +18,10 @@ void chr_device_register(dev_t dev, CharDevice* chrdev)
         char_devices->next = chrdev;
     }
 }
-    
+
 void blk_device_register(dev_t dev, BlockDevice* blkdev)
 {
+    blkdev->dev = dev;
     if (!block_devices) {
         block_devices = blkdev;
         blkdev->next = blkdev;
@@ -40,6 +42,7 @@ BlockDevice* blk_device_get(dev_t dev)
         if (p->dev == dev) return p;
         p = p->next;
     } while (p != block_devices);
+    return nullptr;
 }
 
 CharDevice* chr_device_get(dev_t dev)
@@ -50,5 +53,6 @@ CharDevice* chr_device_get(dev_t dev)
         if (p->dev == dev) return p;
         p = p->next;
     } while (p != char_devices);
+    return nullptr;
 }
 

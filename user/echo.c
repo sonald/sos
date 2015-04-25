@@ -10,7 +10,7 @@ char undef[128] = "inited string";
 
 static void myprint(const char* buf)
 {
-    write(0, buf, strlen(buf));
+    write(1, buf, strlen(buf));
 }
 
 static void test_fs_readdir(const char* dir)
@@ -21,7 +21,7 @@ static void test_fs_readdir(const char* dir)
         while (readdir(fd, &dire, 1) > 0) {
             char buf[64] = "";
             int len = sprintf(buf, sizeof buf - 1, "%s, ", dire.d_name);
-            write(0, buf, len);
+            write(1, buf, len);
         }
         close(fd);
     }
@@ -35,7 +35,7 @@ static void test_fs_read(const char* filepath)
         int len = 0;
         while ((len = read(fd, buf, sizeof buf - 1)) > 0) {
             buf[len] = 0;
-            write(0, buf, len);
+            write(1, buf, len);
         }
         close(fd);
     }
@@ -70,7 +70,7 @@ void _start()
         int step = 0;
         for(;;) {
             int len = sprintf(buf, sizeof buf - 1, "{%c%d %d} ", logo, pid, step);
-            write(0, buf, len);
+            write(1, buf, len);
 
             sleep(2000);
             step++;
@@ -79,7 +79,7 @@ void _start()
         logo = 'B';
         pid = getpid();
         int len = sprintf(buf, sizeof buf - 1, "{%c%d going to exit} ", logo, pid);
-        write(0, buf, len);
+        write(1, buf, len);
 
         exit();
         // for(;;) sleep(500);

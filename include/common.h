@@ -1,5 +1,5 @@
 #ifndef _COMMON_H
-#define _COMMON_H 
+#define _COMMON_H
 
 #include "types.h"
 #include "stdarg.h"
@@ -20,7 +20,7 @@ void panic(const char* fmt, ...);
 
 static inline int max(int a, int b)
 {
-    return ((a>b)?a:b); 
+    return ((a>b)?a:b);
 }
 
 static inline int min(int a, int b)

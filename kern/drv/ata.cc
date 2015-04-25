@@ -60,7 +60,7 @@ void PATADevice::init(int bus, bool master)
     char serial[21];
 
     if (!ata_ready(_iobase)) {
-        this->_valid = false; 
+        this->_valid = false;
     } else {
         uint16_t data[256];
         for (size_t i = 0; i < ARRAYLEN(data); i++) {
@@ -72,9 +72,9 @@ void PATADevice::init(int bus, bool master)
                 dst[i*2] = *src >> 8;
                 dst[i*2+1] = *src & 0xff;
             }
-            
+
             for (size_t i = sz*2; i > 0; i--) {
-                if (dst[i] <= 0x20) 
+                if (dst[i] <= 0x20)
                     dst[i] = 0;
                 else break;
             }
@@ -84,7 +84,7 @@ void PATADevice::init(int bus, bool master)
         fn(&data[27], (char*)&model, 20);
         _sectors = data[60] | (data[61] << 16);
     }
-    kprintf("IDE %d %s %sdetected, sectors %d, model (%s) serial (%s)", 
+    kprintf("IDE %d %s %sdetected, sectors %d, model (%s) serial (%s)",
             bus, master?"master":"slave",
             _valid?"":"not ", _sectors, model, serial);
 }
@@ -100,7 +100,7 @@ bool PATADevice::read(Buffer* bufp)
 
     _outb(ATA_CMD_REG, ATA_CMD_READ);
     //TODO: wait for interrupt, so sleep .... ,now just polling
-    
+
     if (!ata_ready(_iobase)) return false;
     for (size_t i = 0; i < 256; i++) {
         uint16_t d = _inw(ATA_DATA_REG);
@@ -121,7 +121,8 @@ void ata_init()
     kprintf("Probing IDE hard drives\n");
     auto* pata0 = new PATADevice;
     pata0->init(0, true);
-    blk_device_register(DEVNO(IDE_MAJOR, 0), pata0);
+    pata0->dev = DEVNO(IDE_MAJOR, 0);
+    blk_device_register(pata0->dev, pata0);
 
     //patas[1].init(0, false);
     picenable(IRQ_ATA1);

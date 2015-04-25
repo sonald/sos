@@ -21,6 +21,8 @@
 #include <dirent.h>
 #include <sys.h>
 #include <string.h>
+#include <devfs.h>
+#include <tty.h>
 
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
@@ -44,33 +46,8 @@ void idle_thread()
         "jmp 1b");
 }
 
-static void debug_print(Keyboard* kb)
-{
-    key_packet_t pkt = kb->kbbuf().read();
-    KeyCode key = pkt.keycode;
-    if (key == KEY_UNKNOWN || (pkt.status & KB_RELEASE))
-        return;
-
-    if (kb->shift_down()) {
-        if (key >= KEY_A && key <= KEY_Z) {
-            kputchar(key - 0x20);
-        } else if (key >= KEY_0 && key <= KEY_9){
-        }
-    } else {
-        if (key == KEY_RETURN)
-            kputchar('\n');
-        else if (key == KEY_TAB)
-            kputchar('\t');
-        else if (key == KEY_BACKSPACE)
-            kputchar('\b');
-        else
-            kputchar(key);
-    }
-}
-
 void tty_thread()
 {
-
     while (1) {
         if (!kbd.msbuf().empty()) {
             mouse_packet_t pkt = kbd.msbuf().read();
@@ -88,9 +65,6 @@ void tty_thread()
             sti();
         }
 
-        if (!kbd.kbbuf().empty()) {
-            debug_print(&kbd);
-        }
 
         asm ("hlt");
     }
@@ -225,11 +199,14 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     tasks_init();
     kbd.init(); // both kb & mouse
     ata_init();
+    tty_init();
     bio.init();
 
     vfs.register_fs("fat32", create_fat32fs);
     vfs.register_fs("ramfs", create_ramfs);
+    vfs.register_fs("devfs", create_devfs);
     vfs.init_root(DEVNO(IDE_MAJOR, 1));
+    vfs.mount("devfs", "/dev", "devfs", 0, NULL);
 
     picenable(IRQ_KBD);
     picenable(IRQ_MOUSE);
@@ -240,8 +217,8 @@ extern "C" int kernel_main(struct multiboot_info *mb)
 
     // for(;;) asm volatile ("hlt");
 
-    create_kthread("kthread1", kthread1);
-    create_kthread("kthread2", kthread2);
+    // create_kthread("kthread1", kthread1);
+    // create_kthread("kthread2", kthread2);
     create_kthread("idle", idle_thread);
     create_kthread("tty", tty_thread);
 

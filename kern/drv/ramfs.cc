@@ -19,7 +19,7 @@ typedef struct initrd_entry_header
 
 typedef struct initrd_header
 {
-    u32 nfiles; 
+    u32 nfiles;
     initrd_entry_header_t files[NR_INITRD_FILES];
 } initrd_header_t;
 
@@ -47,7 +47,7 @@ void Ramfs::init(char* addr, size_t size, const char* cmdline)
     _nr_nodes = _sb->nfiles;
 }
 
-ssize_t Ramfs::read(File * filp, char * buf, size_t count, off_t * offset) 
+ssize_t Ramfs::read(File * filp, char * buf, size_t count, off_t * offset)
 {
     inode_t* ip = filp->inode();
     off_t off = filp->off();
@@ -64,7 +64,7 @@ ssize_t Ramfs::read(File * filp, char * buf, size_t count, off_t * offset)
     return count;
 }
 
-ssize_t Ramfs::write(File* filp, const char * buf, size_t count, off_t *offset) 
+ssize_t Ramfs::write(File* filp, const char * buf, size_t count, off_t *offset)
 {
     inode_t* ip = filp->inode();
     kassert(ip->type == FsNodeType::File);
@@ -74,9 +74,9 @@ ssize_t Ramfs::write(File* filp, const char * buf, size_t count, off_t *offset)
     return -EINVAL;
 
 }
-int Ramfs::readdir(File* filp, dentry_t * de, filldir_t) 
+int Ramfs::readdir(File* filp, dentry_t * de, filldir_t)
 {
-    inode_t* ip = filp->inode();    
+    inode_t* ip = filp->inode();
     int id = filp->off() / sizeof(initrd_entry_header_t);
 
     if (ip->type != FsNodeType::Dir) return -EINVAL;
@@ -84,7 +84,7 @@ int Ramfs::readdir(File* filp, dentry_t * de, filldir_t)
 
     initrd_entry_header_t* ieh = &_sb->files[id];
     strcpy(de->name, ieh->name);
-    
+
     de->ip = vfs.alloc_inode();
     de->ip->ino = id+2;
     read_inode(de->ip);
@@ -93,10 +93,10 @@ int Ramfs::readdir(File* filp, dentry_t * de, filldir_t)
     return 1;
 }
 
-dentry_t * Ramfs::lookup(inode_t * dir, dentry_t *de) 
+dentry_t * Ramfs::lookup(inode_t * dir, dentry_t *de)
 {
     if (dir->type != FsNodeType::Dir) return NULL;
-    
+
     int i = -1;
     for (i = 0; i < _nr_nodes; ++i) {
         initrd_entry_header* dp = &_sb->files[i];
@@ -109,11 +109,11 @@ dentry_t * Ramfs::lookup(inode_t * dir, dentry_t *de)
     de->ip = vfs.alloc_inode();
     de->ip->ino = i+2;
     read_inode(de->ip);
-    
+
     return de;
 }
 
-void Ramfs::read_inode(inode_t *ip) 
+void Ramfs::read_inode(inode_t *ip)
 {
     int i = ip->ino;
     if (i == 1) {
@@ -136,6 +136,6 @@ FileSystem* create_ramfs(const void* data)
     auto* info = (ramfs_mod_info_t*)data;
     auto* ramfs = new Ramfs;
     ramfs->init(info->addr, info->size, info->cmdline);
-    return ramfs; 
+    return ramfs;
 }
 

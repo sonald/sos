@@ -1,5 +1,5 @@
 #ifndef _DEVICES_H
-#define _DEVICES_H 
+#define _DEVICES_H
 
 #include "types.h"
 #include "blkio.h"
@@ -9,20 +9,22 @@
 #define DEVNO(ma, mi) ((((u32)(ma))<<16) | (((u32)(mi)) & 0xFFFF))
 
 enum DeviceType {
-    TTY_MAJOR  = 0,
-    RAMFS_MAJOR = 1,
-    IDE_MAJOR = 2,
-    FLOPPY_MAJOR = 3,
-    SCSI_MAJOR = 4,
-    NDEV = 5
+    TTY_MAJOR  = 1,
+    RAMFS_MAJOR,
+    IDE_MAJOR,
+    FLOPPY_MAJOR,
+    SCSI_MAJOR,
+    NULL_MAJOR,
+    ZERO_MAJOR,
+    NDEV
 };
 
-struct BlockDevice 
+struct BlockDevice
 {
     dev_t dev;
     BlockDevice* prev;
     BlockDevice* next;
-    virtual bool read(Buffer* bufp) = 0;        
+    virtual bool read(Buffer* bufp) = 0;
     virtual bool write(Buffer* bufp) = 0;
 };
 
@@ -31,8 +33,8 @@ struct CharDevice
     dev_t dev;
     CharDevice* prev;
     CharDevice* next;
-    virtual char read(dev_t dev) = 0;
-    virtual bool write(dev_t dev, char ch) = 0;
+    virtual char read() = 0;
+    virtual bool write(char ch) = 0;
 };
 
 extern struct BlockDevice* block_devices;

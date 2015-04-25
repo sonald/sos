@@ -207,7 +207,7 @@ int sys_fork()
     *(proc->kctx) = *(current->kctx);
     proc->kctx->eip = A2I(trap_return);
 
-    kprintf("%s: old eip %x, new eip %x  ", __func__, current->regs->eip, proc->regs->eip);
+    // kprintf("%s: old eip %x, new eip %x  ", __func__, current->regs->eip, proc->regs->eip);
     kprintf("fork %d -> %d\n", current->pid, next_pid);
     kassert(proc->regs->useresp == current->regs->useresp);
     proc->state = TASK_READY;
@@ -282,11 +282,11 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
         current->mmap[i] = {0, 0};
     }
 
-    kprintf("elf: 0x%x, entry: 0x%x, ph: %d\n", elf, elf->e_entry, elf->e_phnum);
+    // kprintf("elf: 0x%x, entry: 0x%x, ph: %d\n", elf, elf->e_entry, elf->e_phnum);
     elf_prog_header_t* ph = (elf_prog_header_t*)((char*)elf + elf->e_phoff);
     for (int i = 0; i < elf->e_phnum; ++i) {
-        kprintf("off: 0x%x, pa: 0x%x, va: 0x%x, fsz: 0x%x, msz: 0x%x\n",
-                ph[i].p_offset, ph[i].p_pa, ph[i].p_va, ph[i].p_filesz, ph[i].p_memsz);
+        // kprintf("off: 0x%x, pa: 0x%x, va: 0x%x, fsz: 0x%x, msz: 0x%x\n",
+        //         ph[i].p_offset, ph[i].p_pa, ph[i].p_va, ph[i].p_filesz, ph[i].p_memsz);
         if (ph[i].p_type != ELF_PROG_LOAD) {
             continue;
         }
@@ -298,10 +298,6 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
         }
 
         load_proc(prog, &ph[i]);
-            page_t* pte = vmm.walk(current->pgdir, (void*)UCODE, false);
-
-        kprintf("pgdir: %x, pte: %x \n", (void*)current->pgdir, *(u32*)pte);
-
     }
 
     delete buf;

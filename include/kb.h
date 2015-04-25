@@ -1,13 +1,14 @@
 #ifndef _KB_H
-#define _KB_H 
+#define _KB_H
 
 #include "types.h"
 #include "ringbuf.h"
 
-enum KeyCode: int16_t 
+enum KeyCode: int16_t
 {
 
 // Alphanumeric keys ////////////////
+    KEY_INVALID           = 0,
 
     KEY_SPACE             = ' ',
     KEY_0                 = '0',
@@ -165,10 +166,14 @@ enum KeyStatus
     KB_NUM_LOCK = 0x0004,
 
     KB_PRESS = 0x0010,
-    KB_RELEASE = 0x0020
+    KB_RELEASE = 0x0020,
+
+    KB_SHIFT_DOWN = 0x0100,
+    KB_CTRL_DOWN = 0x0200,
+    KB_ALT_DOWN = 0x0400,
 };
 
-typedef struct key_packet_s 
+typedef struct key_packet_s
 {
     KeyCode keycode;
     uint16_t status;
@@ -182,7 +187,7 @@ enum MouseStatus
     MOUSE_MID_DOWN = 0x0004,
 };
 
-typedef struct mouse_packet_s 
+typedef struct mouse_packet_s
 {
     uint16_t flags;
     short relx, rely;
@@ -191,9 +196,9 @@ typedef struct mouse_packet_s
 class Keyboard
 {
     public:
-        // enough size of ctl-shift-alt-cmd-* 
-        using KeyBuffer = RingBuffer<key_packet_t, 64>; 
-        using MouseBuffer = RingBuffer<mouse_packet_t, 64>; 
+        // enough size of ctl-shift-alt-cmd-*
+        using KeyBuffer = RingBuffer<key_packet_t, 64>;
+        using MouseBuffer = RingBuffer<mouse_packet_t, 64>;
 
         Keyboard();
 
@@ -227,9 +232,6 @@ class Keyboard
         void set_alt_down(bool on) { _alt_down = on; }
         void set_meta_down(bool on) { _meta_down = on; }
 
-        KeyCode last_key() const { return _last_key; }
-        void set_last_key(KeyCode kc) { _last_key = kc; }
-
     private:
         bool _scroll_lock_on;
         bool _num_lock_on;
@@ -240,13 +242,12 @@ class Keyboard
         bool _alt_down;
         bool _meta_down;
 
-        KeyCode _last_key;
-        KeyBuffer _kbbuf; 
+        KeyBuffer _kbbuf;
         MouseBuffer _msbuf;
 
         int check_reply();
         int poll_aux_status();
 };
 
-extern Keyboard kbd; 
+extern Keyboard kbd;
 #endif

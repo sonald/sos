@@ -30,6 +30,8 @@ kern_objs := $(OBJS_DIR)/kern/runtime/crti.o $(crtbegin_o) \
 DEPFILES := $(patsubst %.cc, $(OBJS_DIR)/%.d, $(kernel_srcs))
 DEPFILES := $(patsubst %.s, $(OBJS_DIR)/%.d, $(DEPFILES))
 
+ulib = $(wildcard lib/*.cc)
+
 all: run ramfs_gen
 
 -include $(DEPFILES)
@@ -80,11 +82,11 @@ ramfs_gen: tools/ramfs_gen.c
 	gcc -o $@ $^
 
 # user prog
-echo: user/echo.c user/libc.c lib/sprintf.cc lib/string.cc user/user.ld
+echo: user/echo.c user/libc.c $(ulib) user/user.ld
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^
 
-init: user/init.c user/libc.c lib/sprintf.cc lib/string.cc user/user.ld
+init: user/init.c user/libc.c $(ulib) user/user.ld
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^
 

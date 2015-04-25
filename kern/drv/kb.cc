@@ -1,30 +1,32 @@
 #include "kb.h"
 #include "isr.h"
 #include "x86.h"
+#include <string.h>
+#include <task.h>
 
 enum KB_ENCODER_IO {
     KB_ENC_INPUT_BUF =   0x60,
     KB_ENC_CMD_REG   =   0x60
 };
- 
+
 enum KB_CTRL_IO {
     KB_CTRL_STATS_REG =   0x64,
     KB_CTRL_CMD_REG   =   0x64
 };
 
 enum KB_CTRL_STATS_MASK {
-    KBC_STATS_MASK_OUT_BUF   =   0x01, 
+    KBC_STATS_MASK_OUT_BUF   =   0x01,
     KBC_STATS_MASK_IN_BUF    =   0x02,
     KBC_STATS_MASK_SYSTEM    =   0x04,
     KBC_STATS_MASK_CMD_DATA  =   0x08,
     KBC_STATS_MASK_LOCKED    =   0x10,
     KBC_STATS_MASK_AUX_BUF   =   0x20,
     KBC_STATS_MASK_TIMEOUT   =   0x40,
-    KBC_STATS_MASK_PARITY    =   0x80 
+    KBC_STATS_MASK_PARITY    =   0x80
 };
 
-#define KB_CTRL_STATS_OUT_BUF_EMPTY 0    
-#define KB_CTRL_STATS_OUT_BUF_READY  1    
+#define KB_CTRL_STATS_OUT_BUF_EMPTY 0
+#define KB_CTRL_STATS_OUT_BUF_READY  1
 
 #define KB_CTRL_STATS_IN_BUF_READY 0
 #define KB_CTRL_STATS_IN_BUF_FULL  1
@@ -188,7 +190,7 @@ static struct {
     {0x9c, KEY_KP_ENTER},
 };
 
-Keyboard kbd; 
+Keyboard kbd;
 
 static void keyboard_irq(trapframe_t* regs)
 {
@@ -202,56 +204,64 @@ static void keyboard_irq(trapframe_t* regs)
     }
 
     key_packet_t packet;
+    memset(&packet, 0, sizeof packet);
+
     if (data & 0x80) {
-        packet.status = KB_RELEASE;
+        packet.status |= KB_RELEASE;
         if (_is_extended) {
             for (int i = 0, len = ARRAYLEN(_xtkb_scancode_ex); i < len; i++) {
                 if (_xtkb_scancode_ex[i].scan == (data&0x7f)) {
                     packet.keycode = _xtkb_scancode_ex[i].keycode;
                 }
             }
-        } else 
+        } else
             packet.keycode = _xtkb_scancode_std[data & 0x7f];
 
         //Break Code
         switch(packet.keycode) {
             case KEY_LSHIFT:
             case KEY_RSHIFT:
+                packet.status &= ~KB_SHIFT_DOWN;
                 kbd.set_shift_down(false); break;
 
             case KEY_LCTRL:
             case KEY_RCTRL:
+                packet.status &= ~KB_CTRL_DOWN;
                 kbd.set_ctrl_down(false); break;
 
             case KEY_LALT:
             case KEY_RALT:
+                packet.status &= ~KB_ALT_DOWN;
                 kbd.set_alt_down(false); break;
 
             default: break;
         }
     } else {
-        packet.status = KB_PRESS;
+        packet.status |= KB_PRESS;
         if (_is_extended) {
             for (int i = 0, len = ARRAYLEN(_xtkb_scancode_ex); i < len; i++) {
                 if (_xtkb_scancode_ex[i].scan == (data&0x7f)) {
                     packet.keycode = _xtkb_scancode_ex[i].keycode;
                 }
             }
-        } else 
+        } else
             packet.keycode = _xtkb_scancode_std[data];
 
         //Make Code
         switch(packet.keycode) {
             case KEY_LSHIFT:
             case KEY_RSHIFT:
+                packet.status |= KB_SHIFT_DOWN;
                 kbd.set_shift_down(true); break;
 
             case KEY_LCTRL:
             case KEY_RCTRL:
+                packet.status |= KB_CTRL_DOWN;
                 kbd.set_ctrl_down(true); break;
 
             case KEY_LALT:
             case KEY_RALT:
+                packet.status |= KB_ALT_DOWN;
                 kbd.set_alt_down(true); break;
 
             default: break;
@@ -259,8 +269,10 @@ static void keyboard_irq(trapframe_t* regs)
 
     }
 
-    kbd.kbbuf().write(packet);        
-    if (_is_extended) { _is_extended = false; } 
+    kbd.kbbuf().write(packet);
+    wakeup(&kbd.kbbuf());
+
+    if (_is_extended) { _is_extended = false; }
 }
 
 static void mouse_irq(trapframe_t* regs)
@@ -289,7 +301,7 @@ static void mouse_irq(trapframe_t* regs)
             ym = data;
             _state = 1;
             if ((_status & 0x80) || (_status & 0x40)) {
-                st = kbd.kbc_read(); continue; 
+                st = kbd.kbc_read(); continue;
             }
 
             mouse_packet_t pkt;
@@ -307,7 +319,7 @@ static void mouse_irq(trapframe_t* regs)
     }
 }
 
-//FIXME: need to check if mouse exists and this won't work 
+//FIXME: need to check if mouse exists and this won't work
 //if got usb mouse. (no usb bus configured)
 void Keyboard::init()
 {

@@ -70,6 +70,7 @@ int sys_open(const char *path, int flags, int mode)
     (void)flags;
     (void)mode;
 
+
     File* f = nullptr;
     inode_t* ip = nullptr;
     int fd = -1;
@@ -78,7 +79,7 @@ int sys_open(const char *path, int flags, int mode)
         fd = -ENOMEM;
         goto _out;
     }
-
+    // kprintf("%s:fd %d\n", __func__, fd);
     ip = vfs.namei(path);
     if (!ip) {
         fd = -ENOENT;
@@ -102,6 +103,7 @@ _out:
 
 int sys_close(int fd)
 {
+    // kprintf("%s:fd %d\n", __func__, fd);
     auto* filp = current->files[fd];
     inode_t* ip = filp->inode();
     kassert(filp && ip);
@@ -110,7 +112,6 @@ int sys_close(int fd)
     memset(filp, 0, sizeof *filp);
     current->files[fd] = NULL;
     vfs.dealloc_inode(ip);
-
     vfslock.release(eflags);
     return 0;
 }
@@ -122,21 +123,24 @@ int sys_mmap(struct file *, struct vm_area_struct *)
 
 int sys_write(int fd, const void *buf, size_t nbyte)
 {
-    size_t nwrite = 0;
-    if (fd == 0) {
-        char* p = (char*)buf;
-        while (*p && nwrite < nbyte) {
-            auto eflags = vfslock.lock();
-            kputchar(*p++);
-            vfslock.release(eflags);
-            ++nwrite;
-        }
+    // kprintf("%s:fd %d\n", __func__, fd);
+    auto* filp = current->files[fd];
+    inode_t* ip = filp->inode();
+    if (ip->type != FsNodeType::CharDev) {
+        kprintf("%s: fd %d, not chardev, don not support\n", __func__, fd);
+        return -1;
     }
-    return nwrite;
+
+    off_t off = filp->off();
+    auto eflags = vfslock.lock();
+    auto ret = ip->fs->write(filp, (char*)buf, nbyte, &off);
+    vfslock.release(eflags);
+    return ret;
 }
 
 int sys_read(int fd, void *buf, size_t nbyte)
 {
+    // kprintf("%s:fd %d\n", __func__, fd);
     auto* filp = current->files[fd];
     inode_t* ip = filp->inode();
     off_t off = filp->off();
@@ -150,6 +154,7 @@ int sys_read(int fd, void *buf, size_t nbyte)
 // ret > 0 success, = 0 end of dir, < 0 error
 int sys_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
+    // kprintf("%s:fd %d\n", __func__, fd);
     // dir should be opened
     auto* filp = current->files[fd];
     inode_t* ip = filp->inode();
@@ -179,9 +184,9 @@ void VFSManager::init_root(dev_t rootdev)
     hd->init(DEVNO(MAJOR(rootdev), 0));
     auto* part = hd->part(MINOR(rootdev)-1);
     if (part->part_type == PartType::Fat32L) {
-        char devname[NAMELEN+1];
-        sprintf(devname, NAMELEN, "/dev/hd%c%d", 'a', MINOR(rootdev));
-        mount(devname, "/", "fat32", 0, 0);
+        // char devname[NAMELEN+1] = "rootfs";
+        // sprintf(devname, NAMELEN, "/dev/hd%c%d", 'a', MINOR(rootdev));
+        mount("rootfs", "/", "fat32", 0, 0);
     }
     delete hd;
 }
@@ -206,13 +211,15 @@ int VFSManager::mount(const char *src, const char *target,
     mnt->next = _mounts;
     _mounts = mnt;
 
-    if (strcmp(src, "dev") == 0) {
+    if (strcmp(src, "devfs") == 0) {
+        mnt->fs = fs->spawn(data);
+
     } else if (strcmp(fstype, "ramfs") == 0) {
         mnt->fs = fs->spawn(data);
         kassert(get_mount(target) != NULL);
 
-    } else if (strncmp(src, "/dev/hda", 8) == 0) {
-        dev_t devno = DEVNO(IDE_MAJOR, src[8] - '0');
+    } else if (strcmp(src, "rootfs") == 0) {
+        dev_t devno = DEVNO(IDE_MAJOR, 1);
         mnt->fs = fs->spawn((void*)devno);
     }
 
@@ -334,7 +341,7 @@ mount_info_t* VFSManager::find_mount(const char* path, char**new_path)
     delete pth;
 
     auto* stripped = strip_parent(path, mnt->mnt_point);
-    kprintf("get mount %s, new_path %s ", mnt->mnt_point, stripped);
+    // kprintf("get mount %s, new_path %s ", mnt->mnt_point, stripped);
     if (new_path) {
         *new_path = stripped;
     } else {
@@ -354,14 +361,16 @@ inode_t* VFSManager::namei(const char* path)
 
     if (strcmp(new_path, "/") == 0) {
         vfslock.release(eflags);
-        return mnt->fs->root();
+        auto* dup = alloc_inode();
+        memcpy(dup, mnt->fs->root(), sizeof *dup);
+        return dup;
     }
 
     auto* old = new_path;
     char part[NAMELEN+1];
     auto* ip = mnt->fs->root();
     while ((new_path = path_part(new_path, part)) != NULL) {
-        kprintf("%s: part %s, path %s\n", __func__, part, new_path);
+        // kprintf("%s: part %s, path %s\n", __func__, part, new_path);
         if ((ip = dir_lookup(ip, part)) == NULL) {
             kprintf("%s failed to find %s\n", __func__, path);
             break;

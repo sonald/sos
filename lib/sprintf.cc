@@ -8,52 +8,52 @@ char* itoa(int d, char* buf, int base)
         *buf = '\0';
         return buf;
     }
-    
+
     const char map[] = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz";
     char* p = buf, *dp = buf;
     if (d < 0 && base == 10) {
         *buf++ = '-';
         dp = buf;
-    }   
-    
+    }
+
      do {
          *buf++ = map[35 + d % base];
          d /= base;
      } while (d);
      *buf-- = '\0';
-     
+
      while (dp < buf) {
          char c = *dp;
          *dp++ = *buf;
          *buf-- = c;
      }
-     
+
      return p;
 }
 
-char* utoa(u32 u, char* buf, int base) 
+char* utoa(u32 u, char* buf, int base)
 {
     if (base < 2 || base > 36) {
         *buf = '\0';
         return buf;
     }
-    
+
     const char map[] = "0123456789abcdefghijklmnopqrstuvwxyz";
     char* p = buf, *dp = buf;
-    
+
      do {
          *buf++ = map[u % base];
          u /= base;
      } while (u);
      *buf-- = '\0';
-     
+
      while (dp < buf) {
          char c = *dp;
          *dp++ = *buf;
          *buf-- = c;
      }
-     
-     return p;        
+
+     return p;
 }
 
 static char* ksputs(char* buf, size_t* len, const char* p)
@@ -88,7 +88,7 @@ int vsprintf(char* sbuf, size_t len, const char* fmt, va_list args)
                     sbuf = ksputs(sbuf, &len, utoa(u, buf, 16));
                     break;
 
-                case 'd': 
+                case 'd':
                     d = va_arg(args, int);
                     sbuf = ksputs(sbuf, &len, itoa(d, buf, 10));
                     break;
@@ -98,7 +98,7 @@ int vsprintf(char* sbuf, size_t len, const char* fmt, va_list args)
                     sbuf = ksputs(sbuf, &len, utoa(u, buf, 10));
                     len--;
                     break;
-                    
+
                 case '%':
                     *sbuf++ = '%';
                     len--;
