@@ -48,6 +48,9 @@ class File {
 
         File(Type ty = Type::None): _ip(NULL), _off(0), _ref(0), _type(ty) {}
 
+        void dup() { _ref++; }
+        //TODO: update disk (noimpl)
+        void put() { if (_ref > 0) _ref--; }
         int ref() const { return _ref; }
         off_t off() const { return _off; }
         void set_off(off_t off) { _off = off; }

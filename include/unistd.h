@@ -59,6 +59,16 @@ ret_t fn(t1 arg1, t2 arg2, t3 arg3, t4 arg4) \
     return ret; \
 }
 
+#define STDIN_FILENO    0
+#define STDOUT_FILENO   1
+#define STDERR_FILENO   2
+
+#ifndef NULL
+#define NULL    ((void*)0)
+#endif
+
+extern int errno;
+
 #ifdef __cplusplus
 extern "C" {
 #endif

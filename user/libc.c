@@ -20,3 +20,23 @@ int execve(const char *path, char *const argv[], char *const envp[])
 {
     return exec(path, argv, envp);
 }
+
+extern int main(int argc, char* argv[]);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void _start()
+{
+    int argc = 0;
+    char* argv[1] = {NULL};
+    main(argc, argv);
+
+    exit();
+}
+
+#ifdef __cplusplus
+}
+#endif
+

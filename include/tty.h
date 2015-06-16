@@ -3,6 +3,8 @@
 
 #include <types.h>
 #include <devices.h>
+#include <termios.h>
+#include <ringbuf.h>
 
 class TtyDevice: public CharDevice
 {

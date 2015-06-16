@@ -28,8 +28,6 @@ extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
 extern void setup_tss(u32);
 extern void init_syscall();
-extern int sys_write(int fildes, const void *buf, size_t nbyte);
-
 
 /*
  * gets called before Global constructor

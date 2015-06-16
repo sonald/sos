@@ -102,8 +102,10 @@ int sys_exit()
 {
     kassert(current != task_init);
 
-    for (int fd = 0; fd < FILES_PER_PROC; fd++) {
-        if (current->files[fd]) {
+    for (int fd = 0; current->files[fd]; fd++) {
+        if (current->files[fd]->ref() > 0) {
+            current->files[fd]->put();
+        } else {
             sys_close(fd);
         }
     }
@@ -185,9 +187,9 @@ int sys_fork()
     if (!proc) return -1;
 
     auto oldflags = tasklock.lock();
-    *proc = *current;
-    proc->state = TASK_CREATE;
+    *proc = *current; // copy everything
 
+    proc->state = TASK_CREATE;
     proc->ppid = current->pid;
     proc->pid = next_pid;
 
@@ -206,6 +208,11 @@ int sys_fork()
     proc->kctx = (kcontext_t*)((char*)proc->regs - sizeof(kcontext_t));
     *(proc->kctx) = *(current->kctx);
     proc->kctx->eip = A2I(trap_return);
+
+    for (int fd = 0; current->files[fd]; fd++) {
+        proc->files[fd] = current->files[fd];
+        proc->files[fd]->dup();
+    }
 
     // kprintf("%s: old eip %x, new eip %x  ", __func__, current->regs->eip, proc->regs->eip);
     kprintf("fork %d -> %d\n", current->pid, next_pid);

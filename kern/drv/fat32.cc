@@ -4,6 +4,7 @@
 #include <devices.h>
 #include <string.h>
 #include <vm.h>
+#include <ctype.h>
 
 // arg name should have enough space
 // return size read
@@ -90,8 +91,9 @@ fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
 
         lfn_len = strlen(lfn_name);
         ip->long_name = new char[lfn_len+1];
-        sanity_name(lfn_name, ip->long_name);
+        //sanity_name(lfn_name, ip->long_name);
         ip->lfn_len = lfn_len;
+        memcpy(ip->long_name, lfn_name, lfn_len);
         ip->long_name[lfn_len] = 0;
         delete lfn_name;
         // kprintf("LFN: %s, ", ip->long_name);
@@ -226,23 +228,32 @@ void Fat32Fs::read_inode(inode_t *ip, fat_inode_t* fat_ip)
     }
 }
 
+static bool str_caseequal(const char* s1, const char* s2)
+{
+    //kprintf("%s: %s, %s \n", __func__, s1, s2);
+    const char* p1 = s1, *p2 = s2;
+    while (*p1 && *p2) {
+        int c1 = tolower(*p1), c2 = tolower(*p2);
+        if (c1 != c2) return false;
+        p1++, p2++;
+    }
+
+    return *p1 == 0 && *p2 == 0;
+}
+
 static bool name_equal(const char* name, fat_inode_t* fat_ip)
 {
-    if (strcmp(fat_ip->std_name, name) == 0)
+    if (str_caseequal(fat_ip->std_name, name))
         return true;
-    else if (fat_ip->long_name && strcmp(fat_ip->long_name, name) == 0)
+    else if (fat_ip->long_name && str_caseequal(fat_ip->long_name, name))
         return true;
     return false;
 }
 
 dentry_t* Fat32Fs::lookup(inode_t * dir, dentry_t *de)
 {
-    char *name = new char[NAMELEN+1];
-    name[0] = 0;
-    sanity_name(de->name, name);
-    scan_dir_option_t opt = { .name = name, .target_id = -1 };
+    scan_dir_option_t opt = { .name = de->name, .target_id = -1 };
     scan_dir(dir, &opt, &de->ip);
-    delete name;
     return de;
 }
 

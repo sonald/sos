@@ -52,13 +52,13 @@ debug: kernel
 	-drive file=hd.img,format=raw -vga vmware
 
 run: kernel hd.img initramfs.img
-	qemu-system-i386 -m 32 -s -monitor stdio -hda hd.img -vga vmware
+	qemu-system-i386 -m 32 -s -monitor stdio -drive file=hd.img,format=raw -vga vmware
 
-hd.img: kernel init initramfs.img
+hd.img: kernel bin/init bin/echo initramfs.img
 	hdiutil attach hd.img
 	cp kernel /Volumes/SOS
-	cp init /Volumes/SOS
-	cp echo /Volumes/SOS
+	cp bin/init /Volumes/SOS
+	cp bin/echo /Volumes/SOS/bin
 	cp initramfs.img /Volumes/SOS
 	#hdiutil detach disk2
 
@@ -82,16 +82,12 @@ ramfs_gen: tools/ramfs_gen.c
 	gcc -o $@ $^
 
 # user prog
-echo: user/echo.c user/libc.c $(ulib) user/user.ld
+bin/%: user/%.c user/libc.c $(ulib) user/user.ld
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^
 
-init: user/init.c user/libc.c $(ulib) user/user.ld
-	@mkdir -p $(@D)
-	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^
-
-initramfs.img: echo ramfs_gen
-	./ramfs_gen README.md user/echo.c echo
+initramfs.img: bin/echo ramfs_gen
+	./ramfs_gen README.md user/echo.c bin/echo
 
 .PHONY: clean
 
