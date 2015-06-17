@@ -192,6 +192,17 @@ static struct {
 
 Keyboard kbd;
 
+static KeyCode get_extend_keycode(u8 data)
+{
+    for (int i = 0, len = ARRAYLEN(_xtkb_scancode_ex); i < len; i++) {
+        if (_xtkb_scancode_ex[i].scan == (data&0x7f)) {
+            return _xtkb_scancode_ex[i].keycode;
+        }
+    }
+    return KEY_UNKNOWN;
+}
+
+extern void tty_enqueue();
 static void keyboard_irq(trapframe_t* regs)
 {
     static bool _is_extended = false;
@@ -209,29 +220,21 @@ static void keyboard_irq(trapframe_t* regs)
     if (data & 0x80) {
         packet.status |= KB_RELEASE;
         if (_is_extended) {
-            for (int i = 0, len = ARRAYLEN(_xtkb_scancode_ex); i < len; i++) {
-                if (_xtkb_scancode_ex[i].scan == (data&0x7f)) {
-                    packet.keycode = _xtkb_scancode_ex[i].keycode;
-                }
-            }
-        } else
-            packet.keycode = _xtkb_scancode_std[data & 0x7f];
+            packet.keycode = get_extend_keycode(data);
+        } else packet.keycode = _xtkb_scancode_std[data & 0x7f];
 
         //Break Code
         switch(packet.keycode) {
             case KEY_LSHIFT:
             case KEY_RSHIFT:
-                packet.status &= ~KB_SHIFT_DOWN;
                 kbd.set_shift_down(false); break;
 
             case KEY_LCTRL:
             case KEY_RCTRL:
-                packet.status &= ~KB_CTRL_DOWN;
                 kbd.set_ctrl_down(false); break;
 
             case KEY_LALT:
             case KEY_RALT:
-                packet.status &= ~KB_ALT_DOWN;
                 kbd.set_alt_down(false); break;
 
             default: break;
@@ -239,29 +242,21 @@ static void keyboard_irq(trapframe_t* regs)
     } else {
         packet.status |= KB_PRESS;
         if (_is_extended) {
-            for (int i = 0, len = ARRAYLEN(_xtkb_scancode_ex); i < len; i++) {
-                if (_xtkb_scancode_ex[i].scan == (data&0x7f)) {
-                    packet.keycode = _xtkb_scancode_ex[i].keycode;
-                }
-            }
-        } else
-            packet.keycode = _xtkb_scancode_std[data];
+            packet.keycode = get_extend_keycode(data);
+        } else packet.keycode = _xtkb_scancode_std[data];
 
         //Make Code
         switch(packet.keycode) {
             case KEY_LSHIFT:
             case KEY_RSHIFT:
-                packet.status |= KB_SHIFT_DOWN;
                 kbd.set_shift_down(true); break;
 
             case KEY_LCTRL:
             case KEY_RCTRL:
-                packet.status |= KB_CTRL_DOWN;
                 kbd.set_ctrl_down(true); break;
 
             case KEY_LALT:
             case KEY_RALT:
-                packet.status |= KB_ALT_DOWN;
                 kbd.set_alt_down(true); break;
 
             default: break;
@@ -269,8 +264,40 @@ static void keyboard_irq(trapframe_t* regs)
 
     }
 
+    if (kbd.shift_down()) {
+        packet.status |= KB_SHIFT_DOWN;
+        switch(packet.keycode) {
+            case KEY_0:             packet.keycode = KEY_RIGHTPARENTHESIS; break;
+            case KEY_1:             packet.keycode = KEY_EXCLAMATION; break;
+            case KEY_2:             packet.keycode = KEY_AT; break;
+            case KEY_3:             packet.keycode = KEY_HASH; break;
+            case KEY_4:             packet.keycode = KEY_DOLLAR; break;
+            case KEY_5:             packet.keycode = KEY_PERCENT; break;
+            case KEY_6:             packet.keycode = KEY_CARRET; break;
+            case KEY_7:             packet.keycode = KEY_AMPERSAND; break;
+            case KEY_8:             packet.keycode = KEY_ASTERISK; break;
+            case KEY_9:             packet.keycode = KEY_LEFTPARENTHESIS; break;
+            case KEY_UNDERSCORE:    packet.keycode = KEY_MINUS; break;
+            case KEY_EQUAL:         packet.keycode = KEY_PLUS; break;
+            case KEY_GRAVE:         packet.keycode = KEY_TILDE; break;
+            case KEY_COMMA:         packet.keycode = KEY_LESS; break;
+            case KEY_DOT:           packet.keycode = KEY_GREATER; break;
+            case KEY_SLASH:         packet.keycode = KEY_QUESTION; break;
+            case KEY_LEFTBRACKET:   packet.keycode = KEY_LEFTCURL; break;
+            case KEY_RIGHTBRACKET:  packet.keycode = KEY_RIGHTCURL; break;
+            case KEY_BACKSLASH:     packet.keycode = KEY_BAR; break;
+            default: break;
+        }
+    } else 
+        packet.status &= ~KB_SHIFT_DOWN;
+    if (kbd.alt_down()) packet.status |= KB_ALT_DOWN;
+    else packet.status &= ~KB_ALT_DOWN;
+    if (kbd.ctrl_down()) packet.status |= KB_CTRL_DOWN;
+    else packet.status &= ~KB_CTRL_DOWN;
+
     kbd.kbbuf().write(packet);
-    wakeup(&kbd.kbbuf());
+    tty_enqueue();
+    //wakeup(&kbd.kbbuf());
 
     if (_is_extended) { _is_extended = false; }
 }

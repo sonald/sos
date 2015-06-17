@@ -3,6 +3,7 @@
 #include "common.h"
 #include "graphics.h"
 #include "font.h"
+#include <spinlock.h>
 
 Console console;
 GraphicDisplay graph_console;
@@ -21,6 +22,7 @@ void Console::putchar(char c)
     u16 blank = ' ' | (_attrib << 8);
     int stride = 80;
 
+    auto oflags = _lock.lock();
     if (c == 0x08) { // backspace
         if (_cx > 0) {
             *(vbase + _cy * stride + _cx) = blank;
@@ -44,16 +46,20 @@ void Console::putchar(char c)
     }
 
     scroll(_cy-24);
+    _lock.release(oflags);
     set_phy_cursor(_cx, _cy);
 }
 
 void Console::set_phy_cursor(int x, int y)
 {
     u16 linear = y * 80 + x;
+
+    auto oflags = _lock.lock();
     outb(CRTC_ADDR_REG, CURSOR_LOCATION_HIGH_IND);
     outb(CRTC_ADDR_DATA, linear>>8);
     outb(CRTC_ADDR_REG, CURSOR_LOCATION_LOW_IND);
     outb(CRTC_ADDR_DATA, linear & 0xff);
+    _lock.release(oflags);
 }
 
 void Console::scroll(int lines) 
@@ -66,6 +72,7 @@ void Console::scroll(int lines)
     u16 blank = (' ') | (attrib << 8);
     int stride = 80;
 
+    auto oflags = _lock.lock();
     for (int i = lines; i < 25; i++) {
         int dst = (i-lines) * stride, src = i * stride;
         for (int j = 0; j < stride; ++j) {
@@ -78,6 +85,7 @@ void Console::scroll(int lines)
     }
 
     _cy = max(_cy-lines, 0);
+    _lock.release(oflags);
 }
 
 Color Console::get_text_color()
@@ -108,13 +116,32 @@ void Console::clear()
     u16 blank = (' ') | (attrib << 8);
     int stride = 80;
 
+    auto oflags = _lock.lock();
     for (int i = 0; i < 25 * stride; i++) {
         *(vbase + i) = blank;
     }    
     _cx = 0, _cy = 0;
+    _lock.release(oflags);
+
     set_phy_cursor(_cx, _cy);
 }
 
+void Console::del()
+{
+    u16 blank = ' ' | (_attrib << 8);
+    int stride = 80;
+
+    auto oflags = _lock.lock();
+    if (_cx) {
+        _cx--;
+        *(vbase + _cy * stride + _cx) = blank;
+    }
+    _lock.release(oflags);
+
+    set_phy_cursor(_cx, _cy);
+}
+
+//-----------------------------------------------------------------------------
 
 Color GraphicDisplay::get_text_color()
 {
@@ -198,6 +225,19 @@ void GraphicDisplay::scroll(int lines)
             videoMode.height() - h, {0, 0, 0});
 
     _cursor.y = min(max(_cursor.y-1, 0), _rows-1);
+}
+
+void GraphicDisplay::del() 
+{
+    auto& fi = builtin_fontinfo;
+
+    auto old = _lock.lock();
+    if (_cursor.x > 0) {
+        _cursor.x--;
+        position_t pt = {_cursor.x*fi.xadvance, _cursor.y*fi.yadvance};
+        videoMode.drawChar(pt, 0x08, {0x0, 0x0, 0x0});
+    }
+    _lock.release(old);
 }
 
 void video_mode_test()

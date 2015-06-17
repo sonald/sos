@@ -44,30 +44,6 @@ void idle_thread()
         "jmp 1b");
 }
 
-void tty_thread()
-{
-    while (1) {
-        if (!kbd.msbuf().empty()) {
-            mouse_packet_t pkt = kbd.msbuf().read();
-
-            auto old = current_display->get_text_color();
-            auto cur = current_display->get_cursor();
-            cli();
-            current_display->set_text_color(LIGHT_BLUE);
-            current_display->set_cursor({60, 2});
-
-            kprintf(" @%d, %d, 0x%x@ ", pkt.relx, pkt.rely, pkt.flags);
-
-            current_display->set_cursor(cur);
-            current_display->set_text_color(old);
-            sti();
-        }
-
-
-        asm ("hlt");
-    }
-}
-
 void kthread1()
 {
     dev_t ROOT_DEV = DEVNO(IDE_MAJOR, 0);

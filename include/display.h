@@ -43,6 +43,8 @@ class Display
 
         virtual void scroll(int lines) = 0;
         virtual void putchar(char c) = 0;
+
+        virtual void del() = 0;
 };
 
 class Console: public Display 
@@ -56,6 +58,7 @@ class Console: public Display
 
         void putchar(char c) override;
         void scroll(int lines) override;
+        void del() override;
 
     private:
         void set_phy_cursor(int x, int y);
@@ -74,6 +77,7 @@ class GraphicDisplay: public Display
         void clear() override;
         void putchar(char c) override;
         void scroll(int lines) override;
+        void del() override;
 
     private:
         position_t _cursor {0, 0};

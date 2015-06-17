@@ -31,6 +31,7 @@ typedef struct proc_s {
 
     pid_t pid;
     pid_t ppid;
+    pid_t pgrp;
     char name[32];
 
     u32 kern_esp;

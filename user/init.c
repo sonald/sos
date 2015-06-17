@@ -123,7 +123,6 @@ static void try_external_app(cmd_args_t* args)
             int len = sprintf(buf, sizeof buf - 1, "%s/%s", bin, dire.d_name);
             buf[len] = 0;
             if (str_caseequal(args->cmd, dire.d_name)) {
-                print("found cmd\n");
                 found = true;
                 break;
             }
@@ -140,6 +139,8 @@ static void try_external_app(cmd_args_t* args)
             } else {
                 print("fork error\n");
             }
+        } else {
+            print("can not found executable\n");
         }
     }
 }
@@ -165,7 +166,10 @@ int main()
                 cmd_args_t args;
                 parse_cmdline(cmd_buf, len, &args);
 
-                if (strcmp(args.cmd, "ls") == 0) {
+                if (strcmp(args.cmd, "exit") == 0) {
+                    quit = true;
+
+                } else if (strcmp(args.cmd, "ls") == 0) {
                     Ls(args.argc == 0 ? "/": args.argv[0]).execute();
                 } else if (strcmp(args.cmd, "cat") == 0) {
                     if (args.argc) {

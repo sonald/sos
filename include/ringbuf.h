@@ -13,6 +13,9 @@ class RingBuffer
         void write(T& v);
         bool full() const { return _used == _sz; }
         bool empty() const { return _used == 0; }
+        T peek();
+        T last();
+        T drop(); // remove last input if any
 
     private:
         T _buf[N];
@@ -38,9 +41,38 @@ T RingBuffer<T, N>::read()
 }
 
 template <typename T, size_t N>
+T RingBuffer<T, N>::last()
+{
+    if (empty()) {
+        kassert(_h == _t);
+        return T();
+    }
+
+    auto eflags = _lock.lock();
+    T& v = _buf[_h];
+    _lock.release(eflags);
+    return v;
+}
+
+template <typename T, size_t N>
+T RingBuffer<T, N>::peek()
+{
+    if (empty()) {
+        kassert(_h == _t);
+        return T();
+    }
+
+    auto eflags = _lock.lock();
+    T& v = _buf[_t];
+    _lock.release(eflags);
+    return v;
+}
+
+template <typename T, size_t N>
 void RingBuffer<T, N>::write(T& v)
 {
-    if (full()) return; // drop ? or drop oldest ?
+    if (full()) { read(); } // eat oldest
+
     auto eflags = _lock.lock();
     _buf[_h] = v;
     _h = (_h + 1) % N;
@@ -48,5 +80,22 @@ void RingBuffer<T, N>::write(T& v)
     _lock.release(eflags);
 }
 
+
+template <typename T, size_t N>
+T RingBuffer<T, N>::drop()
+{
+    if (empty()) {
+        kassert(_h == _t);
+        return T();
+    }
+
+    auto eflags = _lock.lock();
+    _h--;
+    if (_h < 0) _h = N-1;
+    T& v = _buf[_h];
+    _used--;
+    _lock.release(eflags);
+    return v;
+}
 #endif
 

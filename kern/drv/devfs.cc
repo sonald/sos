@@ -65,12 +65,7 @@ ssize_t DevFs::read(File *filp, char * buf, size_t count, off_t * offset)
         if (!rdev) return -ENOENT;
         auto* sp = buf;
         while (count > 0 && (*sp = rdev->read()) >= 0) {
-            if (sp > buf && *sp == '\b') {
-                count++; sp--;
-                continue;
-            }
             count--;
-            kputchar(*sp); // echoing
             if (*sp == '\n') break;
             sp++;
         }
