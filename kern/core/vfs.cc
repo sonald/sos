@@ -80,6 +80,7 @@ int sys_open(const char *path, int flags, int mode)
         goto _out;
     }
     // kprintf("%s:fd %d\n", __func__, fd);
+    
     ip = vfs.namei(path);
     if (!ip) {
         fd = -ENOENT;
@@ -355,9 +356,20 @@ inode_t* VFSManager::namei(const char* path)
 {
     auto eflags = vfslock.lock();
 
+    //TODO: need to impl cwd for proc
+    int len = strlen(path)+1;
+    char* full_path = new char[len+1];
+    if (path && path[0] != '/') {
+        sprintf(full_path, len, "/%s", path);
+        full_path[len] = 0;
+    } else {
+        strcpy(full_path, path);
+    }
+
     //TODO: recursively lookup
     char* new_path = nullptr;
-    auto* mnt = find_mount(path, &new_path);
+    auto* mnt = find_mount(full_path, &new_path);
+    //delete full_path;
 
     if (strcmp(new_path, "/") == 0) {
         vfslock.release(eflags);
@@ -370,9 +382,7 @@ inode_t* VFSManager::namei(const char* path)
     char part[NAMELEN+1];
     auto* ip = mnt->fs->root();
     while ((new_path = path_part(new_path, part)) != NULL) {
-        // kprintf("%s: part %s, path %s\n", __func__, part, new_path);
         if ((ip = dir_lookup(ip, part)) == NULL) {
-            kprintf("%s failed to find %s\n", __func__, path);
             break;
         }
     }
