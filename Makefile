@@ -18,6 +18,7 @@ kernel_srcs = kern/boot.s kern/core/irq_stubs.s kern/core/context.s \
 	$(wildcard kern/runtime/*.cc) \
 	$(wildcard kern/core/*.cc) \
 	$(wildcard kern/drv/*.cc) \
+	$(wildcard kern/utils/*.cc) \
 	$(wildcard lib/*.cc)
 
 kernel_objs := $(patsubst %.cc, $(OBJS_DIR)/%.o, $(kernel_srcs))
@@ -54,9 +55,10 @@ debug: kernel
 run: kernel hd.img initramfs.img
 	qemu-system-i386 -m 32 -s -monitor stdio -drive file=hd.img,format=raw -vga vmware
 
-hd.img: kernel bin/init bin/echo initramfs.img
+hd.img: kernel bin/init bin/echo initramfs.img logo.ppm
 	hdiutil attach hd.img
 	cp kernel /Volumes/SOS
+	cp logo.ppm /Volumes/SOS
 	cp bin/init /Volumes/SOS
 	cp bin/echo /Volumes/SOS/bin
 	cp initramfs.img /Volumes/SOS
@@ -96,10 +98,12 @@ clean:
 	-rm $(OBJS_DIR)/lib/*.o
 	-rm $(OBJS_DIR)/kern/core/*.o
 	-rm $(OBJS_DIR)/kern/runtime/*.o
+	-rm $(OBJS_DIR)/kern/utils/*.o
 	-rm $(OBJS_DIR)/kern/drv/*.o
 	-rm $(OBJS_DIR)/kern/*.d
 	-rm $(OBJS_DIR)/kern/core/*.d
 	-rm $(OBJS_DIR)/kern/runtime/*.d
+	-rm $(OBJS_DIR)/kern/utils/*.d
 	-rm $(OBJS_DIR)/kern/drv/*.d
 	-rm $(OBJS_DIR)/lib/*.d
 	-rm echo init

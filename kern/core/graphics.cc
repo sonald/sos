@@ -123,6 +123,17 @@ void VideoMode::drawRect(position_t p, int width, int height, Rgb rgb)
     drawLine(l, b, r, b, rgb);
 }
 
+void VideoMode::drawImage(position_t p, char* data, int width, int height)
+{
+    width = min(_width - p.x, width);
+    height = min(_height - p.y, height);
+
+    char* start = _base + p.y * _pitch + p.x * 3;
+    for (int j = 0; j < height; j++) {
+        memcpy(start + _pitch*j, data + j*width*3, width*3);
+    }
+}
+
 void VideoMode::fillRect(position_t p, int width, int height, Rgb rgb)
 {
     width = min(_width - p.x, width);

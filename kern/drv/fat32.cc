@@ -161,23 +161,12 @@ void Fat32Fs::init(dev_t dev)
     // kassert(*(fat_data + 1) >= 0x3fff);
     bio.release(bufp);
 
-    // kprintf("fat: oem %s, BPS: %d, SPC: %d, RSC: %d, "
-    //         "TC: %d, REC: %d, total sect16: %d, total sect32: %d\n"
-    //         "tbl sz16: %d, drive: %d, "
-    //         "vol: %s, type: %s, total _clusters: %d\n",
-    //         _fat_bs.oem_name, _fat_bs.bytes_per_sector,
-    //         _fat_bs.sectors_per_cluster, _fat_bs.reserved_sector_count,
-    //         _fat_bs.table_count, _fat_bs.root_entry_count,
-    //         _fat_bs.total_sectors_16, _fat_bs.total_sectors_32,
-    //         _fat_bs.table_size_16,
-    //         _fat_bs.ebs16.bios_drive_num, _fat_bs.ebs16.volume_label,
-    //         _fat_bs.ebs16.fat_type_label, _clusters);
-    kprintf("type: %s, _total_sects: %d, _clusters: %d, _fat_sects: %d,"
-            "_root_sects: %d, _data_start_sect: %d, _root_start_sect: %d, "
-            "_lba_start: %d\n",
-            (_type == FatType::Fat32?"fat32":"fat16"), _total_sects,
-            _clusters, _fat_sects, _root_sects, _data_start_sect, _root_start_sect,
-            _lba_start);
+    //kprintf("type: %s, _total_sects: %d, _clusters: %d, _fat_sects: %d,"
+            //"_root_sects: %d, _data_start_sect: %d, _root_start_sect: %d, "
+            //"_lba_start: %d\n",
+            //(_type == FatType::Fat32?"fat32":"fat16"), _total_sects,
+            //_clusters, _fat_sects, _root_sects, _data_start_sect, _root_start_sect,
+            //_lba_start);
 
     kassert(32 == sizeof(union fat_dirent));
 

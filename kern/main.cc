@@ -23,6 +23,7 @@
 #include <string.h>
 #include <devfs.h>
 #include <tty.h>
+#include <ppm.h>
 
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
@@ -151,15 +152,16 @@ extern "C" int kernel_main(struct multiboot_info *mb)
             current_display = &graph_console;
             current_display->clear();
             //video_mode_test();
-            kprintf("VideoMode:\n "
-                    "winsize: %d, pitch: %d, xres: %d, yres: %d,"
-                    "planes: %d, banks: %d, bank_size: %d\n",
-                    modinfo->winsize, modinfo->pitch, modinfo->Xres,
-                    modinfo->Yres, modinfo->planes, modinfo->banks,
-                    modinfo->bank_size);
+            //kprintf("VideoMode:\n "
+                    //"winsize: %d, pitch: %d, xres: %d, yres: %d,"
+                    //"planes: %d, banks: %d, bank_size: %d\n",
+                    //modinfo->winsize, modinfo->pitch, modinfo->Xres,
+                    //modinfo->Yres, modinfo->planes, modinfo->banks,
+                    //modinfo->bank_size);
         }
     }
     current_display->set_text_color(CYAN);
+    current_display->set_cursor({0, 7});
     const char* msg = "booting SOS....\n";
     kputs(msg);
     current_display->set_text_color(YELLOW);
@@ -181,13 +183,22 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     vfs.register_fs("devfs", create_devfs);
     vfs.init_root(DEVNO(IDE_MAJOR, 1));
     vfs.mount("devfs", "/dev", "devfs", 0, NULL);
+    load_module(mb->mods_count, mb->mods_addr);
 
     picenable(IRQ_KBD);
     picenable(IRQ_MOUSE);
     picenable(IRQ_TIMER);
 
     proc_t* proc = prepare_userinit((void*)&init_task);
-    load_module(mb->mods_count, mb->mods_addr);
+
+    if (current_display == &graph_console) {
+        ppm_t* ppm = ppm_load("/logo.ppm");
+        if (ppm) {
+            //kprintf("draw logo (%d, %d)\n", ppm->width, ppm->height);
+            videoMode.drawImage({0, 0}, ppm->data, ppm->width, ppm->height);
+            delete ppm;
+        }
+    }
 
     // for(;;) asm volatile ("hlt");
 

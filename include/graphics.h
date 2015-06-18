@@ -63,6 +63,7 @@ class VideoMode
         void fillRect(position_t p, int width, int height, Rgb rgb);
         void drawString(position_t p, const char* s, Rgb rgb);
         void drawChar(position_t p, char c, Rgb rgb);
+        void drawImage(position_t p, char* data, int width, int height);
 
         void blitCopy(position_t dst, position_t src, int width, int height);
 
