@@ -108,13 +108,35 @@ int sys_close(int fd)
     auto* filp = current->files[fd];
     inode_t* ip = filp->inode();
     kassert(filp && ip);
+    kassert(filp->ref() > 0);
 
     auto eflags = vfslock.lock();
-    memset(filp, 0, sizeof *filp);
+    filp->put();
+    if (filp->ref() == 0) {
+        memset(filp, 0, sizeof *filp);
+        vfs.dealloc_inode(ip);
+    }
     current->files[fd] = NULL;
-    vfs.dealloc_inode(ip);
     vfslock.release(eflags);
     return 0;
+}
+
+int sys_dup(int fd)
+{
+    int newfd = -1;
+
+    auto eflags = vfslock.lock();
+    if ((newfd = fdalloc()) < 0) {
+        newfd = -ENOMEM;
+        goto _out;
+    }
+    
+    current->files[fd]->dup();
+    current->files[newfd] = current->files[fd];
+
+_out:
+    vfslock.release(eflags);
+    return newfd;
 }
 
 int sys_mmap(struct file *, struct vm_area_struct *)
@@ -175,6 +197,38 @@ int sys_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
     }
     vfs.dealloc_entry(de);
     return ret;
+}
+
+File::File(Type ty)
+    : _ip(NULL), _off(0), _ref(0), _type(ty) 
+{
+    if (_type == Type::Pipe) {
+        _ref = 1;
+    }
+}
+
+void File::set_inode(inode_t* ip) {
+    kassert(_type == Type::None);
+    _ref++;
+    _ip = ip;
+    _type = Type::Inode;
+}
+
+//TODO: update disk if dirty
+void File::put() 
+{
+    if (_ref > 0) {
+        _ref--; 
+        if (_ref == 0 && _type == Type::Inode) {
+            vfs.dealloc_inode(_ip);
+            _ip = NULL;
+            _type = Type::None;
+        }
+    }
+}
+
+File::~File()
+{
 }
 
 // rootdev should be dev no for like /dev/hda1

@@ -102,6 +102,7 @@ void init_syscall()
     syscalls[SYS_exit] = { (void*)sys_exit, 0 };
     syscalls[SYS_mount] = { (void*)sys_mount, 5 };
     syscalls[SYS_umount] = { (void*)sys_unmount, 1 };
+    syscalls[SYS_dup] = { (void*)sys_dup, 1 };
 
     register_isr_handler(ISR_SYSCALL, syscall_handler);
 }

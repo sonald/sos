@@ -46,21 +46,17 @@ class File {
             None, Pipe, Inode
         };
 
-        File(Type ty = Type::None): _ip(NULL), _off(0), _ref(0), _type(ty) {}
+        File(Type ty = Type::None);
+        ~File(); 
 
         void dup() { _ref++; }
-        //TODO: update disk (noimpl)
-        void put() { if (_ref > 0) _ref--; }
+        void put();
+
         int ref() const { return _ref; }
         off_t off() const { return _off; }
         void set_off(off_t off) { _off = off; }
         inode_t* inode() { return _ip; }
-
-        void set_inode(inode_t* ip) {
-            _ref++;
-            _ip = ip;
-            _type = Type::Inode;
-        }
+        void set_inode(inode_t* ip);
 
     protected:
         inode_t *_ip;
