@@ -106,15 +106,12 @@ int sys_close(int fd)
 {
     // kprintf("%s:fd %d\n", __func__, fd);
     auto* filp = current->files[fd];
-    inode_t* ip = filp->inode();
-    kassert(filp && ip);
-    kassert(filp->ref() > 0);
+    kassert(filp && filp->ref() > 0);
 
     auto eflags = vfslock.lock();
     filp->put();
     if (filp->ref() == 0) {
         memset(filp, 0, sizeof *filp);
-        vfs.dealloc_inode(ip);
     }
     current->files[fd] = NULL;
     vfslock.release(eflags);
@@ -139,6 +136,37 @@ _out:
     return newfd;
 }
 
+int sys_pipe(int fd[2])
+{
+    File* f = nullptr;
+
+    auto eflags = vfslock.lock();
+    if ((fd[0] = fdalloc()) < 0) {
+        fd[0] = fd[1] = -ENOMEM;
+        goto _out;
+    }
+
+    f = get_free_file();
+    if (!f) {
+        fd[0] = fd[1] = -ENOMEM;
+        goto _out;
+    }
+    current->files[fd[0]] = f;
+
+    if ((fd[1] = fdalloc()) < 0) {
+        fd[0] = fd[1] = -ENOMEM;
+        goto _out;
+    }
+    
+    current->files[fd[1]] = f;
+    f->set_as_pipe(fd);
+    f->dup();
+
+_out:
+    vfslock.release(eflags);
+    return (fd[0] >= 0? 0: -fd[0]);
+}
+
 int sys_mmap(struct file *, struct vm_area_struct *)
 {
     return 0;
@@ -146,8 +174,30 @@ int sys_mmap(struct file *, struct vm_area_struct *)
 
 int sys_write(int fd, const void *buf, size_t nbyte)
 {
-    // kprintf("%s:fd %d\n", __func__, fd);
+    if (fd >= MAX_NR_FILE) return -EINVAL; 
+
     auto* filp = current->files[fd];
+    if (filp->type() == File::Type::Pipe) {
+        PipeBuffer* pbuf = filp->buf();
+        const char* p = (const char*)buf;
+        int nr_written = nbyte;
+
+        while (nr_written > 0) {
+            while (pbuf->full()) {
+                wakeup(pbuf);
+                auto oflags = vfslock.lock();
+                sleep(&vfslock, pbuf);
+                vfslock.release(oflags);
+            }
+
+            nr_written--;
+            pbuf->write(*p++);
+        }
+
+        wakeup(pbuf);
+        return nbyte;
+    }
+
     inode_t* ip = filp->inode();
     if (ip->type != FsNodeType::CharDev) {
         kprintf("%s: fd %d, not chardev, don not support\n", __func__, fd);
@@ -163,8 +213,28 @@ int sys_write(int fd, const void *buf, size_t nbyte)
 
 int sys_read(int fd, void *buf, size_t nbyte)
 {
-    // kprintf("%s:fd %d\n", __func__, fd);
+    if (fd >= MAX_NR_FILE) return -EINVAL; 
+
     auto* filp = current->files[fd];
+    if (filp->type() == File::Type::Pipe) {
+        PipeBuffer* pbuf = filp->buf();
+        char* p = (char*)buf;
+        size_t nr_read = 0;
+
+        while (nr_read < nbyte) {
+            while (pbuf->empty()) {
+                wakeup(pbuf);
+                auto oflags = vfslock.lock();
+                sleep(&vfslock, pbuf);
+                vfslock.release(oflags);
+            }
+
+            nr_read++;
+            *p++ = pbuf->read();
+        }
+        return nr_read;
+    }
+
     inode_t* ip = filp->inode();
     off_t off = filp->off();
     auto eflags = vfslock.lock();
@@ -200,16 +270,23 @@ int sys_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 }
 
 File::File(Type ty)
-    : _ip(NULL), _off(0), _ref(0), _type(ty) 
+    : _ip(NULL), _off(0), _ref(0), _type(ty), _buf(NULL) 
 {
-    if (_type == Type::Pipe) {
-        _ref = 1;
-    }
+}
+
+void File::set_as_pipe(int fd[2])
+{
+    kassert(_type == Type::None);
+    _type = Type::Pipe;
+    _ref = 1;
+    _buf = new PipeBuffer;
+    _pfd[0] = fd[0];
+    _pfd[1] = fd[1];
 }
 
 void File::set_inode(inode_t* ip) {
     kassert(_type == Type::None);
-    _ref++;
+    _ref = 1;
     _ip = ip;
     _type = Type::Inode;
 }
@@ -219,9 +296,16 @@ void File::put()
 {
     if (_ref > 0) {
         _ref--; 
-        if (_ref == 0 && _type == Type::Inode) {
-            vfs.dealloc_inode(_ip);
-            _ip = NULL;
+        if (_ref == 0) {
+            if (_type == Type::Inode) {
+                vfs.dealloc_inode(_ip);
+                _ip = NULL;
+            } else if (_type == Type::Pipe) {
+                //FIXME: flush remaining data or just close ?
+                while (!_buf->empty()) wakeup(_buf);
+                delete _buf;
+                _buf = NULL;
+            }
             _type = Type::None;
         }
     }

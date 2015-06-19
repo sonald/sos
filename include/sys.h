@@ -22,5 +22,6 @@ extern int sys_mount(const char *, const char *,
         const char *, unsigned long, const void *);
 extern int sys_unmount(const char *target);
 extern int sys_dup(int);
+extern int sys_pipe(int fd[2]);
 
 #endif

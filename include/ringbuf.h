@@ -10,9 +10,13 @@ class RingBuffer
 {
     public:
         T read();
-        void write(T& v);
+        void write(const T& v);
+
         bool full() const { return _used == _sz; }
         bool empty() const { return _used == 0; }
+        int sz() const { return _sz; }
+        int remain() const { return _sz - _used; }
+
         T peek();
         T last();
         T drop(); // remove last input if any
@@ -27,12 +31,9 @@ class RingBuffer
 template <typename T, size_t N>
 T RingBuffer<T, N>::read()
 {
-    if (empty()) {
-        kassert(_h == _t);
-        return T();
-    }
-
     auto eflags = _lock.lock();
+    if (empty()) return T();
+
     T& v = _buf[_t];
     _t = (_t + 1) % N;
     _used--;
@@ -43,12 +44,9 @@ T RingBuffer<T, N>::read()
 template <typename T, size_t N>
 T RingBuffer<T, N>::last()
 {
-    if (empty()) {
-        kassert(_h == _t);
-        return T();
-    }
-
     auto eflags = _lock.lock();
+    if (empty()) return T();
+
     T& v = _buf[_h];
     _lock.release(eflags);
     return v;
@@ -57,23 +55,19 @@ T RingBuffer<T, N>::last()
 template <typename T, size_t N>
 T RingBuffer<T, N>::peek()
 {
-    if (empty()) {
-        kassert(_h == _t);
-        return T();
-    }
-
     auto eflags = _lock.lock();
+    if (empty()) return T();
     T& v = _buf[_t];
     _lock.release(eflags);
     return v;
 }
 
 template <typename T, size_t N>
-void RingBuffer<T, N>::write(T& v)
+void RingBuffer<T, N>::write(const T& v)
 {
+    auto eflags = _lock.lock();
     if (full()) { read(); } // eat oldest
 
-    auto eflags = _lock.lock();
     _buf[_h] = v;
     _h = (_h + 1) % N;
     _used++;
@@ -84,12 +78,9 @@ void RingBuffer<T, N>::write(T& v)
 template <typename T, size_t N>
 T RingBuffer<T, N>::drop()
 {
-    if (empty()) {
-        kassert(_h == _t);
-        return T();
-    }
-
     auto eflags = _lock.lock();
+    if (empty()) return T();
+
     _h--;
     if (_h < 0) _h = N-1;
     T& v = _buf[_h];

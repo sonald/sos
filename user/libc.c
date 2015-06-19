@@ -16,6 +16,7 @@ _syscall0(int, exit);
 _syscall0(int, wait);
 _syscall3(int, readdir, unsigned int, fd, struct dirent *, dirp, unsigned int, count);
 _syscall1(int, dup, int, fd);
+_syscall1(int, pipe, int*, fds); // int fd[2]
 
 int execve(const char *path, char *const argv[], char *const envp[])
 {

@@ -6,6 +6,7 @@
 #include <devices.h>
 #include <sos/limits.h>
 #include <errno.h>
+#include <ringbuf.h>
 
 class Disk;
 
@@ -40,6 +41,7 @@ typedef struct dentry_s {
     inode_t *ip;
 } dentry_t;
 
+using PipeBuffer = RingBuffer<char, 1024>;
 class File {
     public:
         enum class Type {
@@ -52,17 +54,22 @@ class File {
         void dup() { _ref++; }
         void put();
 
+        Type type() const { return _type; }
         int ref() const { return _ref; }
         off_t off() const { return _off; }
         void set_off(off_t off) { _off = off; }
         inode_t* inode() { return _ip; }
         void set_inode(inode_t* ip);
+        void set_as_pipe(int fd[2]);
+        PipeBuffer* buf() { return _buf; }
 
     protected:
         inode_t *_ip;
         off_t _off;
         int _ref;
         Type _type;
+        PipeBuffer* _buf;
+        int _pfd[2];
 };
 
 typedef struct fs_super_s {

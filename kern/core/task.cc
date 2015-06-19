@@ -25,6 +25,7 @@ static int next_pid = 0;
 
 void sleep(Spinlock* lk, void* chan)
 {
+    kassert(current->channel == NULL);
     current->channel = chan;
     current->state = TASK_SLEEP;
     //kprintf(" (%s:sleep) ", current->name);
