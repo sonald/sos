@@ -42,11 +42,35 @@ typedef struct dentry_s {
 } dentry_t;
 
 using PipeBuffer = RingBuffer<char, 1024>;
+class File;
+class Pipe {
+    public:
+        File* readf;
+        File* writef;
+        PipeBuffer* pbuf;
+
+        Pipe(): readf(NULL), writef(NULL) {
+            pbuf = new PipeBuffer;
+        }
+
+        int write(const void *buf, size_t nbyte);
+        int read(void *buf, size_t nbyte);
+
+        ~Pipe() {
+            delete pbuf;
+        }
+};
+
 class File {
     public:
         enum class Type {
             None, Pipe, Inode
         };
+        enum Mode {
+            Readable = 0x01,
+            Writable = 0x02,
+        };
+
 
         File(Type ty = Type::None);
         ~File(); 
@@ -60,16 +84,21 @@ class File {
         void set_off(off_t off) { _off = off; }
         inode_t* inode() { return _ip; }
         void set_inode(inode_t* ip);
-        void set_as_pipe(int fd[2]);
-        PipeBuffer* buf() { return _buf; }
+        void set_pipe(Pipe* p);
+        Pipe* pipe() { return _pipe; }
+
+        void set_readable() { _mode |= Readable; }
+        void set_writable() { _mode |= Writable; }
+        bool readable() const { return _mode & Readable; }
+        bool writable() const { return _mode & Writable; }
 
     protected:
         inode_t *_ip;
         off_t _off;
         int _ref;
         Type _type;
-        PipeBuffer* _buf;
-        int _pfd[2];
+        Pipe *_pipe;
+        int _mode;
 };
 
 typedef struct fs_super_s {

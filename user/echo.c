@@ -22,24 +22,31 @@ int main(int argc, char* argv[])
 
     pid_t pid = fork();
     if (pid == 0) {
+        close(fd[0]);
         int count = 0;
         // child 
         while(1) {
             sprintf(echobuf, BUF_SZ - 1, "welcome from child #%d", count++);
             write(fd[1], echobuf, strlen(echobuf));
             /*sleep(2000);*/
+            if (count >= 4) break;
         }
         
     } else if (pid > 0) {
+        close(fd[1]);
         while (1) {
             char buf[10];
-            int len = read(fd[0], buf, sizeof buf - 1);
+            int len = 0;
+            if ((len = read(fd[0], buf, sizeof buf - 1)) <= 0) {
+                break;
+            }
             buf[len] = 0;
             myprint("P: ");
             myprint(buf);
             myprint("\n");
             sleep(1000);
         }
+        wait();
     }
 
     return 0;

@@ -23,6 +23,12 @@ ppm_t* ppm_load(const char* path)
 
     char* buf = new char[ip->size];
     int fd = sys_open(path, O_RDONLY, 0);
+    if (fd < 0) {
+        kprintf("open logo failed\n");
+        delete buf;
+        return NULL;
+    }
+
     int len = sys_read(fd, buf, ip->size);
     sys_close(fd);
 

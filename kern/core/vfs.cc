@@ -25,14 +25,14 @@ static File* get_free_file()
     int i;
     auto oflags = vfslock.lock();
     for (i = 0; i < MAX_NR_FILE; i++, fp++) {
-        if (fp->ref() == 0)
-            break;
+        if (fp->ref() == 0) {
+            memset(fp, 0, sizeof *fp);
+            vfslock.release(oflags);
+            return fp;
+        }
     }
     vfslock.release(oflags);
-
-    if (i >= MAX_NR_FILE) return NULL;
-    memset(fp, 0, sizeof *fp);
-    return fp;
+    return NULL;
 }
 
 static int fdalloc()
@@ -40,15 +40,12 @@ static int fdalloc()
     int fd = -EINVAL;
     auto oflags = vfslock.lock();
     for (fd = 0; fd < FILES_PER_PROC; fd++) {
-        if (!current->files[fd])
-            break;
+        if (!current->files[fd]) {
+            vfslock.release(oflags);
+            return fd;
+        }
     }
     vfslock.release(oflags);
-
-    if (fd >= FILES_PER_PROC) {
-        fd = -EINVAL;
-    }
-
     return fd;
 }
 
@@ -67,9 +64,7 @@ int sys_unmount(const char *target)
 
 int sys_open(const char *path, int flags, int mode)
 {
-    (void)flags;
     (void)mode;
-
 
     File* f = nullptr;
     inode_t* ip = nullptr;
@@ -95,6 +90,9 @@ int sys_open(const char *path, int flags, int mode)
     }
 
     f->set_inode(ip);
+    if (!(flags & O_WRONLY)) f->set_readable();
+    if ((flags & O_WRONLY) || (flags & O_RDWR)) f->set_writable();
+
     current->files[fd] = f;
 
 _out:
@@ -104,7 +102,7 @@ _out:
 
 int sys_close(int fd)
 {
-    // kprintf("%s:fd %d\n", __func__, fd);
+     //kprintf("%s:fd %d\n", __func__, fd);
     auto* filp = current->files[fd];
     kassert(filp && filp->ref() > 0);
 
@@ -138,33 +136,40 @@ _out:
 
 int sys_pipe(int fd[2])
 {
-    File* f = nullptr;
+    File* f[2] = {NULL, NULL};
+    Pipe* p = new Pipe;
+    int ret = 0;
 
     auto eflags = vfslock.lock();
-    if ((fd[0] = fdalloc()) < 0) {
-        fd[0] = fd[1] = -ENOMEM;
-        goto _out;
-    }
+    for (int i = 0; i < 2; i++) {
+        if (!(f[i] = get_free_file())) {
+            ret = -ENFILE;
+            goto _bad;
+        }
+        if (i == 0) p->readf = f[i];
+        else p->writef = f[i];
 
-    f = get_free_file();
-    if (!f) {
-        fd[0] = fd[1] = -ENOMEM;
-        goto _out;
+        if ((fd[i] = fdalloc()) < 0) {
+            ret = -EMFILE;
+            goto _bad;
+        }
+        current->files[fd[i]] = f[i];
+        f[i]->set_pipe(p);
+        if (i == 0) f[i]->set_readable();
+        else f[i]->set_writable();
     }
-    current->files[fd[0]] = f;
+    kassert(f[0] != f[1]);
 
-    if ((fd[1] = fdalloc()) < 0) {
-        fd[0] = fd[1] = -ENOMEM;
-        goto _out;
-    }
-    
-    current->files[fd[1]] = f;
-    f->set_as_pipe(fd);
-    f->dup();
-
-_out:
     vfslock.release(eflags);
-    return (fd[0] >= 0? 0: -fd[0]);
+    return ret;
+
+_bad:
+    if (f[0] && f[0]->ref()) f[0]->put();
+    if (f[1] && f[1]->ref()) f[1]->put();
+    if (p) delete p;
+
+    vfslock.release(eflags);
+    return ret;
 }
 
 int sys_mmap(struct file *, struct vm_area_struct *)
@@ -177,25 +182,10 @@ int sys_write(int fd, const void *buf, size_t nbyte)
     if (fd >= MAX_NR_FILE) return -EINVAL; 
 
     auto* filp = current->files[fd];
+    if (!filp->writable()) return -EPERM;
+
     if (filp->type() == File::Type::Pipe) {
-        PipeBuffer* pbuf = filp->buf();
-        const char* p = (const char*)buf;
-        int nr_written = nbyte;
-
-        while (nr_written > 0) {
-            while (pbuf->full()) {
-                wakeup(pbuf);
-                auto oflags = vfslock.lock();
-                sleep(&vfslock, pbuf);
-                vfslock.release(oflags);
-            }
-
-            nr_written--;
-            pbuf->write(*p++);
-        }
-
-        wakeup(pbuf);
-        return nbyte;
+        return filp->pipe()->write(buf, nbyte);
     }
 
     inode_t* ip = filp->inode();
@@ -216,23 +206,10 @@ int sys_read(int fd, void *buf, size_t nbyte)
     if (fd >= MAX_NR_FILE) return -EINVAL; 
 
     auto* filp = current->files[fd];
+    if (!filp->readable()) return -EPERM;
+
     if (filp->type() == File::Type::Pipe) {
-        PipeBuffer* pbuf = filp->buf();
-        char* p = (char*)buf;
-        size_t nr_read = 0;
-
-        while (nr_read < nbyte) {
-            while (pbuf->empty()) {
-                wakeup(pbuf);
-                auto oflags = vfslock.lock();
-                sleep(&vfslock, pbuf);
-                vfslock.release(oflags);
-            }
-
-            nr_read++;
-            *p++ = pbuf->read();
-        }
-        return nr_read;
+        return filp->pipe()->read(buf, nbyte);
     }
 
     inode_t* ip = filp->inode();
@@ -269,19 +246,66 @@ int sys_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
     return ret;
 }
 
+
+
+int Pipe::write(const void *buf, size_t nbyte)
+{
+    const char* p = (const char*)buf;
+    int nr_written = nbyte;
+
+    while (nr_written > 0) {
+        if (pbuf->full()) {
+            if (readf == NULL) {
+                //TODO: send signal PIPE
+                break;
+            }
+            wakeup(this);
+            auto oflags = vfslock.lock();
+            sleep(&vfslock, this);
+            vfslock.release(oflags);
+        } else {
+            nr_written--;
+            pbuf->write(*p++);
+        }
+    }
+
+    wakeup(this);
+    return nbyte - nr_written;
+}
+
+int Pipe::read(void *buf, size_t nbyte)
+{
+    char* p = (char*)buf;
+    size_t nr_read = 0;
+
+    while (nr_read < nbyte) {
+        if (pbuf->empty()) {
+            if (writef == NULL) {
+                break; // write end is closed
+            }
+            wakeup(this);
+            auto oflags = vfslock.lock();
+            sleep(&vfslock, this);
+            vfslock.release(oflags);
+        } else {
+            nr_read++;
+            *p++ = pbuf->read();
+        }
+    }
+    return nr_read;
+}
+
 File::File(Type ty)
-    : _ip(NULL), _off(0), _ref(0), _type(ty), _buf(NULL) 
+    : _ip(NULL), _off(0), _ref(0), _type(ty), _pipe(NULL) 
 {
 }
 
-void File::set_as_pipe(int fd[2])
+void File::set_pipe(Pipe* p)
 {
     kassert(_type == Type::None);
     _type = Type::Pipe;
     _ref = 1;
-    _buf = new PipeBuffer;
-    _pfd[0] = fd[0];
-    _pfd[1] = fd[1];
+    _pipe = p;
 }
 
 void File::set_inode(inode_t* ip) {
@@ -294,20 +318,28 @@ void File::set_inode(inode_t* ip) {
 //TODO: update disk if dirty
 void File::put() 
 {
-    if (_ref > 0) {
-        _ref--; 
-        if (_ref == 0) {
-            if (_type == Type::Inode) {
-                vfs.dealloc_inode(_ip);
-                _ip = NULL;
-            } else if (_type == Type::Pipe) {
-                //FIXME: flush remaining data or just close ?
-                while (!_buf->empty()) wakeup(_buf);
-                delete _buf;
-                _buf = NULL;
+    if (--_ref > 0) {
+        return;
+    } else {
+        if (_type == Type::Inode) {
+            vfs.dealloc_inode(_ip);
+            _ip = NULL;
+        } else if (_type == Type::Pipe) {
+            //FIXME: flush remaining data or just close ?
+            if (_pipe->readf == this) {
+                _pipe->readf = NULL;
+                wakeup(_pipe);
+            } else if (_pipe->writef == this) {
+                _pipe->writef = NULL;
+                wakeup(_pipe);
             }
-            _type = Type::None;
+
+            if (_pipe->readf == NULL && _pipe->writef == NULL) {
+                delete _pipe;
+                _pipe = NULL;
+            }
         }
+        _type = Type::None;
     }
 }
 

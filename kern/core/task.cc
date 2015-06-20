@@ -103,8 +103,8 @@ int sys_exit()
 {
     kassert(current != task_init);
 
-    for (int fd = 0; current->files[fd]; fd++) {
-        sys_close(fd);
+    for (int fd = 0; fd < FILES_PER_PROC; fd++) {
+        if (current->files[fd]) sys_close(fd);
     }
     memset(current->files, 0, sizeof current->files);
 
