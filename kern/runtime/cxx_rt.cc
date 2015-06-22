@@ -3,11 +3,16 @@
  * http://wiki.osdev.org/C%2B%2B
  */
 
+#ifdef __sos__
 #include "common.h"
 #include "vm.h"
+#else
+#include <unistd.h>
+#endif
 
 #define MAX_ATEXIT_ENTRIES 128
 
+//TODO: in user-space this should throw error
 extern "C" void __cxa_pure_virtual()
 {
     // do nothing
@@ -39,7 +44,6 @@ extern "C" void __cxa_finalize(void * d)
         for (int i = refs_len-1; i >= 0; --i) {
             if (refs[i].f)
                 refs[i].f(refs[i].arg);
-            kprintf("destructing %d ", i);
         }
         return;
     }
@@ -49,7 +53,6 @@ extern "C" void __cxa_finalize(void * d)
         if (refs[i].f == d) {
             refs[i].f(refs[i].arg);
             refs[i].f = NULL;
-            kprintf("destructing %d ", i);
         }
     }
 }
@@ -80,6 +83,7 @@ namespace __cxxabiv1
 }
 
 
+#ifdef __sos__
 void operator delete(void *ptr)
 {
     vmm.kfree(ptr);
@@ -99,4 +103,8 @@ void* operator new[](size_t len)
 {
     return ::operator new(len);
 }
+
+#else 
+// no user space impl yet
+#endif
 

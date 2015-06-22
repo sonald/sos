@@ -5,8 +5,6 @@
 #include <string.h>
 #include <ctype.h>
 
-#define NAME_MAX 64
-
 static const char* prompt = "sos # ";
 
 static void print(const char* buf)
@@ -14,13 +12,42 @@ static void print(const char* buf)
     write(STDOUT_FILENO, buf, strlen(buf));
 }
 
+static bool str_caseequal(const char* s1, const char* s2)
+{
+    const char* p1 = s1, *p2 = s2;
+    while (*p1 && *p2) {
+        int c1 = tolower(*p1), c2 = tolower(*p2);
+        if (c1 != c2) return false;
+        p1++, p2++;
+    }
+}
+
+#define MAX_NR_ARG 10
+#define MAX_NR_TOKEN 32
+#define MAX_NR_SYM MAX_NR_TOKEN
+#define SYM_LEN 128
+
+#define PATH_LEN 1024
+
+typedef struct cmd_args_s {
+    char argv[MAX_NR_ARG][SYM_LEN];
+    int argc;
+} cmd_args_t;
+
+typedef struct io_redirect_s {
+    bool apply;
+    char desc[SYM_LEN];
+} io_redirect_t;
+
 struct Command {
-    char name[NAME_MAX];
     virtual int execute() = 0;
+    virtual void dump() = 0;
 };
 
+static char pathname[PATH_LEN];
+
 struct Ls: public Command {
-    Ls(const char* dir): dir{dir} { strcpy(name, "ls"); }
+    Ls(const char* dir): dir{dir} {}
     const char* dir {NULL};
 
     int execute() override {
@@ -36,112 +63,302 @@ struct Ls: public Command {
         }
         return 0;
     }
+    void dump() override {}
 };
 
-struct Cat: public Command {
-    Cat(const char* filepath): filepath{filepath} { strcpy(name, "cat"); }
-    const char* filepath {NULL};
+struct Help: public Command {
+    Help() {}
 
     int execute() override {
-        int fd = open(filepath, O_RDONLY, 0);
-        if (fd >= 0) {
-            char buf[64];
-            int len = 0;
-            while ((len = read(fd, buf, sizeof buf - 1)) > 0) {
-                buf[len] = 0;
-                write(STDOUT_FILENO, buf, len);
-            }
+        char buf[128];
+        int len = sprintf(buf, sizeof buf - 1, "builtin commands: \n");
+        buf[len] = 0;
+        print(buf);
 
-            close(fd);
-        }
+        len = sprintf(buf, sizeof buf - 1, "dir, help \n");
+        buf[len] = 0;
+        print(buf);
         return 0;
     }
+    void dump() override {}
 };
 
-typedef struct cmd_args_s {
-    char cmd[NAME_MAX];
-    char argv[6][NAME_MAX];
-    int argc;
-} cmd_args_t;
+struct BaseCommand: public Command {
+    cmd_args_t args;
+    io_redirect_t input, output;
 
-char log[512] = "";
-void parse_cmdline(char* buf, int len, cmd_args_t* cmd)
-{
-    char* p = buf, *s = buf;
-    bool inarg = true;
-    memset((char*)cmd, 0, sizeof *cmd);
-
-    while (*p) {
-        if (isspace((int)*p)) {
-            if (inarg && (p - s > 0)) {
-                auto sz = p - s;
-                auto* sp = cmd->cmd[0] ? cmd->argv[cmd->argc++] : cmd->cmd;
-
-                strncpy(sp, s, sz);
-                sp[sz] = 0;
-            }
-            inarg = false;
-
-        } else if (!inarg) {
-            s = p;
-            inarg = true;
+    int execute() override {
+        auto& av = args.argv;
+        if (str_caseequal(av[0], "dir")) {
+            return Ls(args.argc > 1 ? av[1]: "/").execute();
+        } else if (str_caseequal(av[0], "help")) {
+            return Help().execute();
         }
-        p++;
-    }
 
-    if (inarg && (p - s > 0)) {
-        auto sz = p - s;
-        auto* sp = cmd->cmd[0] ? cmd->argv[cmd->argc++] : cmd->cmd;
-        strncpy(sp, s, sz);
-        sp[sz] = 0;
-    }
-}
+        const char bin[] = "/bin";
+        bool found = false;
 
-static bool str_caseequal(const char* s1, const char* s2)
-{
-    //kprintf("%s: %s, %s \n", __func__, s1, s2);
-    const char* p1 = s1, *p2 = s2;
-    while (*p1 && *p2) {
-        int c1 = tolower(*p1), c2 = tolower(*p2);
-        if (c1 != c2) return false;
-        p1++, p2++;
-    }
-
-    return *p1 == 0 && *p2 == 0;
-}
-
-static void try_external_app(cmd_args_t* args)
-{
-    const char bin[] = "/bin";
-    char buf[64] = "";
-    bool found = false;
-
-    int fd = open(bin, O_RDONLY, 0);
-    if (fd >= 0) {
-        struct dirent dire;
-        while (readdir(fd, &dire, 1) > 0) {
-            int len = sprintf(buf, sizeof buf - 1, "%s/%s", bin, dire.d_name);
-            buf[len] = 0;
-            if (str_caseequal(args->cmd, dire.d_name)) {
-                found = true;
-                break;
+        int fd = open(bin, O_RDONLY, 0);
+        if (fd >= 0) {
+            struct dirent dire;
+            while (readdir(fd, &dire, 1) > 0) {
+                if (str_caseequal(av[0], dire.d_name)) {
+                    int len = sprintf(pathname, PATH_LEN-1, "%s/%s", bin, av[0]);
+                    pathname[len] = 0;
+                    found = true;
+                    break;
+                }
             }
+            close(fd);
         }
-        close(fd);
 
         if (found) {
             int pid = fork();
             if (pid > 0) {
                 wait();
-
             } else if (pid == 0) {
-                execve(buf, 0, 0);
+                execve(pathname, 0, 0);
             } else {
                 print("fork error\n");
             }
         } else {
             print("can not found executable\n");
         }
+
+        return 0;
+    }
+
+    void dump() override {
+        print("(");
+        for (int i = 0; i < args.argc; i++) {
+            print(args.argv[i]);
+            print(" ");
+        }
+
+        if (input.apply) { print("(<"); print(input.desc); print(")"); }
+        if (output.apply) { print("(>"); print(output.desc); print(")"); }
+        print(")");
+    }
+};
+
+struct PipeCommand: public Command {
+    Command *lhs {NULL}, *rhs {NULL};
+    int execute() override {
+        pid_t pid = fork();
+        if (pid > 0) {
+            wait();
+        } else if (pid == 0) {
+            int fd[2];
+            pipe(fd);
+
+            pid_t pid = fork();
+            if (pid == 0) {
+                close(fd[0]);
+                dup2(fd[1], STDOUT_FILENO);
+                lhs->execute();
+
+            } else if (pid > 0) {
+                close(fd[1]);
+                dup2(fd[0], STDIN_FILENO);
+                rhs->execute();
+            }
+        }
+        return 0;
+    }
+
+    void dump() override {
+        print("(");
+        lhs->dump();
+        print(" ");
+        rhs->dump();
+        print(")");
+    }
+};
+
+enum TokenType {
+    T_PIPE,
+    T_REDIRECT_INPUT,  // < 
+    T_REDIRECT_OUTPUT, // >
+    T_STR_LITERAL,
+    T_SYMBOL, // all non-white sequence is considered a symbol now
+    T_EOF
+};
+
+typedef struct token_s {
+    TokenType type;
+    char* val; // for symbol or literal
+} token_t;
+
+//static storages, cause no malloc provided yet
+static PipeCommand s_pipes[10];
+static int s_nr_pipe = 0;
+static BaseCommand s_basecmds[MAX_NR_SYM];
+static int s_nr_basecmd = 0;
+
+// symbol and literal values
+static char symbols[MAX_NR_SYM*SYM_LEN];
+static int sym_mark = 0;
+
+static token_t tokens[MAX_NR_TOKEN];
+static int nr_token = 0;
+//~
+
+static token_t* peek(char* buf)
+{
+    if (nr_token == 0) return NULL;
+    if (nr_token >= MAX_NR_TOKEN) return NULL;
+    return &tokens[nr_token-1];
+}
+
+static char* _p = NULL;
+static token_t* next(char* buf)
+{
+    if (nr_token == 0) _p = buf;
+    else if (nr_token >= MAX_NR_TOKEN) return NULL;
+    while (*_p && isspace(*_p)) _p++;
+
+    token_t* tk = &tokens[nr_token++];
+    if (*_p == 0) {
+        tk->type = T_EOF;
+    } else if (*_p == '>') {
+        tk->type = T_REDIRECT_OUTPUT;
+        _p++;
+    } else if (*_p == '<') {
+        tk->type = T_REDIRECT_INPUT;
+        _p++;
+    } else if (*_p == '|') {
+        tk->type = T_PIPE;
+        _p++;
+    } else if (*_p == '"') {
+        tk->type = T_STR_LITERAL;
+        tk->val = &symbols[sym_mark];
+        _p++;
+        while (*_p && *_p != '"') {
+            symbols[sym_mark++] = *_p++;
+        }
+        _p++; // eat right \"
+        symbols[sym_mark++] = 0;
+    } else {
+        tk->type = T_SYMBOL;
+        tk->val = &symbols[sym_mark];
+        while (*_p && !isspace(*_p)) {
+            symbols[sym_mark++] = *_p++;
+        }
+        symbols[sym_mark++] = 0;
+    }
+    return tk;
+}
+
+static bool expect(char* buf, TokenType tt)
+{
+    auto* tk = peek(buf);
+    if (tk && tk->type != tt) {
+        print("parsing error\n");
+        return false;
+    }
+    return true;
+}
+
+
+static Command* parse_base_cmd(char* buf)
+{
+    BaseCommand* base = &s_basecmds[s_nr_basecmd++];
+    cmd_args_t& as = base->args;
+    as.argc = 0;
+
+    /*print("parse_base_cmd\n");*/
+    while (as.argc < MAX_NR_ARG) {
+        token_t* tk = next(buf);
+        if (!tk || (tk->type == T_EOF || tk->type == T_PIPE)) break;
+        switch(tk->type) {
+            case T_REDIRECT_INPUT: 
+                base->input.apply = true;
+                tk = next(buf);
+                if (!tk || tk->type != T_SYMBOL) return NULL;
+                memcpy(base->input.desc, tk->val, SYM_LEN);
+                base->input.desc[SYM_LEN-1] = 0;
+                break;
+
+            case T_REDIRECT_OUTPUT: 
+                base->output.apply = true;
+                tk = next(buf);
+                if (!tk || tk->type != T_SYMBOL) return NULL;
+                memcpy(base->output.desc, tk->val, SYM_LEN);
+                base->output.desc[SYM_LEN-1] = 0;
+                break;
+
+            case T_STR_LITERAL: 
+            case T_SYMBOL: 
+                memcpy(as.argv[as.argc], tk->val, SYM_LEN);
+                as.argv[as.argc++][SYM_LEN-1] = 0;
+                break;
+
+            default: return NULL; // should not go to ehre
+        }
+    }
+
+    return base;
+}
+
+static Command* parse_pipe(char* buf)
+{
+    Command* lhs = NULL, *rhs = NULL;
+
+    /*print("parse_pipe\n");*/
+    lhs = parse_base_cmd(buf);
+    token_t* tk = peek(buf);
+    while (tk && tk->type != T_EOF) {
+        if (expect(buf, T_PIPE)) {
+            /*print("parse_pipe rhs\n");*/
+            rhs = parse_base_cmd(buf);
+            PipeCommand* pipe = &s_pipes[s_nr_pipe++];
+            pipe->lhs = lhs, pipe->rhs = rhs;
+            lhs = pipe;
+
+            tk = peek(buf);
+
+        } else {
+            return NULL;
+        }
+    }
+
+    return lhs;
+}
+
+static void dump_tokens(char* buf)
+{
+    token_t* tk = NULL;
+    bool quit = false;
+    while ((tk = next(buf)) && !quit) {
+        switch(tk->type) {
+            case T_PIPE: print("| "); break;
+            case T_REDIRECT_INPUT: print("< "); break;
+            case T_REDIRECT_OUTPUT: print("> "); break;
+            case T_STR_LITERAL: print("\'"); print(tk->val); print("\' "); break;
+            case T_SYMBOL: print("{"); print(tk->val); print("} "); break;
+            case T_EOF: print("{EOF}\n"); quit = true; break;
+        }
+    }
+}
+
+static void reset_parser()
+{
+    nr_token = 0;
+    sym_mark = 0;
+    s_nr_pipe = 0;
+    s_nr_basecmd = 0;
+}
+
+static void parse_cmdline(char* buf)
+{
+    if (nr_token > 0) reset_parser();
+    dump_tokens(buf);
+
+    if (nr_token > 0) reset_parser();
+    Command* cmd = parse_pipe(buf);
+    if (cmd) {
+        cmd->dump();
+        cmd->execute();
     }
 }
 
@@ -163,21 +380,7 @@ int main()
             int len = read(STDIN_FILENO, cmd_buf, sizeof cmd_buf - 1);
             if (len > 0) {
                 cmd_buf[len] = 0;
-                cmd_args_t args;
-                parse_cmdline(cmd_buf, len, &args);
-
-                if (strcmp(args.cmd, "exit") == 0) {
-                    quit = true;
-
-                } else if (strcmp(args.cmd, "ls") == 0) {
-                    Ls(args.argc == 0 ? "/": args.argv[0]).execute();
-                } else if (strcmp(args.cmd, "cat") == 0) {
-                    if (args.argc) {
-                        Cat(args.argv[0]).execute();
-                    }
-                }  else {
-                    try_external_app(&args);
-                }
+                parse_cmdline(cmd_buf);
             }
         }
 

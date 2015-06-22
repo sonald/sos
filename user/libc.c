@@ -16,6 +16,7 @@ _syscall0(int, exit);
 _syscall0(int, wait);
 _syscall3(int, readdir, unsigned int, fd, struct dirent *, dirp, unsigned int, count);
 _syscall1(int, dup, int, fd);
+_syscall2(int, dup2, int, fd, int, fd2);
 _syscall1(int, pipe, int*, fds); // int fd[2]
 
 int execve(const char *path, char *const argv[], char *const envp[])
@@ -29,12 +30,18 @@ extern int main(int argc, char* argv[]);
 extern "C" {
 #endif
 
+extern void _init();
+extern void _fini();
+extern void __cxa_finalize(void * d);
+
 void _start()
 {
+    _init();
     int argc = 0;
     char* argv[1] = {NULL};
     main(argc, argv);
-
+    _fini();
+    __cxa_finalize(NULL);
     exit();
 }
 

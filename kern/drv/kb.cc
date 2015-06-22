@@ -286,6 +286,7 @@ static void keyboard_irq(trapframe_t* regs)
             case KEY_LEFTBRACKET:   packet.keycode = KEY_LEFTCURL; break;
             case KEY_RIGHTBRACKET:  packet.keycode = KEY_RIGHTCURL; break;
             case KEY_BACKSLASH:     packet.keycode = KEY_BAR; break;
+            case KEY_QUOTE:         packet.keycode = KEY_QUOTEDOUBLE; break;
             default: break;
         }
     } else 

@@ -3,7 +3,7 @@ CXX = $(CROSS_PATH)/i686-elf-g++
 CPP = $(CROSS_PATH)/i686-elf-cpp
 CC = $(CROSS_PATH)/i686-elf-gcc
 CXXFLAGS = -std=c++11 -I./include -ffreestanding  \
-		 -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG -fno-strict-aliasing
+		 -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG -fno-strict-aliasing -D__sos__
 
 USER_FLAGS = -std=c++11 -I./include -ffreestanding  \
 	   -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG
@@ -31,9 +31,21 @@ kern_objs := $(OBJS_DIR)/kern/runtime/crti.o $(crtbegin_o) \
 DEPFILES := $(patsubst %.cc, $(OBJS_DIR)/%.d, $(kernel_srcs))
 DEPFILES := $(patsubst %.s, $(OBJS_DIR)/%.d, $(DEPFILES))
 
-ulib = $(wildcard lib/*.cc)
+ulib_src = $(wildcard lib/*.cc) user/libc.c 
+ulib_obj := $(patsubst %.cc, $(OBJS_DIR)/user/%.o, $(ulib_src)) $(OBJS_DIR)/user/cxx_rt.o
+ulib_obj := $(patsubst user/%.c, $(OBJS_DIR)/user/lib/%.o, $(ulib_obj))
+
+ulib_pre_objs := $(OBJS_DIR)/kern/runtime/crti.o $(crtbegin_o) 
+ulib_post_objs := $(ulib_obj) $(crtend_o) $(OBJS_DIR)/kern/runtime/crtn.o
+
+uprogs_objs = $(patsubst user/%.c, $(OBJS_DIR)/user/bin/%.o, \
+	$(filter-out user/libc.c, $(wildcard user/*.c)))
+uprogs = $(patsubst $(OBJS_DIR)/user/bin/%.o, bin/%, $(uprogs_objs))
 
 all: run ramfs_gen
+
+# for debugging
+print-%: ; @echo $* = $($*)
 
 -include $(DEPFILES)
 
@@ -45,6 +57,11 @@ $(OBJS_DIR)/lib/%.d: lib/%.cc
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
+# for userspace
+$(OBJS_DIR)/user/cxx_rt.d: kern/runtime/cxx_rt.cc
+	@mkdir -p $(@D)
+	$(CPP) $(USER_FLAGS) $< -MM -MT $(@:.d=.o) >$@
+
 # print makefile variable (for debug purpose)
 print-%: ; @echo $* = $($*)
 
@@ -55,12 +72,12 @@ debug: kernel
 run: kernel hd.img initramfs.img
 	qemu-system-i386 -m 32 -s -monitor stdio -drive file=hd.img,format=raw -vga vmware
 
-hd.img: kernel bin/init bin/echo initramfs.img logo.ppm
+hd.img: kernel $(uprogs) initramfs.img logo.ppm
 	hdiutil attach hd.img
 	cp kernel /Volumes/SOS
 	cp logo.ppm /Volumes/SOS
 	cp bin/init /Volumes/SOS
-	cp bin/echo /Volumes/SOS/bin
+	cp bin/* /Volumes/SOS/bin
 	cp initramfs.img /Volumes/SOS
 	#hdiutil detach disk2
 
@@ -83,8 +100,35 @@ $(OBJS_DIR)/lib/%.o: lib/%.cc
 ramfs_gen: tools/ramfs_gen.c
 	gcc -o $@ $^
 
-# user prog
-bin/%: user/%.c user/libc.c $(ulib) user/user.ld
+$(OBJS_DIR)/user/%.o: kern/runtime/%.cc
+	@mkdir -p $(@D)
+	$(CXX) $(USER_FLAGS) -c -o $@ $<
+
+$(OBJS_DIR)/user/%.o: kern/runtime/%.s
+	@mkdir -p $(@D)
+	nasm -f elf32 -o $@ $<
+
+#################################################################
+# user space 
+#################################################################
+
+$(OBJS_DIR)/user/cxx_rt.o: kern/runtime/cxx_rt.cc
+	@mkdir -p $(@D)
+	$(CXX) $(USER_FLAGS) -c -o $@ $<
+
+$(OBJS_DIR)/user/lib/%.o: lib/%.cc
+	@mkdir -p $(@D)
+	$(CXX) $(USER_FLAGS) -c -o $@ $<
+
+$(OBJS_DIR)/user/lib/%.o: user/libc.c
+	@mkdir -p $(@D)
+	$(CXX) $(USER_FLAGS) -c -o $@ $<
+
+$(OBJS_DIR)/user/bin/%.o: user/%.c
+	@mkdir -p $(@D)
+	$(CXX) $(USER_FLAGS) -c -o $@ $<
+
+bin/%: $(ulib_pre_objs) $(OBJS_DIR)/user/bin/%.o $(ulib_post_objs) user/user.ld
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^
 
@@ -100,11 +144,13 @@ clean:
 	-rm $(OBJS_DIR)/kern/runtime/*.o
 	-rm $(OBJS_DIR)/kern/utils/*.o
 	-rm $(OBJS_DIR)/kern/drv/*.o
+	-rm $(OBJS_DIR)/user/lib/*.o
 	-rm $(OBJS_DIR)/kern/*.d
 	-rm $(OBJS_DIR)/kern/core/*.d
 	-rm $(OBJS_DIR)/kern/runtime/*.d
 	-rm $(OBJS_DIR)/kern/utils/*.d
 	-rm $(OBJS_DIR)/kern/drv/*.d
 	-rm $(OBJS_DIR)/lib/*.d
+	-rm $(OBJS_DIR)/user/lib/*.d
 	-rm echo init
 	-rm kernel

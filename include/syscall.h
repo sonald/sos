@@ -31,7 +31,8 @@
 #define SYS_getppid    24
 #define SYS_mmap       25
 #define SYS_readdir    26
+#define SYS_dup2       27
 
-#define NR_SYSCALL     27
+#define NR_SYSCALL     28
 
 #endif

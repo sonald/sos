@@ -116,6 +116,20 @@ int sys_close(int fd)
     return 0;
 }
 
+int sys_dup2(int fd, int fd2)
+{
+    if (fd == fd2) return 0;
+
+    auto* filp = current->files[fd2];
+    if (filp) sys_close(fd2); 
+
+    auto eflags = vfslock.lock();
+    current->files[fd]->dup();
+    current->files[fd2] = current->files[fd];
+    vfslock.release(eflags);
+    return 0;
+}
+
 int sys_dup(int fd)
 {
     int newfd = -1;
