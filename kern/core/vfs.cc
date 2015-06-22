@@ -370,7 +370,7 @@ void VFSManager::init_root(dev_t rootdev)
     auto* part = hd->part(MINOR(rootdev)-1);
     if (part->part_type == PartType::Fat32L) {
         // char devname[NAMELEN+1] = "rootfs";
-        // sprintf(devname, NAMELEN, "/dev/hd%c%d", 'a', MINOR(rootdev));
+        // snprintf(devname, NAMELEN, "/dev/hd%c%d", 'a', MINOR(rootdev));
         mount("rootfs", "/", "fat32", 0, 0);
     }
     delete hd;
@@ -544,8 +544,7 @@ inode_t* VFSManager::namei(const char* path)
     int len = strlen(path)+1;
     char* full_path = new char[len+1];
     if (path && path[0] != '/') {
-        sprintf(full_path, len, "/%s", path);
-        full_path[len] = 0;
+        snprintf(full_path, len, "/%s", path);
     } else {
         strcpy(full_path, path);
     }

@@ -56,9 +56,10 @@ struct Ls: public Command {
             struct dirent dire;
             while (readdir(fd, &dire, 1) > 0) {
                 char buf[64] = "";
-                int len = sprintf(buf, sizeof buf - 1, "%s, ", dire.d_name);
-                write(STDOUT_FILENO, buf, len);
+                snprintf(buf, sizeof buf - 1, "%s, ", dire.d_name);
+                print(buf);
             }
+            print("\n");
             close(fd);
         }
         return 0;
@@ -71,12 +72,10 @@ struct Help: public Command {
 
     int execute() override {
         char buf[128];
-        int len = sprintf(buf, sizeof buf - 1, "builtin commands: \n");
-        buf[len] = 0;
+        snprintf(buf, sizeof buf - 1, "builtin commands: \n");
         print(buf);
 
-        len = sprintf(buf, sizeof buf - 1, "dir, help \n");
-        buf[len] = 0;
+        snprintf(buf, sizeof buf - 1, "dir, help \n");
         print(buf);
         return 0;
     }
@@ -103,8 +102,7 @@ struct BaseCommand: public Command {
             struct dirent dire;
             while (readdir(fd, &dire, 1) > 0) {
                 if (str_caseequal(av[0], dire.d_name)) {
-                    int len = sprintf(pathname, PATH_LEN-1, "%s/%s", bin, av[0]);
-                    pathname[len] = 0;
+                    snprintf(pathname, PATH_LEN-1, "%s/%s", bin, av[0]);
                     found = true;
                     break;
                 }
@@ -389,8 +387,8 @@ int main()
         for(;;) {
             pid_t cpid = wait();
 
-            int len = sprintf(cmd_buf, sizeof cmd_buf - 1, "[A%d child %d exit]  ", pid, cpid);
-            write(1, cmd_buf, len);
+            snprintf(cmd_buf, sizeof cmd_buf - 1, "[A%d child %d exit]  ", pid, cpid);
+            print(cmd_buf);
         }
     }
 

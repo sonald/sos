@@ -12,8 +12,8 @@ int main(int argc, char* argv[])
         struct dirent dire;
         while (readdir(fd, &dire, 1) > 0) {
             char buf[64] = "";
-            int len = sprintf(buf, sizeof buf - 1, "%s, ", dire.d_name);
-            write(STDOUT_FILENO, buf, len);
+            snprintf(buf, sizeof buf - 1, "%s, ", dire.d_name);
+            write(STDOUT_FILENO, buf, strlen(buf));
         }
         close(fd);
     }

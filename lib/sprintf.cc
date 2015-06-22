@@ -56,7 +56,7 @@ char* utoa(u32 u, char* buf, int base)
      return p;
 }
 
-static char* ksputs(char* buf, size_t* len, const char* p)
+static char* ksnputs(char* buf, size_t* len, const char* p)
 {
     while (*p && (*len)--) {
         *buf++ = *p++;
@@ -64,7 +64,15 @@ static char* ksputs(char* buf, size_t* len, const char* p)
     return buf;
 }
 
-int vsprintf(char* sbuf, size_t len, const char* fmt, va_list args)
+static char* ksputs(char* buf, const char* p)
+{
+    while (*p) {
+        *buf++ = *p++;
+    }
+    return buf;
+}
+
+int vsnprintf(char* sbuf, size_t len, const char* fmt, va_list args)
 {
     char* old = sbuf;
 
@@ -80,22 +88,22 @@ int vsprintf(char* sbuf, size_t len, const char* fmt, va_list args)
             switch(*++fmt) {
                 case 'b': case 'B':
                     d = va_arg(args, int);
-                    sbuf = ksputs(sbuf, &len, itoa(d, buf, 2));
+                    sbuf = ksnputs(sbuf, &len, itoa(d, buf, 2));
                     break;
 
                 case 'x': case 'X':
                     u = va_arg(args, u32);
-                    sbuf = ksputs(sbuf, &len, utoa(u, buf, 16));
+                    sbuf = ksnputs(sbuf, &len, utoa(u, buf, 16));
                     break;
 
                 case 'd':
                     d = va_arg(args, int);
-                    sbuf = ksputs(sbuf, &len, itoa(d, buf, 10));
+                    sbuf = ksnputs(sbuf, &len, itoa(d, buf, 10));
                     break;
 
                 case 'u':
                     u = va_arg(args, u32);
-                    sbuf = ksputs(sbuf, &len, utoa(u, buf, 10));
+                    sbuf = ksnputs(sbuf, &len, utoa(u, buf, 10));
                     len--;
                     break;
 
@@ -112,7 +120,7 @@ int vsprintf(char* sbuf, size_t len, const char* fmt, va_list args)
 
                 case 's':
                     s = va_arg(args, char*);
-                    sbuf = ksputs(sbuf, &len, s?s:"(NULL)");
+                    sbuf = ksnputs(sbuf, &len, s?s:"(NULL)");
                     break;
 
                 default:
@@ -127,11 +135,81 @@ int vsprintf(char* sbuf, size_t len, const char* fmt, va_list args)
     return sbuf - old;
 }
 
-int sprintf(char* buf, size_t len, const char* fmt, ...)
+int vsprintf(char* sbuf, const char* fmt, va_list args)
+{
+    char* old = sbuf;
+
+    int d = 0;
+    u32 u = 0;
+    char* s = NULL;
+    char c = ' ';
+    char buf[32];
+
+    while (*fmt) {
+        char ch = *fmt;
+        if (ch == '%') {
+            switch(*++fmt) {
+                case 'b': case 'B':
+                    d = va_arg(args, int);
+                    sbuf = ksputs(sbuf, itoa(d, buf, 2));
+                    break;
+
+                case 'x': case 'X':
+                    u = va_arg(args, u32);
+                    sbuf = ksputs(sbuf, utoa(u, buf, 16));
+                    break;
+
+                case 'd':
+                    d = va_arg(args, int);
+                    sbuf = ksputs(sbuf, itoa(d, buf, 10));
+                    break;
+
+                case 'u':
+                    u = va_arg(args, u32);
+                    sbuf = ksputs(sbuf, utoa(u, buf, 10));
+                    break;
+
+                case '%':
+                    *sbuf++ = '%';
+                    break;
+
+                case 'c':
+                    c = va_arg(args, int);
+                    *sbuf++ = c;
+                    break;
+
+                case 's':
+                    s = va_arg(args, char*);
+                    sbuf = ksputs(sbuf, s?s:"(NULL)");
+                    break;
+
+                default:
+                    break;
+            }
+        } else {
+            *sbuf++ = ch;
+        }
+        fmt++;
+    }
+
+    return sbuf - old;
+}
+
+int snprintf(char* buf, size_t len, const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    int nwrite = vsprintf(buf, len, fmt, args);
+    int nwrite = vsnprintf(buf, len, fmt, args);
+    buf[nwrite] = 0;
+    va_end(args);
+    return nwrite;
+}
+
+int sprintf(char* buf, const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    int nwrite = vsprintf(buf, fmt, args);
     va_end(args);
     return nwrite;
 }

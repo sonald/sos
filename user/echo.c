@@ -17,7 +17,7 @@ int main(int argc, char* argv[])
     int fd[2];
     pipe(fd);
 
-    sprintf(echobuf, BUF_SZ - 1, "echo: fd0 %d, fd1 %d\n", fd[0], fd[1]);
+    snprintf(echobuf, BUF_SZ - 1, "echo: fd0 %d, fd1 %d\n", fd[0], fd[1]);
     myprint(echobuf);
 
     pid_t pid = fork();
@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
         int count = 0;
         // child 
         while(1) {
-            sprintf(echobuf, BUF_SZ - 1, "welcome from child #%d", count++);
+            snprintf(echobuf, BUF_SZ - 1, "welcome from child #%d", count++);
             write(fd[1], echobuf, strlen(echobuf));
             /*sleep(2000);*/
             if (count >= 4) break;
