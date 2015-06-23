@@ -40,7 +40,7 @@ typedef struct io_redirect_s {
 } io_redirect_t;
 
 struct Command {
-    virtual int execute() = 0;
+    virtual int execute(bool dofork = false) = 0;
     virtual void dump() = 0;
 };
 
@@ -50,7 +50,7 @@ struct Ls: public Command {
     Ls(const char* dir): dir{dir} {}
     const char* dir {NULL};
 
-    int execute() override {
+    int execute(bool dofork = false) override {
         int fd = open(dir, O_RDONLY, 0);
         if (fd >= 0) {
             struct dirent dire;
@@ -70,7 +70,7 @@ struct Ls: public Command {
 struct Help: public Command {
     Help() {}
 
-    int execute() override {
+    int execute(bool dofork = false) override {
         char buf[128];
         snprintf(buf, sizeof buf - 1, "builtin commands: \n");
         print(buf);
@@ -87,7 +87,7 @@ struct BaseCommand: public Command {
     cmd_args_t args;
     io_redirect_t input, output;
 
-    int execute() override {
+    int execute(bool dofork = false) override {
         auto& av = args.argv;
         if (str_caseequal(av[0], "dir")) {
             return Ls(args.argc > 1 ? av[1]: "/").execute();
@@ -112,7 +112,7 @@ struct BaseCommand: public Command {
         }
 
         if (found) {
-            run(pathname);
+            run(pathname, dofork);
         } else {
             print("can not found executable\n");
         }
@@ -120,20 +120,22 @@ struct BaseCommand: public Command {
         return 0;
     }
 
-    void run(const char* path) {
-        int pid = fork();
-        if (pid > 0) {
-            wait();
-        } else if (pid == 0) {
-            //TODO: io redirection
-            int argc = args.argc;
-            char* argv[argc+1];
-            for (int i = 0; i < argc; i++) {
-                argv[i] = &store[i][0];
-                strcpy(argv[i], args.argv[i]);
+    void run(const char* path, bool dofork) {
+        int pid = 0;
+        if (!dofork || (pid = fork()) >= 0) {
+            if (pid > 0) {
+                wait();
+            } else if (pid == 0) {
+                //TODO: io redirection
+                int argc = args.argc;
+                char* argv[argc+1];
+                for (int i = 0; i < argc; i++) {
+                    argv[i] = &store[i][0];
+                    strcpy(argv[i], args.argv[i]);
+                }
+                argv[argc] = NULL;
+                execve(path, argv, 0);
             }
-            argv[argc] = NULL;
-            execve(path, argv, 0);
         } else {
             print("fork error\n");
         }
@@ -154,7 +156,7 @@ struct BaseCommand: public Command {
 
 struct PipeCommand: public Command {
     Command *lhs {NULL}, *rhs {NULL};
-    int execute() override {
+    int execute(bool dofork = false) override {
         pid_t pid = fork();
         if (pid > 0) {
             wait();
@@ -166,12 +168,12 @@ struct PipeCommand: public Command {
             if (pid == 0) {
                 close(fd[0]);
                 dup2(fd[1], STDOUT_FILENO);
-                lhs->execute();
+                lhs->execute(false);
 
             } else if (pid > 0) {
                 close(fd[1]);
                 dup2(fd[0], STDIN_FILENO);
-                rhs->execute();
+                rhs->execute(false);
             }
         }
         return 0;
@@ -360,21 +362,16 @@ static void reset_parser()
     s_nr_basecmd = 0;
 }
 
-static void parse_cmdline(char* buf)
+static Command* parse_cmdline(char* buf)
 {
-    if (nr_token > 0) reset_parser();
-    dump_tokens(buf);
+    /*if (nr_token > 0) reset_parser();*/
+    /*dump_tokens(buf);*/
 
     if (nr_token > 0) reset_parser();
-    Command* cmd = parse_pipe(buf);
-    if (cmd) {
-        cmd->dump();
-        cmd->execute();
-    }
+    return parse_pipe(buf);
 }
 
 static char cmd_buf[64] = "";
-
 static bool quit = false;
 
 int main()
@@ -391,17 +388,17 @@ int main()
             int len = read(STDIN_FILENO, cmd_buf, sizeof cmd_buf - 1);
             if (len > 0) {
                 cmd_buf[len] = 0;
-                parse_cmdline(cmd_buf);
+                auto* cmd = parse_cmdline(cmd_buf);
+                if (cmd) {
+                    cmd->dump();
+                    cmd->execute(true);
+                }
             }
         }
 
     } else {
-        pid = getpid();
         for(;;) {
-            pid_t cpid = wait();
-
-            snprintf(cmd_buf, sizeof cmd_buf - 1, "[A%d child %d exit]  ", pid, cpid);
-            print(cmd_buf);
+            wait();
         }
     }
 

@@ -64,12 +64,15 @@ ssize_t DevFs::read(File *filp, char * buf, size_t count, off_t * offset)
         auto* rdev = chr_device_get(ip->dev);
         if (!rdev) return -ENOENT;
         auto* sp = buf;
+
+        auto oflags = devfslock.lock();
         while (count > 0 && (*sp = rdev->read()) >= 0) {
             count--;
             if (*sp == '\n') break;
             sp++;
         }
         *sp = 0;
+        devfslock.release(oflags);
 
         count = sp - buf;
     } else if (ip->type == FsNodeType::BlockDev) {
@@ -93,11 +96,13 @@ ssize_t DevFs::write(File *filp, const char * buf, size_t count, off_t *offset)
         auto* rdev = chr_device_get(ip->dev);
         if (!rdev) return -ENOENT;
 
+        auto oflags = devfslock.lock();
         while (count > 0 && *sp) {
             rdev->write(*sp);
             sp++;
             count--;
         }
+        devfslock.release(oflags);
     }
 
     return sp - buf;

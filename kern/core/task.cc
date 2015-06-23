@@ -252,6 +252,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     int argc = 0;
     char* kargv[MAX_NR_ARG+1];
 
+    auto oldflags = tasklock.lock();
     // copy from userspace before addrspace remapped
     if (argv) {
         while (argc < MAX_NR_ARG && argv[argc]) argc++;
@@ -264,7 +265,9 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     kargv[argc] = NULL;
 
     inode_t* ip = vfs.namei(path);
-    kassert(ip != NULL);
+    if (!ip) {
+        return -ENOENT;
+    }
 
     char* buf = new char[ip->size];
 
@@ -278,7 +281,6 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
         return -ENOENT;
     }
 
-    auto oldflags = tasklock.lock();
     strncpy(current->name, path, sizeof current->name - 1);
 
     elf_header_t* elf = (elf_header_t*)buf;

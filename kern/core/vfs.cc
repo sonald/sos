@@ -208,8 +208,8 @@ int sys_write(int fd, const void *buf, size_t nbyte)
         return -1;
     }
 
-    off_t off = filp->off();
     auto eflags = vfslock.lock();
+    off_t off = filp->off();
     auto ret = ip->fs->write(filp, (char*)buf, nbyte, &off);
     vfslock.release(eflags);
     return ret;
@@ -227,8 +227,8 @@ int sys_read(int fd, void *buf, size_t nbyte)
     }
 
     inode_t* ip = filp->inode();
-    off_t off = filp->off();
     auto eflags = vfslock.lock();
+    off_t off = filp->off();
     auto ret = ip->fs->read(filp, (char*)buf, nbyte, &off);
     vfslock.release(eflags);
     return ret;
