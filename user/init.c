@@ -82,6 +82,7 @@ struct Help: public Command {
     void dump() override {}
 };
 
+static char store[MAX_NR_ARG][SYM_LEN];
 struct BaseCommand: public Command {
     cmd_args_t args;
     io_redirect_t input, output;
@@ -111,19 +112,31 @@ struct BaseCommand: public Command {
         }
 
         if (found) {
-            int pid = fork();
-            if (pid > 0) {
-                wait();
-            } else if (pid == 0) {
-                execve(pathname, 0, 0);
-            } else {
-                print("fork error\n");
-            }
+            run(pathname);
         } else {
             print("can not found executable\n");
         }
 
         return 0;
+    }
+
+    void run(const char* path) {
+        int pid = fork();
+        if (pid > 0) {
+            wait();
+        } else if (pid == 0) {
+            //TODO: io redirection
+            int argc = args.argc;
+            char* argv[argc+1];
+            for (int i = 0; i < argc; i++) {
+                argv[i] = &store[i][0];
+                strcpy(argv[i], args.argv[i]);
+            }
+            argv[argc] = NULL;
+            execve(path, argv, 0);
+        } else {
+            print("fork error\n");
+        }
     }
 
     void dump() override {

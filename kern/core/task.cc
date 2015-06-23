@@ -245,16 +245,26 @@ static int load_proc(void* code, elf_prog_header_t* ph)
     return 0;
 }
 
+#define MAX_NR_ARG 10
+static char store[MAX_NR_ARG][128];
 int sys_execve(const char *path, char *const argv[], char *const envp[])
 {
-    (void)argv;
-    (void)envp;
+    int argc = 0;
+    char* kargv[MAX_NR_ARG+1];
 
-    auto oldflags = tasklock.lock();
+    // copy from userspace before addrspace remapped
+    if (argv) {
+        while (argc < MAX_NR_ARG && argv[argc]) argc++;
+        for (int i = 0; i < argc; i++) {
+            kargv[i] = &store[i][0];
+            int len = strlen(argv[i]) + 1;
+            memcpy(kargv[i], argv[i], len);
+        }
+    }
+    kargv[argc] = NULL;
 
     inode_t* ip = vfs.namei(path);
     kassert(ip != NULL);
-    strncpy(current->name, path, sizeof current->name - 1);
 
     char* buf = new char[ip->size];
 
@@ -265,9 +275,11 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     if (len < 0) {
         kprintf("load %s failed\n", path);
         delete buf;
-        tasklock.release(oldflags);
         return -ENOENT;
     }
+
+    auto oldflags = tasklock.lock();
+    strncpy(current->name, path, sizeof current->name - 1);
 
     elf_header_t* elf = (elf_header_t*)buf;
     if (elf->e_magic != ELF_MAGIC) {
@@ -310,7 +322,34 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
     current->entry = (void*)elf->e_entry;
     trapframe_t* regs = current->regs;
     regs->eip = elf->e_entry;
-    regs->useresp = USTACK_TOP;
+
+
+    // layout: 
+    // &argv[MAX_ARG-1]
+    // ...
+    // &argv[0]
+    // argv
+    // argc
+    // ret_addr (fake)
+    uint32_t ustack[12];
+    ustack[0] = 0x0;
+
+    char* sp = (char*)USTACK_TOP;
+    for (int i = 0; i < argc; i++) {
+        len = strlen(kargv[i]) + 1;
+        sp = (char*)(((uint32_t)sp - len) & ~3); // align word boundary
+        memcpy(sp, kargv[i], len);
+        ustack[3+i] = (uint32_t)sp;
+    }
+
+    ustack[3+argc] = 0; // null terminated
+
+    ustack[1] = argc;
+    ustack[2] = (uint32_t)sp - (argc+1) * sizeof(int);
+    sp = (char*)((uint32_t)sp - (argc+4) * sizeof(int));
+    memcpy(sp, ustack, (argc+4) * sizeof(int));
+
+    regs->useresp = (uint32_t)sp;
 
     tasklock.release(oldflags);
     return 0;

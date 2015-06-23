@@ -34,11 +34,9 @@ extern void _init();
 extern void _fini();
 extern void __cxa_finalize(void * d);
 
-void _start()
+void _start(int argc, char* argv[])
 {
     _init();
-    int argc = 0;
-    char* argv[1] = {NULL};
     main(argc, argv);
     _fini();
     __cxa_finalize(NULL);
