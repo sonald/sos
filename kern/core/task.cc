@@ -262,6 +262,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
             memcpy(kargv[i], argv[i], len);
         }
     }
+    tasklock.release(oldflags);
     kargv[argc] = NULL;
 
     inode_t* ip = vfs.namei(path);
@@ -281,6 +282,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
         return -ENOENT;
     }
 
+    oldflags = tasklock.lock();
     strncpy(current->name, path, sizeof current->name - 1);
 
     elf_header_t* elf = (elf_header_t*)buf;

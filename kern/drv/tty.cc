@@ -158,6 +158,7 @@ void tty_enqueue()
         if (ch == ERASE_CHAR(tty1) || ch == '\b') {
             //do erase
             if (!tty1->secondaryq.empty() && tty1->secondaryq.last() != '\n') {
+                //TODO: handle \t deletion
                 current_display->del();
                 tty1->secondaryq.drop();
             }
@@ -173,18 +174,22 @@ void tty_enqueue()
 
         } else if (ch == WERASE_CHAR(tty1)) {
             //remove word
-            while (!tty1->secondaryq.empty() && !isspace(tty1->secondaryq.last())) {
+            int state = isspace(tty1->secondaryq.last()) ? 0:1;
+            while (!tty1->secondaryq.empty()) {
+                if (state == 0 && !isspace(tty1->secondaryq.last()))
+                    state = 1;
+                else if (state == 1 && isspace(tty1->secondaryq.last()))
+                    break;
+
+                //TODO: handle \t deletion
                 current_display->del();
                 tty1->secondaryq.drop();
             }
+
             return;
 
         } else if (ch == EOF_CHAR(tty1)) {
             ch = '\n'; // return immediately
-            tty1->secondaryq.write(ch);
-            tty1->has_full_line = true;
-            wakeup(&tty1->readq);
-            return;
         }
     } 
 
