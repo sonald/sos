@@ -177,6 +177,7 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     ata_init();
     tty_init();
     bio.init();
+    vfs.init();
 
     vfs.register_fs("fat32", create_fat32fs);
     vfs.register_fs("ramfs", create_ramfs);

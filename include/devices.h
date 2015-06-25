@@ -10,6 +10,7 @@
 
 enum DeviceType {
     TTY_MAJOR  = 1,
+    DEVFS_MAJOR,
     RAMFS_MAJOR,
     IDE_MAJOR,
     FLOPPY_MAJOR,

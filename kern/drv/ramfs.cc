@@ -35,7 +35,8 @@ void Ramfs::init(char* addr, size_t size, const char* cmdline)
     kprintf("files: %d\n", _sb->nfiles);
 
     u32 dev = DEVNO(RAMFS_MAJOR, 0);
-    _iroot = vfs.alloc_inode();
+    _iroot = vfs.alloc_inode(dev, 1);
+    _iroot->ref = 1;
     _iroot->dev = dev;
     _iroot->type = FsNodeType::Dir;
     _iroot->ino = 1;
@@ -85,9 +86,12 @@ int Ramfs::readdir(File* filp, dentry_t * de, filldir_t)
     initrd_entry_header_t* ieh = &_sb->files[id];
     strcpy(de->name, ieh->name);
 
-    de->ip = vfs.alloc_inode();
-    de->ip->ino = id+2;
-    read_inode(de->ip);
+    de->ip = vfs.alloc_inode(_iroot->dev, id+2);
+    if (de->ip->ref == 0) {
+        de->ip->ref++;
+        de->ip->ino = id+2;
+        read_inode(de->ip);
+    }
 
     filp->set_off((id+1)*sizeof(initrd_entry_header_t));
     return 1;
@@ -106,9 +110,12 @@ dentry_t * Ramfs::lookup(inode_t * dir, dentry_t *de)
     }
 
     if (i >= _nr_nodes) return NULL;
-    de->ip = vfs.alloc_inode();
-    de->ip->ino = i+2;
-    read_inode(de->ip);
+    de->ip = vfs.alloc_inode(_iroot->dev, i+2);
+    if (de->ip->ref == 0) {
+        de->ip->ref++;
+        de->ip->ino = i+2;
+        read_inode(de->ip);
+    }
 
     return de;
 }

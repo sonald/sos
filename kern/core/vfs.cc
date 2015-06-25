@@ -553,8 +553,8 @@ inode_t* VFSManager::namei(const char* path)
 
     if (strcmp(new_path, "/") == 0) {
         vfslock.release(eflags);
-        auto* dup = alloc_inode();
-        memcpy(dup, mnt->fs->root(), sizeof *dup);
+        auto* dup = mnt->fs->root();
+        dup->ref++;
         return dup;
     }
 
@@ -616,31 +616,44 @@ void VFSManager::dealloc_entry(dentry_t* de)
     vfslock.release(eflags);
 }
 
-inode_t* VFSManager::alloc_inode()
+inode_t* VFSManager::alloc_inode(dev_t dev, uint32_t ino)
 {
-    inode_t* ip = &cached_inodes[0];
+    inode_t *newp = NULL;
     int i;
 
     auto eflags = vfslock.lock();
-    for (i = 0; i < MAX_NR_INODE; i++, ip++) {
-        if (ip->ino == 0 && ip->dev == 0 && ip->blksize == 0) {
-            memset(ip, 0, sizeof *ip);
+    for (i = 0; i < MAX_NR_INODE; i++) {
+        auto* p = &cached_inodes[i];
+        if (p->ref > 0 && p->ino == ino && p->dev == dev) {
+            p->ref++;
             vfslock.release(eflags);
-            return ip;
+            return p;
+        }
+        if (p->ref == 0 && p->ino == 0) {
+            newp = p;
         } 
     }
+    if (!newp) panic("no mem for inode");
     vfslock.release(eflags);
-    panic("no mem for inode");
-    return NULL;
+
+    return newp;
 }
 
 void VFSManager::dealloc_inode(inode_t* ip)
 {
     auto eflags = vfslock.lock();
-    if (ip->data) {
-        vmm.kfree(ip->data);
-        ip->data = 0;
-    }
-    memset(ip, 0, sizeof *ip);
+    if (--ip->ref == 0) {
+        if (ip->data) {
+            vmm.kfree(ip->data);
+            ip->data = 0;
+        }
+        memset(ip, 0, sizeof *ip);
+    } 
     vfslock.release(eflags);
+}
+
+void VFSManager::init()
+{
+    memset(cached_inodes, 0 ,sizeof cached_inodes);
+    memset(cached_dentries, 0, sizeof cached_dentries);
 }

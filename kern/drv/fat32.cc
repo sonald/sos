@@ -107,6 +107,7 @@ void Fat32Fs::init(dev_t dev)
     Disk* hd = new Disk;
 
     _dev = DEVNO(MAJOR(dev), 0);
+    _pdev = dev;
     int partid = MINOR(dev)-1;
     kprintf("load fat32 at drive %d part %d\n", _dev, partid);
     hd->init(_dev);
@@ -171,9 +172,12 @@ void Fat32Fs::init(dev_t dev)
     kassert(32 == sizeof(union fat_dirent));
 
     // create _iroot
-    _iroot = vfs.alloc_inode();
-    _iroot->ino = 1;
-    read_inode(_iroot);
+    _iroot = vfs.alloc_inode(_pdev, 1);
+    if (_iroot->ref == 0) {
+        _iroot->ino = 1;
+        read_inode(_iroot);
+        _iroot->ref = 1;
+    }
 
     _icache_size = 0;
     memset(_icaches, 0, sizeof _icaches);
@@ -193,7 +197,7 @@ uint32_t Fat32Fs::cluster2sector(uint32_t cluster)
 void Fat32Fs::read_inode(inode_t *ip, fat_inode_t* fat_ip)
 {
     if (ip->ino == 1) {
-        ip->dev = _dev;
+        ip->dev = _pdev;
         ip->type = FsNodeType::Dir;
         ip->size = 0;
         ip->blksize = _blksize;
@@ -209,7 +213,7 @@ void Fat32Fs::read_inode(inode_t *ip, fat_inode_t* fat_ip)
         // for fat12/16, this is invalid
         fat_ip->start_cluster = sector2cluster(_root_start_sect); // care about fat32
     } else {
-        ip->dev = _dev;
+        ip->dev = _pdev;
         ip->type = (fat_ip->attr & DIRECTORY) ? FsNodeType::Dir : FsNodeType::File;
         ip->size = fat_ip->size; //FIXME: if dir, need traverse to do it !!
         ip->blksize = _blksize;
@@ -346,12 +350,12 @@ _out:
     vmm.kfree(dpp);
 
     if (fat_ip) {
-        *ip = vfs.alloc_inode();
-        (*ip)->ino = fat_ip->start_cluster;
-        read_inode(*ip, fat_ip);
-        // kprintf("[%s: found %s attr 0x%x type %s]", __func__, fat_ip->std_name,
-        //     fat_ip->attr, ((*ip)->type == FsNodeType::Dir ? "dir" : "file"));
-
+        *ip = vfs.alloc_inode(_pdev, fat_ip->start_cluster);
+        if ((*ip)->ref == 0) {
+            (*ip)->ref++;
+            (*ip)->ino = fat_ip->start_cluster;
+            read_inode(*ip, fat_ip);
+        }
     }
 
     return end_of_dir ? 0 : 1;
@@ -463,11 +467,14 @@ int Fat32Fs::readdir(File *filp, dentry_t *de, filldir_t)
     auto oflags = fatlock.lock();
     fat_inode_t* fat_ip = find_in_cache(dir, id);
     if (fat_ip) {
-        de->ip = vfs.alloc_inode();
-        de->ip->ino = fat_ip->start_cluster;
-        auto* new_fip = (fat_inode_t*)vmm.kmalloc(sizeof(fat_inode_t), 1);
-        memcpy(new_fip, fat_ip, sizeof *new_fip);
-        read_inode(de->ip, new_fip);
+        de->ip = vfs.alloc_inode(_pdev, fat_ip->start_cluster);
+        if (de->ip->ref == 0) {
+            de->ip->ino = fat_ip->start_cluster;
+            de->ip->ref = 1;
+            auto* new_fip = (fat_inode_t*)vmm.kmalloc(sizeof(fat_inode_t), 1);
+            memcpy(new_fip, fat_ip, sizeof *new_fip);
+            read_inode(de->ip, new_fip);
+        }
 
     } else {
         // kprintf(" [%s: off %d, id %d] ", __func__, filp->off(), id);

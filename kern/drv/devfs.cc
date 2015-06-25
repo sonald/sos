@@ -20,8 +20,11 @@ struct known_dev_ {
 
 void DevFs::init()
 {
-    _iroot = vfs.alloc_inode();
-    _iroot->dev = 0;
+    dev_t dev = DEVNO(DEVFS_MAJOR, 0);
+    _iroot = vfs.alloc_inode(dev, 1);
+    kassert(_iroot->ref == 0);
+    _iroot->ref++;
+    _iroot->dev = dev;
     _iroot->type = FsNodeType::Dir;
     _iroot->ino = 1;
     _iroot->size = 0;
@@ -41,15 +44,17 @@ dentry_t * DevFs::lookup(inode_t * dir, dentry_t *de)
         }
     }
     if (i >= ARRAYLEN(known_devs)) return NULL;
-    de->ip = vfs.alloc_inode();
-    de->ip->ino = i+2;
-    de->ip->dev = known_devs[i].dev;
-    de->ip->type = known_devs[i].type;
-    de->ip->size = 0;
-    de->ip->blksize = 1;
-    de->ip->blocks = de->ip->size;
-    de->ip->fs = this;
-
+    de->ip = vfs.alloc_inode(known_devs[i].dev, i+2);
+    if (de->ip->ref == 0) {
+        de->ip->ino = i+2;
+        de->ip->dev = known_devs[i].dev;
+        de->ip->type = known_devs[i].type;
+        de->ip->size = 0;
+        de->ip->blksize = 1;
+        de->ip->blocks = de->ip->size;
+        de->ip->fs = this;
+        de->ip->ref++;
+    } 
     return de;
 }
 

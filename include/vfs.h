@@ -31,6 +31,7 @@ typedef struct inode_s {
     time_t ctime;
     umode_t mode;
     FsNodeType type;
+    int ref; // in-memory copies
     void* data; // fs specific
     FileSystem* fs;
 } inode_t;
@@ -158,6 +159,7 @@ typedef struct file_system_type_s {
 
 class VFSManager {
     public:
+        void init();
         void init_root(dev_t rootdev); //bootstrap root dev
         void register_fs(const char* fsname, CreateFsFunction func);
         file_system_type_t* find_fs(const char* fsname);
@@ -175,7 +177,7 @@ class VFSManager {
 
         dentry_t* alloc_entry();
         void dealloc_entry(dentry_t*);
-        inode_t* alloc_inode();
+        inode_t* alloc_inode(dev_t dev, uint32_t ino);
         void dealloc_inode(inode_t*);
 
     private:
@@ -183,8 +185,6 @@ class VFSManager {
         file_system_type_t* _fs_types {nullptr};
         FileSystem* _rootfs {nullptr}; // fs for root mountpoint
         mount_info_t* _mounts {nullptr};
-
-
 };
 
 extern dev_t rootdev;

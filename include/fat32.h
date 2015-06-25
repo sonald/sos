@@ -167,6 +167,7 @@ class Fat32Fs: public FileSystem {
 
     private:
         dev_t _dev;  // disk device, no partition info included
+        dev_t _pdev; // partiton dev
         fat_bs_t _fat_bs;
         FatType _type;
 
