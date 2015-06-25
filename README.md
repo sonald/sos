@@ -1,6 +1,10 @@
+![logo](images/logo.ppm?raw=true)
+
 sos
 ===
 Sian's experimenting Operating System written in C++. it's a 32bit os kernel and runs on uniprocessor.
+
+![screenshot](images/screenshot.png?raw=true)
 
 BUILD
 ====
@@ -22,7 +26,7 @@ When design other parts of the kernel, you can stick to the unix tradition or ju
 
 TODOs
 ====
-+ tty and io
++ tty and io partially works
 + enough syscalls for sh
 + write support of vfs & block io layers
 + signal handling
