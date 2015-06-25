@@ -10,14 +10,14 @@ void Disk::init(dev_t dev)
     memcpy(_parts, &mbr->data[PART_TABLE_OFFSET], sizeof _parts);
     bio.release(mbr);
 
-    kprintf("PARTs: \n");
-    auto* p = &_parts[0];
-    while (p->nr_sects) {
-        kprintf("\tstart: 0x%x, sz: 0x%x, b: %d, ty: %s\n", p->lba_start,
-                p->nr_sects, p->boot,
-                p->part_type == PartType::Fat32L ? "fat32l"
-                : (p->part_type == PartType::Linux ? "ext2" : "(X"));
-        p++;
-    }
+    //kprintf("PARTs: \n");
+    //auto* p = &_parts[0];
+    //while (p->nr_sects) {
+        //kprintf("\tstart: 0x%x, sz: 0x%x, b: %d, ty: %s\n", p->lba_start,
+                //p->nr_sects, p->boot,
+                //p->part_type == PartType::Fat32L ? "fat32l"
+                //: (p->part_type == PartType::Linux ? "ext2" : "(X"));
+        //p++;
+    //}
 }
 

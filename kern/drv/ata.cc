@@ -84,7 +84,7 @@ void PATADevice::init(int bus, bool master)
         fn(&data[27], (char*)&model, 20);
         _sectors = data[60] | (data[61] << 16);
     }
-    kprintf("IDE %d %s %sdetected, sectors %d, model (%s) serial (%s)",
+    kprintf("IDE %d %s %sdetected, sectors %d, model (%s) serial (%s)\n",
             bus, master?"master":"slave",
             _valid?"":"not ", _sectors, model, serial);
 }

@@ -240,8 +240,7 @@ int sys_fork()
         }
     }
 
-    // kprintf("%s: old eip %x, new eip %x  ", __func__, current->regs->eip, proc->regs->eip);
-    kprintf("fork %d -> %d\n", current->pid, next_pid);
+    //kprintf("fork %d -> %d\n", current->pid, next_pid);
     kassert(proc->regs->useresp == current->regs->useresp);
     proc->state = TASK_READY;
     tasklock.release(oldflags);

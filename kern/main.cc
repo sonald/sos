@@ -167,9 +167,9 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     current_display->set_text_color(YELLOW);
     kprintf("detected mem(%dKB): low: %dKB, hi: %dKB\n",
             memsize, mb->low_mem, mb->high_mem);
-    if (mb->flags & MULTIBOOT_INFO_MEM_MAP) {
-        apply_mmap(mb->mmap_length, mb->mmap_addr);
-    }
+    //if (mb->flags & MULTIBOOT_INFO_MEM_MAP) {
+        //apply_mmap(mb->mmap_length, mb->mmap_addr);
+    //}
     current_display->set_text_color(LIGHT_MAGENTA);
 
     tasks_init();

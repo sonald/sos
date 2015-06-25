@@ -44,41 +44,50 @@ struct Command {
     virtual void dump() = 0;
 };
 
-
-struct Ls: public Command {
-    Ls(const char* dir): dir{dir} {}
-    const char* dir {NULL};
-
-    int execute(bool dofork = false) override {
-        int fd = open(dir, O_RDONLY, 0);
-        if (fd >= 0) {
-            struct dirent dire;
-            while (readdir(fd, &dire, 1) > 0) {
-                char buf[64] = "";
-                snprintf(buf, sizeof buf - 1, "%s, ", dire.d_name);
-                print(buf);
-            }
-            print("\n");
-            close(fd);
+using command_runner_t = int (*)(const cmd_args_t& args);
+using command_descriptor_t = void (*)();
+static struct builtin_command {
+    const char* name;
+    command_runner_t fn; 
+    command_descriptor_t desc_fn;
+} builtins[] = {
+    { 
+        "kdump",
+        [] (const cmd_args_t& args) -> int {
+            kdump();
+            return 0;
+        },
+        [] () {
+            print("display basic information for all tasks.\n");
         }
-        return 0;
+    },
+    { 
+        "help",
+        [] (const cmd_args_t& args) -> int {
+            if (args.argc > 1) {
+                for (int i = 0; builtins[i].name; i++) {
+                    if (str_caseequal(args.argv[1], builtins[i].name)) {
+                        builtins[i].desc_fn();
+                        return 0;
+                    }
+                }
+            }
+            char buf[128];
+            snprintf(buf, sizeof buf - 1, "builtin commands: \n");
+            print(buf);
+
+            snprintf(buf, sizeof buf - 1, "kdump, help \n");
+            print(buf);
+            return 0;
+        },
+        [] () {
+            print("show help for all builtin commands. use help "
+                    " command to show details. \n");
+        }
+    },
+    {
+        NULL, NULL, NULL
     }
-    void dump() override {}
-};
-
-struct Help: public Command {
-    Help() {}
-
-    int execute(bool dofork = false) override {
-        char buf[128];
-        snprintf(buf, sizeof buf - 1, "builtin commands: \n");
-        print(buf);
-
-        snprintf(buf, sizeof buf - 1, "dir, help \n");
-        print(buf);
-        return 0;
-    }
-    void dump() override {}
 };
 
 struct BaseCommand: public Command {
@@ -87,10 +96,10 @@ struct BaseCommand: public Command {
 
     int execute(bool dofork = false) override {
         auto& av = args.argv;
-        if (str_caseequal(av[0], "dir")) {
-            return Ls(args.argc > 1 ? av[1]: "/").execute();
-        } else if (str_caseequal(av[0], "help")) {
-            return Help().execute();
+        for (int i = 0; builtins[i].name; i++) {
+            if (str_caseequal(av[0], builtins[i].name)) {
+                return builtins[i].fn(args);
+            }
         }
 
         const char bin[] = "/bin";
@@ -120,7 +129,6 @@ struct BaseCommand: public Command {
     }
 
     void run(const char* path, bool dofork) {
-        /*char store[MAX_NR_ARG][SYM_LEN];*/
         int pid = 0;
         if (!dofork || (pid = fork()) >= 0) {
             if (pid > 0) {
@@ -131,8 +139,6 @@ struct BaseCommand: public Command {
                 char* argv[argc+1];
                 for (int i = 0; i < argc; i++) {
                     argv[i] = &args.argv[i][0];
-                    /*argv[i] = &store[i][0];*/
-                    /*strcpy(argv[i], args.argv[i]);*/
                 }
                 argv[argc] = NULL;
                 execve(path, argv, 0);
@@ -397,8 +403,8 @@ int main()
                 auto* cmd = parse_cmdline(cmd_buf);
                 if (cmd) {
                     cmd->dump();
+                    print("\n");
                     cmd->execute(true);
-                    /*kdump();*/
                 }
             }
         }

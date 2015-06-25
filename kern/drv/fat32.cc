@@ -207,7 +207,6 @@ void Fat32Fs::read_inode(inode_t *ip, fat_inode_t* fat_ip)
         if (!fat_ip) {
             fat_ip = (fat_inode_t*)vmm.kmalloc(sizeof(fat_inode_t), 1);
             memset(fat_ip, 0, sizeof *fat_ip);
-            kprintf("fat32 root fat_ip = %x\n", fat_ip);
         }
         ip->data = (void*)fat_ip;
         // for fat12/16, this is invalid

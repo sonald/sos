@@ -32,7 +32,7 @@ void Ramfs::init(char* addr, size_t size, const char* cmdline)
     strcpy(_cmdline, cmdline);
 
     _sb = (initrd_header_t*)addr;
-    kprintf("files: %d\n", _sb->nfiles);
+    //kprintf("files: %d\n", _sb->nfiles);
 
     u32 dev = DEVNO(RAMFS_MAJOR, 0);
     _iroot = vfs.alloc_inode(dev, 1);
