@@ -396,7 +396,7 @@ void* VirtualMemoryManager::ksbrk(size_t size)
 
 void* VirtualMemoryManager::kmalloc(size_t size, int align)
 {
-    size_t realsize = size; //ALIGN(size, align);
+    size_t realsize = size; 
     // kprintf("kmalloc: size = %d, realsize = %d, align = %d\n", size, realsize, align);
 
     auto eflags = _lock.lock();
@@ -426,6 +426,7 @@ void* VirtualMemoryManager::kmalloc(size_t size, int align)
         split_block(h, realsize);
     }
 
+    kassert(h->used == 0);
     h->used = 1;
     kassert(aligned(h->data, align));
     // kprintf("(%s: v %x size %x) \n", __func__, h->data, h->size);

@@ -43,22 +43,14 @@ typedef struct dentry_s {
 
 using PipeBuffer = RingBuffer<char, 1024>;
 class File;
-class Pipe {
+struct Pipe {
     public:
         File* readf;
         File* writef;
-        PipeBuffer* pbuf;
-
-        Pipe(): readf(NULL), writef(NULL) {
-            pbuf = new PipeBuffer;
-        }
+        PipeBuffer pbuf;
 
         int write(const void *buf, size_t nbyte);
         int read(void *buf, size_t nbyte);
-
-        ~Pipe() {
-            delete pbuf;
-        }
 };
 
 class File {

@@ -44,7 +44,6 @@ struct Command {
     virtual void dump() = 0;
 };
 
-static char pathname[PATH_LEN];
 
 struct Ls: public Command {
     Ls(const char* dir): dir{dir} {}
@@ -82,7 +81,6 @@ struct Help: public Command {
     void dump() override {}
 };
 
-static char store[MAX_NR_ARG][SYM_LEN];
 struct BaseCommand: public Command {
     cmd_args_t args;
     io_redirect_t input, output;
@@ -97,6 +95,7 @@ struct BaseCommand: public Command {
 
         const char bin[] = "/bin";
         bool found = false;
+        char pathname[PATH_LEN];
 
         int fd = open(bin, O_RDONLY, 0);
         if (fd >= 0) {
@@ -121,6 +120,7 @@ struct BaseCommand: public Command {
     }
 
     void run(const char* path, bool dofork) {
+        /*char store[MAX_NR_ARG][SYM_LEN];*/
         int pid = 0;
         if (!dofork || (pid = fork()) >= 0) {
             if (pid > 0) {
@@ -130,8 +130,9 @@ struct BaseCommand: public Command {
                 int argc = args.argc;
                 char* argv[argc+1];
                 for (int i = 0; i < argc; i++) {
-                    argv[i] = &store[i][0];
-                    strcpy(argv[i], args.argv[i]);
+                    argv[i] = &args.argv[i][0];
+                    /*argv[i] = &store[i][0];*/
+                    /*strcpy(argv[i], args.argv[i]);*/
                 }
                 argv[argc] = NULL;
                 execve(path, argv, 0);
@@ -157,25 +158,29 @@ struct BaseCommand: public Command {
 struct PipeCommand: public Command {
     Command *lhs {NULL}, *rhs {NULL};
     int execute(bool dofork = false) override {
-        pid_t pid = fork();
-        if (pid > 0) {
-            wait();
-        } else if (pid == 0) {
-            int fd[2];
-            pipe(fd);
+        int pid = 0;
+        if (!dofork || (pid = fork()) >= 0) {
+            if (pid > 0) {
+                wait();
 
-            pid_t pid = fork();
-            if (pid == 0) {
-                close(fd[0]);
-                dup2(fd[1], STDOUT_FILENO);
-                lhs->execute(false);
+            } else if (pid == 0) {
+                int fd[2];
+                pipe(fd);
 
-            } else if (pid > 0) {
-                close(fd[1]);
-                dup2(fd[0], STDIN_FILENO);
-                rhs->execute(false);
+                pid_t pid = fork();
+                if (pid == 0) {
+                    dup2(fd[1], STDOUT_FILENO);
+                    close(fd[0]);
+                    lhs->execute(false);
+
+                } else if (pid > 0) {
+                    dup2(fd[0], STDIN_FILENO);
+                    close(fd[1]);
+                    rhs->execute(false);
+                }
             }
         }
+
         return 0;
     }
 
@@ -277,6 +282,7 @@ static Command* parse_base_cmd(char* buf)
 {
     BaseCommand* base = &s_basecmds[s_nr_basecmd++];
     cmd_args_t& as = base->args;
+    memset(&as, 0, sizeof as);
     as.argc = 0;
 
     /*print("parse_base_cmd\n");*/
@@ -371,7 +377,7 @@ static Command* parse_cmdline(char* buf)
     return parse_pipe(buf);
 }
 
-static char cmd_buf[64] = "";
+static char cmd_buf[1024] = "";
 static bool quit = false;
 
 int main()
@@ -392,6 +398,7 @@ int main()
                 if (cmd) {
                     cmd->dump();
                     cmd->execute(true);
+                    /*kdump();*/
                 }
             }
         }

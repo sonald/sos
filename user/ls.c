@@ -28,7 +28,7 @@ int main(int argc, char* const argv[])
     if (fd >= 0) {
         struct dirent dire;
         while (readdir(fd, &dire, 1) > 0) {
-            char buf[64] = "";
+            char buf[128] = "";
             if (f_stream) 
                 snprintf(buf, sizeof buf - 1, "%s, ", dire.d_name);
             else if (f_long) 

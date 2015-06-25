@@ -5,6 +5,9 @@
 #include <string.h>
 #include <vm.h>
 #include <ctype.h>
+#include <spinlock.h>
+
+Spinlock fatlock {"fatlock"};
 
 // arg name should have enough space
 // return size read
@@ -44,7 +47,7 @@ static int sanity_name(const char* name, char* res)
 
 fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
 {
-    auto* ip = new fat_inode_t;
+    auto* ip = (fat_inode_t*)vmm.kmalloc(sizeof(fat_inode_t), 1);
     memset(ip, 0, sizeof *ip);
     auto* std_dp = &dp[dp_len-1];
     {
@@ -78,7 +81,7 @@ fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
     }
 
     if (--dp_len) {
-        char* lfn_name = new char[64 * 13];
+        char* lfn_name = new char[LFN_MAX_LEN];
         lfn_name[0] = 0;
         int lfn_len = 0;
 
@@ -90,13 +93,10 @@ fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
         }
 
         lfn_len = strlen(lfn_name);
-        ip->long_name = new char[lfn_len+1];
-        //sanity_name(lfn_name, ip->long_name);
         ip->lfn_len = lfn_len;
         memcpy(ip->long_name, lfn_name, lfn_len);
         ip->long_name[lfn_len] = 0;
         delete lfn_name;
-        // kprintf("LFN: %s, ", ip->long_name);
     }
 
     return ip;
@@ -200,8 +200,11 @@ void Fat32Fs::read_inode(inode_t *ip, fat_inode_t* fat_ip)
         ip->blocks = (ip->size + _blksize - 1) / _blksize;
         ip->fs = this;
 
-        fat_inode_t* fat_ip = new fat_inode_t;
-        memset(fat_ip, 0, sizeof *fat_ip);
+        if (!fat_ip) {
+            fat_ip = (fat_inode_t*)vmm.kmalloc(sizeof(fat_inode_t), 1);
+            memset(fat_ip, 0, sizeof *fat_ip);
+            kprintf("fat32 root fat_ip = %x\n", fat_ip);
+        }
         ip->data = (void*)fat_ip;
         // for fat12/16, this is invalid
         fat_ip->start_cluster = sector2cluster(_root_start_sect); // care about fat32
@@ -234,7 +237,7 @@ static bool name_equal(const char* name, fat_inode_t* fat_ip)
 {
     if (str_caseequal(fat_ip->std_name, name))
         return true;
-    else if (fat_ip->long_name && str_caseequal(fat_ip->long_name, name))
+    else if (fat_ip->long_name[0] && str_caseequal(fat_ip->long_name, name))
         return true;
     return false;
 }
@@ -318,7 +321,7 @@ int Fat32Fs::scan_dir(inode_t* dir, scan_dir_option_t* opt, inode_t** ip)
                     }
 
                     entry_id++;
-                    delete fat_ip;
+                    vmm.kfree(fat_ip);
                     fat_ip = 0;
                     dp_len = 0;
                 }
@@ -391,6 +394,8 @@ ssize_t Fat32Fs::read(File *filp, char * buf, size_t count, off_t * offset)
 
     uint32_t cluster_order = off / _blksize;
     auto cluster = fat_ip->start_cluster;
+
+    auto eflags = fatlock.lock();
     while (cluster_order-- > 0) {
         cluster = find_next_cluster(cluster);
         if (cluster >= CLUSTER_DATA_END_16)
@@ -414,6 +419,7 @@ ssize_t Fat32Fs::read(File *filp, char * buf, size_t count, off_t * offset)
 
     filp->set_off(filp->off() + count);
     if (offset) *offset = filp->off();
+    fatlock.release(eflags);
 
     return count;
 }
@@ -454,11 +460,12 @@ int Fat32Fs::readdir(File *filp, dentry_t *de, filldir_t)
     int ret = 1;
     if (dir->type != FsNodeType::Dir) return -EINVAL;
 
+    auto oflags = fatlock.lock();
     fat_inode_t* fat_ip = find_in_cache(dir, id);
     if (fat_ip) {
         de->ip = vfs.alloc_inode();
         de->ip->ino = fat_ip->start_cluster;
-        fat_inode_t* new_fip = new fat_inode_t;
+        auto* new_fip = (fat_inode_t*)vmm.kmalloc(sizeof(fat_inode_t), 1);
         memcpy(new_fip, fat_ip, sizeof *new_fip);
         read_inode(de->ip, new_fip);
 
@@ -474,12 +481,13 @@ int Fat32Fs::readdir(File *filp, dentry_t *de, filldir_t)
     if (de->ip) {
         auto* fat_ip = (fat_inode_t*)de->ip->data;
         push_cache(fat_ip);
-        if (fat_ip->long_name) {
+        if (fat_ip->long_name[0]) {
             strncpy(de->name, fat_ip->long_name, NAMELEN);
         } else {
             strcpy(de->name, fat_ip->std_name);
         }
     }
+    fatlock.release(oflags);
     return ret;
 }
 

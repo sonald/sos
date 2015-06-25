@@ -20,8 +20,10 @@ ppm_t* ppm_load(const char* path)
 {
     inode_t* ip = vfs.namei(path);
     if (!ip) return NULL;
+    auto sz = ip->size;
+    vfs.dealloc_inode(ip);
 
-    char* buf = new char[ip->size];
+    char* buf = new char[sz];
     int fd = sys_open(path, O_RDONLY, 0);
     if (fd < 0) {
         kprintf("open logo failed\n");
@@ -29,7 +31,7 @@ ppm_t* ppm_load(const char* path)
         return NULL;
     }
 
-    int len = sys_read(fd, buf, ip->size);
+    int len = sys_read(fd, buf, sz);
     sys_close(fd);
 
     if (len < 0) {

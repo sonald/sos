@@ -26,7 +26,6 @@ static File* get_free_file()
     auto oflags = vfslock.lock();
     for (i = 0; i < MAX_NR_FILE; i++, fp++) {
         if (fp->ref() == 0) {
-            memset(fp, 0, sizeof *fp);
             vfslock.release(oflags);
             return fp;
         }
@@ -102,15 +101,10 @@ _out:
 
 int sys_close(int fd)
 {
-     //kprintf("%s:fd %d\n", __func__, fd);
+    auto eflags = vfslock.lock();
     auto* filp = current->files[fd];
     kassert(filp && filp->ref() > 0);
-
-    auto eflags = vfslock.lock();
     filp->put();
-    if (filp->ref() == 0) {
-        memset(filp, 0, sizeof *filp);
-    }
     current->files[fd] = NULL;
     vfslock.release(eflags);
     return 0;
@@ -120,10 +114,10 @@ int sys_dup2(int fd, int fd2)
 {
     if (fd == fd2) return 0;
 
-    auto* filp = current->files[fd2];
-    if (filp) sys_close(fd2); 
-
     auto eflags = vfslock.lock();
+    auto* filp = current->files[fd2];
+    if (filp) filp->put();
+
     current->files[fd]->dup();
     current->files[fd2] = current->files[fd];
     vfslock.release(eflags);
@@ -261,14 +255,13 @@ int sys_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 }
 
 
-
 int Pipe::write(const void *buf, size_t nbyte)
 {
     const char* p = (const char*)buf;
     int nr_written = nbyte;
 
     while (nr_written > 0) {
-        if (pbuf->full()) {
+        if (pbuf.full()) {
             if (readf == NULL) {
                 //TODO: send signal PIPE
                 break;
@@ -279,7 +272,7 @@ int Pipe::write(const void *buf, size_t nbyte)
             vfslock.release(oflags);
         } else {
             nr_written--;
-            pbuf->write(*p++);
+            pbuf.write(*p++);
         }
     }
 
@@ -293,7 +286,7 @@ int Pipe::read(void *buf, size_t nbyte)
     size_t nr_read = 0;
 
     while (nr_read < nbyte) {
-        if (pbuf->empty()) {
+        if (pbuf.empty()) {
             if (writef == NULL) {
                 break; // write end is closed
             }
@@ -303,7 +296,7 @@ int Pipe::read(void *buf, size_t nbyte)
             vfslock.release(oflags);
         } else {
             nr_read++;
-            *p++ = pbuf->read();
+            *p++ = pbuf.read();
         }
     }
     return nr_read;
@@ -332,29 +325,33 @@ void File::set_inode(inode_t* ip) {
 //TODO: update disk if dirty
 void File::put() 
 {
+    kassert(_ref > 0);
     if (--_ref > 0) {
         return;
-    } else {
-        if (_type == Type::Inode) {
-            vfs.dealloc_inode(_ip);
-            _ip = NULL;
-        } else if (_type == Type::Pipe) {
-            //FIXME: flush remaining data or just close ?
-            if (_pipe->readf == this) {
-                _pipe->readf = NULL;
-                wakeup(_pipe);
-            } else if (_pipe->writef == this) {
-                _pipe->writef = NULL;
-                wakeup(_pipe);
-            }
-
-            if (_pipe->readf == NULL && _pipe->writef == NULL) {
-                delete _pipe;
-                _pipe = NULL;
-            }
-        }
-        _type = Type::None;
     }
+    if (_type == Type::Inode) {
+        vfs.dealloc_inode(_ip);
+        _ip = NULL;
+    } else if (_type == Type::Pipe) {
+        //FIXME: flush remaining data or just close ?
+        if (_pipe->readf == this) {
+            _pipe->readf = NULL;
+            wakeup(_pipe);
+        } else if (_pipe->writef == this) {
+            _pipe->writef = NULL;
+            wakeup(_pipe);
+        }
+
+        if (_pipe->readf == NULL && _pipe->writef == NULL) {
+            delete _pipe;
+        }
+        _pipe = NULL;
+    }
+
+    kassert(_ip == NULL && _pipe == NULL && _ref == 0);
+    _off = 0;
+    _mode = 0;
+    _type = Type::None;
 }
 
 File::~File()
@@ -625,21 +622,25 @@ inode_t* VFSManager::alloc_inode()
     int i;
 
     auto eflags = vfslock.lock();
-
     for (i = 0; i < MAX_NR_INODE; i++, ip++) {
-        if (ip->ino == 0 && ip->dev == 0 && ip->blksize == 0) break;
+        if (ip->ino == 0 && ip->dev == 0 && ip->blksize == 0) {
+            memset(ip, 0, sizeof *ip);
+            vfslock.release(eflags);
+            return ip;
+        } 
     }
     vfslock.release(eflags);
-
-    if (i >= MAX_NR_INODE)
-        panic("no mem for inode");
-    return ip;
+    panic("no mem for inode");
+    return NULL;
 }
 
 void VFSManager::dealloc_inode(inode_t* ip)
 {
     auto eflags = vfslock.lock();
-    if (ip->data) delete (char*)ip->data;
+    if (ip->data) {
+        vmm.kfree(ip->data);
+        ip->data = 0;
+    }
     memset(ip, 0, sizeof *ip);
     vfslock.release(eflags);
 }

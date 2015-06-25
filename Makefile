@@ -2,7 +2,7 @@ CROSS_PATH = /Users/sonald/crossgcc/bin
 CXX = $(CROSS_PATH)/i686-elf-g++
 CPP = $(CROSS_PATH)/i686-elf-cpp
 CC = $(CROSS_PATH)/i686-elf-gcc
-CXXFLAGS = -std=c++11 -I./include -ffreestanding  \
+CXXFLAGS = -std=c++11 -g -I./include -ffreestanding  \
 		 -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG -fno-strict-aliasing -D__sos__
 
 USER_FLAGS = -std=c++11 -I./include -ffreestanding  \

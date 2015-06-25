@@ -116,12 +116,13 @@ union fat_dirent {
 // inode_t.data part
 // dir_id and dir_start are for cache purpose, dir_id locates node at dir position
 // dir_start is used to identify dir
+#define LFN_MAX_LEN (64*13)
 typedef struct fat_inode_s {
     uint32_t start_cluster;
     uint32_t size;
     int dir_id;  
     uint32_t dir_start;
-    char* long_name;
+    char long_name[LFN_MAX_LEN];
     uint8_t attr;
     int lfn_len;
     char std_name[13];

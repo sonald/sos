@@ -3,7 +3,6 @@
 
 #include <types.h>
 
-// System call numbers (from xv6)
 #define SYS_none        0
 #define SYS_fork        1
 #define SYS_exit        2
@@ -32,7 +31,8 @@
 #define SYS_mmap       25
 #define SYS_readdir    26
 #define SYS_dup2       27
+#define SYS_kdump      28
 
-#define NR_SYSCALL     28
+#define NR_SYSCALL     29
 
 #endif

@@ -79,6 +79,32 @@ int sys_getppid()
     return current->ppid;
 }
 
+int sys_kdump()
+{
+    const char* states[] = {
+        "TASK_UNUSED",
+        "TASK_CREATE",
+        "TASK_READY",
+        "TASK_RUNNING",
+        "TASK_SLEEP",
+        "TASK_ZOMBIE",
+    };
+
+    auto oldflags = tasklock.lock();
+    auto* p = task_init;
+    while (p) {
+        int ofds = 0;
+        for (int i = 0; i < FILES_PER_PROC; i++) {
+            if (p->files[i]) ofds++;
+        }
+        kprintf("#%d(%s), ppid: %d, state: %s, fds: %d\n",
+                p->pid, p->name, p->ppid, states[p->state], ofds);
+        p = p->next;
+    }
+    tasklock.release(oldflags);
+    return 0;
+}
+
 int sys_getpid()
 {
     kassert(current);
@@ -104,9 +130,10 @@ int sys_exit()
     kassert(current != task_init);
 
     for (int fd = 0; fd < FILES_PER_PROC; fd++) {
-        if (current->files[fd]) sys_close(fd);
+        if (current->files[fd]) {
+            sys_close(fd);
+        }
     }
-    memset(current->files, 0, sizeof current->files);
 
     // parent probably waiting
     wakeup(current->parent);
@@ -206,9 +233,11 @@ int sys_fork()
     *(proc->kctx) = *(current->kctx);
     proc->kctx->eip = A2I(trap_return);
 
-    for (int fd = 0; current->files[fd]; fd++) {
-        proc->files[fd] = current->files[fd];
-        proc->files[fd]->dup();
+    for (int fd = 0; fd < FILES_PER_PROC; fd++) {
+        if (current->files[fd]) {
+            proc->files[fd] = current->files[fd];
+            proc->files[fd]->dup();
+        }
     }
 
     // kprintf("%s: old eip %x, new eip %x  ", __func__, current->regs->eip, proc->regs->eip);
@@ -262,18 +291,19 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
             memcpy(kargv[i], argv[i], len);
         }
     }
-    tasklock.release(oldflags);
     kargv[argc] = NULL;
 
     inode_t* ip = vfs.namei(path);
     if (!ip) {
         return -ENOENT;
     }
+    auto sz = ip->size;
+    vfs.dealloc_inode(ip);
 
-    char* buf = new char[ip->size];
+    char* buf = new char[sz];
 
     int fd = sys_open(path, O_RDONLY, 0);
-    int len = sys_read(fd, buf, ip->size);
+    int len = sys_read(fd, buf, sz);
     sys_close(fd);
 
     if (len < 0) {
@@ -282,7 +312,6 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
         return -ENOENT;
     }
 
-    oldflags = tasklock.lock();
     strncpy(current->name, path, sizeof current->name - 1);
 
     elf_header_t* elf = (elf_header_t*)buf;
@@ -322,11 +351,11 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
 
     delete buf;
 
-    kprintf("execv task(%d, %s)\n", current->pid, current->name);
     current->entry = (void*)elf->e_entry;
     trapframe_t* regs = current->regs;
     regs->eip = elf->e_entry;
-
+    
+    vmm.switch_page_directory(current->pgdir);
 
     // layout: 
     // &argv[MAX_ARG-1]
@@ -355,6 +384,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
 
     regs->useresp = (uint32_t)sp;
 
+    kprintf("execv task(%d, %s)\n", current->pid, current->name);
     tasklock.release(oldflags);
     return 0;
 }

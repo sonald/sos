@@ -86,6 +86,7 @@ int readdir(unsigned int fd, struct dirent *dirp, unsigned int count);
 int dup(int fd);
 int dup2(int fd, int fd2);
 int pipe(int fd[2]);
+int kdump();
 
 // return -1 if no child, or pid of any of children exited
 int wait();
