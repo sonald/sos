@@ -212,6 +212,8 @@ uint32_t sys_sbrk(int inc)
 
     if (inc > 0) {
         if (current->heap_end + inc >= current->stack_end) return -1;
+        //TODO: need to know when alloc failed or end of real mem
+        if (current->heap_end - current->data_end >= 0x2000000) return -1;
         vmm.alloc_task_heap(current, (char*)oldbrk, inc);
         current->heap_end += inc;
 

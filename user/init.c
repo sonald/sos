@@ -395,30 +395,6 @@ int main()
 
     pid_t pid = fork();
     if (pid == 0) {
-        void* brk = sbrk(0);
-        snprintf(cmd_buf, 1023, "current brk = 0x%x\n", brk);
-        print(cmd_buf);
-
-        print("alloc 2 pages\n");
-        brk = sbrk(4096*2);
-        snprintf(cmd_buf, 1023, "current brk = 0x%x\n", brk);
-        print(cmd_buf);
-
-        print("dealloc 1 page\n");
-        brk = sbrk(-4096);
-        snprintf(cmd_buf, 1023, "current brk = 0x%x\n", brk);
-        print(cmd_buf);
-
-        print("dealloc 1 page\n");
-        brk = sbrk(-4096);
-        snprintf(cmd_buf, 1023, "current brk = 0x%x\n", brk);
-        print(cmd_buf);
-
-        print("alloc 1 page\n");
-        brk = sbrk(4096);
-        snprintf(cmd_buf, 1023, "current brk = 0x%x\n", brk);
-        print(cmd_buf);
-
         while (!quit) {
             print(prompt);
             int len = read(STDIN_FILENO, cmd_buf, sizeof cmd_buf - 1);

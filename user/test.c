@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <printf.h>
+#include <stdlib.h>
 
 void sbrktest(void)
 {
@@ -100,9 +101,83 @@ void sbrktest(void)
     printf("sbrk test OK\n");
 }
 
+//can not pass this test, do not has error checking in kernel
+void mem(void)
+{
+    void *m1, *m2;
+    int pid, ppid;
+
+    printf("mem test\n");
+    ppid = getpid();
+    if((pid = fork()) == 0){
+        int total = 0x800000;
+        m1 = 0;
+        while(total > 0 && (m2 = malloc(50001)) != 0){
+            printf("m2 = %x, m1 = %x\n", m2, m1);
+            *(char**)m2 = (char*)m1;
+            m1 = m2;
+            total -= 50001;
+        }
+
+        if (!m2) {
+            printf("failed after %x\n", m1);
+        }
+
+        while(m1){
+            m2 = *(char**)m1;
+            free(m1);
+            m1 = m2;
+        }
+        m1 = malloc(1024*20);
+        if(m1 == 0){
+            printf("couldn't allocate mem?!!\n");
+            /*kill(ppid);*/
+            exit();
+        }
+        free(m1);
+        printf("mem ok\n");
+        exit();
+    } else {
+        wait();
+    }
+}
+
+void testmalloc()
+{
+    const int PGSIZE = 4096;
+    void* p1 = malloc(0x80-3);
+    void* p2 = malloc(0x100);
+    void* p3 = malloc(0x400);
+    // kprintf("p1 = 0x%x, p2 = 0x%x, p3 = 0x%x\n", p1, p2, p3);
+
+    void* p4 = malloc(PGSIZE-1);
+    void* p5 = malloc(PGSIZE);
+    // kprintf("p4 = 0x%x\n", p4);
+    free(p3);
+    free(p2);
+    free(p4);
+    free(p1);
+
+    p1 = malloc(PGSIZE*3);
+    free(p5);
+    free(p1);
+
+    {
+        malloc(PGSIZE);
+        malloc(3000);
+        void* pg2 = malloc(PGSIZE+3000);
+        malloc(PGSIZE);
+        malloc(PGSIZE*2);
+        free(pg2);
+        malloc(PGSIZE);
+    }
+}
+
 int main(int argc, char* const argv[])
 {
     sbrktest();
+    mem();
+    testmalloc();
     return 0;
 }
 
