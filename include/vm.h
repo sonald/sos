@@ -31,6 +31,10 @@ class VirtualMemoryManager
         page_directory_t* create_address_space();
         void release_address_space(proc_t* proc, page_directory_t* pgdir);
 
+        void release_task_heap(proc_t* proc, char* vaddr, uint32_t size);
+        void alloc_task_heap(proc_t* proc, char* vaddr, uint32_t size);
+        void copy_task_heap(proc_t* dst, proc_t* src);
+
         page_directory_t* copy_page_directory(page_directory_t* pgdir);
         page_directory_t* kernel_page_directory();
 

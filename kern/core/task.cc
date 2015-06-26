@@ -1,12 +1,12 @@
 #include "task.h"
 #include "string.h"
-#include "vm.h"
-#include "x86.h"
-#include "errno.h"
-#include "elf.h"
-#include "spinlock.h"
-#include "sched.h"
-#include "timer.h"
+#include <vm.h>
+#include <x86.h>
+#include <errno.h>
+#include <elf.h>
+#include <spinlock.h>
+#include <sched.h>
+#include <timer.h>
 #include <vfs.h>
 #include <sys.h>
 #include <sos/limits.h>
@@ -205,6 +205,32 @@ int sys_wait()
     return -1;
 }
 
+uint32_t sys_sbrk(int inc)
+{
+    auto oldbrk = current->heap_end;
+    if (inc == 0) return oldbrk;
+
+    if (inc > 0) {
+        if (current->heap_end + inc >= current->stack_end) return -1;
+        vmm.alloc_task_heap(current, (char*)oldbrk, inc);
+        current->heap_end += inc;
+
+    } else {
+        inc = -inc;
+        if (current->heap_end - inc < current->data_end) return -1;
+        auto newbrk = oldbrk - inc;
+        vmm.release_task_heap(current, (char*)newbrk, inc);
+        current->heap_end -= inc;
+    }
+
+    auto oflags = tasklock.lock();
+    u32 paddr = v2p(current->pgdir);
+    asm volatile ("mov %0, %%cr3" :: "r"(paddr));
+    tasklock.release(oflags);
+
+    return oldbrk;
+}
+
 int sys_fork()
 {
     proc_t* proc = find_free_process();
@@ -222,6 +248,7 @@ int sys_fork()
     current->next = proc;
 
     proc->pgdir = vmm.copy_page_directory(current->pgdir);
+    vmm.copy_task_heap(proc, current);
 
     void* task_kern_stack = vmm.alloc_page();
     proc->kern_esp = A2I(task_kern_stack) + PGSIZE;
@@ -329,6 +356,9 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
         vmm.unmap_pages(current->pgdir, m.start, m.size, true);
         current->mmap[i] = {0, 0};
     }
+    // release heap 
+    uint32_t size = current->heap_end - current->data_end;
+    vmm.release_task_heap(current, (char*)current->data_end, size);
 
      //kprintf("elf: 0x%x, entry: 0x%x, ph: %d\n", elf, elf->e_entry, elf->e_phnum);
     elf_prog_header_t* ph = (elf_prog_header_t*)((char*)elf + elf->e_phoff);
@@ -346,6 +376,15 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
         }
 
         load_proc(prog, &ph[i]);
+    }
+
+    {
+        address_mapping_t* ref = &current->mmap[0];
+        if (current->mmap[1].start) {
+            ref = &current->mmap[1];
+        } 
+        current->data_end = (uint32_t)ref->start + ref->size;
+        current->heap_end = current->data_end;
     }
 
     delete buf;
@@ -420,8 +459,13 @@ proc_t* prepare_userinit(void* prog)
     // copy from tmp avoid a page directory switch
     memcpy(tmp, prog, PGSIZE);
 
+    //TODO: set one page of barrier inacessible
+    proc->data_end = UCODE + proc->mmap[0].size;
+    proc->heap_end = proc->data_end;
+
     proc->mmap[2].start = (void*)USTACK;
     proc->mmap[2].size = PGSIZE;
+    proc->stack_end = USTACK; // bottom of stack
 
     void* task_usr_stack0 = (void*)USTACK;
     u32 paddr_stack0 = v2p(vmm.alloc_page());

@@ -25,5 +25,6 @@ extern int sys_dup(int);
 extern int sys_dup2(int fd, int fd2);
 extern int sys_pipe(int fd[2]);
 extern int sys_kdump(); // for debug
+extern uint32_t sys_sbrk(int inc);
 
 #endif

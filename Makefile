@@ -5,7 +5,7 @@ CC = $(CROSS_PATH)/i686-elf-gcc
 CXXFLAGS = -std=c++11 -g -I./include -ffreestanding  \
 		 -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG -fno-strict-aliasing -D__sos__
 
-USER_FLAGS = -std=c++11 -I./include -ffreestanding  \
+USER_FLAGS = -std=c++11 -I./include -I./user/libc -ffreestanding  \
 	   -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG
 
 OBJS_DIR = objs
@@ -31,15 +31,15 @@ kern_objs := $(OBJS_DIR)/kern/runtime/crti.o $(crtbegin_o) \
 DEPFILES := $(patsubst %.cc, $(OBJS_DIR)/%.d, $(kernel_srcs))
 DEPFILES := $(patsubst %.s, $(OBJS_DIR)/%.d, $(DEPFILES))
 
-ulib_src = $(wildcard lib/*.cc) user/libc.c 
-ulib_obj := $(patsubst %.cc, $(OBJS_DIR)/user/%.o, $(ulib_src)) $(OBJS_DIR)/user/cxx_rt.o
-ulib_obj := $(patsubst user/%.c, $(OBJS_DIR)/user/lib/%.o, $(ulib_obj))
+ulib_src = $(wildcard lib/*.cc) $(wildcard user/libc/*.c)
+ulib_obj := $(patsubst lib/%.cc, $(OBJS_DIR)/user/lib/%.o, $(ulib_src)) $(OBJS_DIR)/user/cxx_rt.o
+ulib_obj := $(patsubst user/libc/%.c, $(OBJS_DIR)/user/lib/%.o, $(ulib_obj))
 
 ulib_pre_objs := $(OBJS_DIR)/kern/runtime/crti.o $(crtbegin_o) 
 ulib_post_objs := $(ulib_obj) $(crtend_o) $(OBJS_DIR)/kern/runtime/crtn.o
 
 uprogs_objs = $(patsubst user/%.c, $(OBJS_DIR)/user/bin/%.o, \
-	$(filter-out user/libc.c, $(wildcard user/*.c)))
+			  $(wildcard user/*.c))
 uprogs = $(patsubst $(OBJS_DIR)/user/bin/%.o, bin/%, $(uprogs_objs))
 
 all: run ramfs_gen
@@ -120,7 +120,7 @@ $(OBJS_DIR)/user/lib/%.o: lib/%.cc
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -c -o $@ $<
 
-$(OBJS_DIR)/user/lib/%.o: user/libc.c
+$(OBJS_DIR)/user/lib/%.o: user/libc/%.c
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -c -o $@ $<
 

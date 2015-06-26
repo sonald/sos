@@ -19,6 +19,7 @@ _syscall1(int, dup, int, fd);
 _syscall2(int, dup2, int, fd, int, fd2);
 _syscall1(int, pipe, int*, fds); // int fd[2]
 _syscall0(int, kdump); 
+_syscall1(void*, sbrk, int, inc);
 
 int execve(const char *path, char *const argv[], char *const envp[])
 {

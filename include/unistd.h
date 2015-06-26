@@ -87,6 +87,7 @@ int dup(int fd);
 int dup2(int fd, int fd2);
 int pipe(int fd[2]);
 int kdump();
+void* sbrk(int inc);
 
 // return -1 if no child, or pid of any of children exited
 int wait();

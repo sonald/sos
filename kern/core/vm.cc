@@ -324,6 +324,46 @@ page_directory_t* VirtualMemoryManager::copy_page_directory(page_directory_t* pg
     return new_pgdir;
 }
 
+void VirtualMemoryManager::copy_task_heap(proc_t* dst, proc_t* src)
+{
+    char* v = (char*)PGROUNDDOWN(src->data_end);
+    char* end = (char*)src->heap_end;
+    while (v < end) {
+        page_t* pte = walk(src->pgdir, v, false);
+        kassert(pte && pte->present);
+
+        u32 paddr = pte->frame * _pmm->frame_size;
+        int flags = pde_get_flags(*(u32*)pte);
+
+        char* mem = (char*)alloc_page();
+        memcpy(mem, p2v(paddr), PGSIZE);
+
+        map_pages(dst->pgdir, v, PGSIZE, v2p(mem), flags);
+        v += PGSIZE;
+    }
+}
+
+void VirtualMemoryManager::alloc_task_heap(proc_t* proc, char* vaddr, uint32_t size)
+{
+    char* v = (char*)PGROUNDDOWN(vaddr-1) + PGSIZE;
+    char* end = (char*)vaddr + size;
+    while (v < end) {
+        char* mem = (char*)alloc_page();
+        map_pages(proc->pgdir, v, PGSIZE, v2p(mem), PDE_USER|PDE_WRITABLE);
+        v += PGSIZE;
+    }
+}
+
+void VirtualMemoryManager::release_task_heap(proc_t* proc, char* vaddr, uint32_t size)
+{
+    char* v = (char*)PGROUNDDOWN(vaddr-1) + PGSIZE;
+    char* end = (char*)vaddr + size;
+    while (v < end) {
+        unmap_pages(proc->pgdir, v, PGSIZE, true);
+        v += PGSIZE;
+    }
+}
+
 void VirtualMemoryManager::release_address_space(proc_t *proc, page_directory_t* pgdir)
 {
     auto eflags = _lock.lock();
@@ -336,6 +376,8 @@ void VirtualMemoryManager::release_address_space(proc_t *proc, page_directory_t*
         address_mapping_t m = proc->mmap[i];;
         unmap_pages(pgdir, m.start, m.size, true);
     }
+
+    release_task_heap(proc, (char*)proc->data_end, proc->heap_end - proc->data_end);
 
     // shallow copies of kernel part do not release
     // for (int i = 0, len = sizeof(kmap)/sizeof(kmap[0]); i < len; i++) {

@@ -37,6 +37,10 @@ typedef struct proc_s {
     u32 kern_esp;
     u32 user_esp;
     address_mapping_t mmap[3]; // for code, text, stack
+    u32 data_end;
+
+    u32 heap_end; // current heap brk, intially = end of data
+    u32 stack_end; // stack end, expanding on-demand
 
     void* entry;
     enum proc_state state;
