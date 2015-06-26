@@ -45,15 +45,14 @@ int main(int argc, char* argv[])
             if (f_lineno) {
                 int i = 0; 
                 while (i < len) {
-                    line[lp++] = buf[i++];
+                    line[lp++] = buf[i];
                     if (buf[i] == '\n') {
-                        i++;
-                        line[lp++] = '\n';
                         line[lp] = 0;
                         print_lino(no++);
                         write(STDOUT_FILENO, line, lp);
                         lp = 0;
                     }
+                    i++;
                 }
 
             } else write(STDOUT_FILENO, buf, len);

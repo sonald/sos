@@ -1,20 +1,51 @@
 #include <unistd.h>
-#include <sprintf.h>
 #include <string.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <stdlib.h>
+#include <printf.h>
  
 #define BUF_LEN 128
 #define LINE_LEN 1024
-static char buf[BUF_LEN];
-static char line[LINE_LEN];
 static int lp = 0;
 
-int match_line(const char* re, const char* ln)
+static int match_here(const char* re, const char* s);
+
+static int match_star(const char* re, const char* s)
 {
-    int nr_re = strlen(re), len = strlen(ln);
-    for (int i = 0; i < len - nr_re; i++) {
-        if (strncmp(re, ln+i, nr_re) == 0) return 1;
+    if (*s == 0) return (*re == 0);
+
+    if (*re == *s || *re == '.') {
+        if (!match_star(re, s+1)) {
+            return match_here(re+2, s+1);
+        } 
+        return 1;
+    } else 
+        return match_here(re+2, s);
+}
+
+static int match_here(const char* re, const char* s)
+{
+    if (!*re) return 1;
+    else if (!*s) return 0;
+
+    if (*re && re[1] == '*') {
+        return match_star(re, s);
+    } else {
+        if (*re == '.' || *s == *re) {
+            return match_here(re+1, s+1);
+        }
+    }
+
+    return 0;
+}
+
+// re is regex: only . and * supported
+static int match(const char* re, const char* s)
+{
+    while (*s) {
+        if (match_here(re, s)) return 1;
+        s++;
     }
     return 0;
 }
@@ -22,6 +53,11 @@ int match_line(const char* re, const char* ln)
 //grep re [file]
 int main(int argc, char* argv[])
 {
+    char* line = (char*)malloc(LINE_LEN);
+    char* buf = (char*)malloc(BUF_LEN);
+
+    int no = 1;
+
     const char* filepath = NULL, *re = NULL;
     if (argc > 1) {
         re = argv[1];
@@ -36,27 +72,32 @@ int main(int argc, char* argv[])
             buf[len] = 0;
             int i = 0; 
             while (i < len) {
-                line[lp++] = buf[i++];
+                line[lp++] = buf[i];
                 if (buf[i] == '\n') {
-                    i++;
-                    line[lp++] = '\n';
                     line[lp] = 0;
-                    if (match_line(re, line)) 
-                        write(STDOUT_FILENO, line, lp);
+                    if (match(re, line)) {
+                        printf("%d:%s", no, line);
+                    }
+                    no++;
                     lp = 0;
                 }
+                i++;
             }
         }
 
         if (lp) {
             line[lp] = 0;
-            if (match_line(re, line)) 
+            if (match(re, line)) 
                 write(STDOUT_FILENO, line, lp);
         }
         if (fd != STDIN_FILENO) close(fd);
     }
+
+    free(line);
+    free(buf);
     return 0;
 }
+
 
 
 
