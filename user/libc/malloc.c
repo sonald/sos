@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <printf.h>
+#include <string.h>
 
 BEGIN_CDECL
 
@@ -116,10 +117,16 @@ static bool aligned(void* ptr, int align)
 
 void* calloc(size_t count, size_t size)
 {
+    size_t sz = count * size;
+    if (sz < 0) return NULL;
+    void* ptr = malloc(sz);
+    memset(ptr, 0, sz);
+    return ptr;
 }
 
 void free(void *ptr)
 {
+    if (!ptr) return;
     kheap_block_head* h = (kheap_block_head*)((char*)ptr - KHEAD_SIZE);
 
     h->used = 0;
@@ -173,6 +180,20 @@ void* malloc(size_t size)
 
 void* realloc(void *ptr, size_t size)
 {
+    if (!ptr) return malloc(size);
+    kheap_block_head* h = (kheap_block_head*)((char*)ptr - KHEAD_SIZE);
+    //sanity check
+    if (h->used == 0 || h->ptr != h->data) {
+        return NULL;
+    }
+
+    if (h->size >= size) return ptr;
+    size = size ? size : 1;
+    void* newptr = malloc(size);
+    if (!newptr) return NULL;
+    memcpy(newptr, ptr, h->size);
+    free(ptr);
+    return newptr;
 }
 
 END_CDECL
