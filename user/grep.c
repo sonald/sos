@@ -13,15 +13,11 @@ static int match_here(const char* re, const char* s);
 
 static int match_star(const char* re, const char* s)
 {
-    if (*s == 0) return (*re == 0);
-
-    if (*re == *s || *re == '.') {
-        if (!match_star(re, s+1)) {
-            return match_here(re+2, s+1);
-        } 
-        return 1;
-    } else 
-        return match_here(re+2, s);
+    int c = re[0];
+    do {
+        if (match_here(re+2, s)) return 1;
+    } while (*s && (c == *s++ || c == '.'));
+    return 0;
 }
 
 static int match_here(const char* re, const char* s)
@@ -29,8 +25,10 @@ static int match_here(const char* re, const char* s)
     if (!*re) return 1;
     else if (!*s) return 0;
 
-    if (*re && re[1] == '*') {
+    if (re[1] == '*') {
         return match_star(re, s);
+    } else if (*re == '$' && re[1] == 0) {
+        return *s == 0;
     } else {
         if (*re == '.' || *s == *re) {
             return match_here(re+1, s+1);
@@ -43,6 +41,8 @@ static int match_here(const char* re, const char* s)
 // re is regex: only . and * supported
 static int match(const char* re, const char* s)
 {
+    if (*re == '^') return match_here(re+1, s);
+
     while (*s) {
         if (match_here(re, s)) return 1;
         s++;
@@ -62,6 +62,8 @@ int main(int argc, char* argv[])
     if (argc > 1) {
         re = argv[1];
         if (argc > 2) filepath = argv[2];
+    } else {
+        printf("usage: grep re file ...\n");
     }
 
     int fd = STDIN_FILENO;
@@ -76,7 +78,7 @@ int main(int argc, char* argv[])
                 if (buf[i] == '\n') {
                     line[lp] = 0;
                     if (match(re, line)) {
-                        printf("%d:%s", no, line);
+                        printf("%d: %s", no, line);
                     }
                     no++;
                     lp = 0;
