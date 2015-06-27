@@ -1,54 +1,17 @@
 #include <unistd.h>
-#include <sprintf.h>
-#include <string.h>
-#include <fcntl.h>
-#include <dirent.h>
-
-static void myprint(const char* buf)
-{
-    write(STDOUT_FILENO, buf, strlen(buf));
-}
+#include <printf.h>
 
 #define BUF_SZ 128
 char echobuf[128];
  
 int main(int argc, char* argv[])
 {
-    int fd[2];
-    pipe(fd);
-
-    snprintf(echobuf, BUF_SZ - 1, "echo: fd0 %d, fd1 %d\n", fd[0], fd[1]);
-    myprint(echobuf);
-
-    pid_t pid = fork();
-    if (pid == 0) {
-        close(fd[0]);
-        int count = 0;
-        // child 
-        while(1) {
-            snprintf(echobuf, BUF_SZ - 1, "welcome from child #%d", count++);
-            write(fd[1], echobuf, strlen(echobuf));
-            /*sleep(2000);*/
-            if (count >= 4) break;
-        }
-        
-    } else if (pid > 0) {
-        close(fd[1]);
-        while (1) {
-            char buf[10];
-            int len = 0;
-            if ((len = read(fd[0], buf, sizeof buf - 1)) <= 0) {
-                break;
-            }
-            buf[len] = 0;
-            myprint("P: ");
-            myprint(buf);
-            myprint("\n");
-            sleep(1000);
-        }
-        wait();
+    argc--;
+    argv++;
+    while (argc-- > 0) {
+        printf("%s ", *argv++);
     }
-
+    printf("\n");
     return 0;
 }
 
