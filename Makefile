@@ -32,11 +32,13 @@ DEPFILES := $(patsubst %.cc, $(OBJS_DIR)/%.d, $(kernel_srcs))
 DEPFILES := $(patsubst %.s, $(OBJS_DIR)/%.d, $(DEPFILES))
 
 ulib_src = $(wildcard lib/*.cc) $(wildcard user/libc/*.c)
-ulib_obj := $(patsubst lib/%.cc, $(OBJS_DIR)/user/lib/%.o, $(ulib_src)) $(OBJS_DIR)/user/cxx_rt.o
+ulib_obj := $(patsubst lib/%.cc, $(OBJS_DIR)/user/lib/%.o, $(ulib_src)) $(OBJS_DIR)/user/lib/cxx_rt.o
 ulib_obj := $(patsubst user/libc/%.c, $(OBJS_DIR)/user/lib/%.o, $(ulib_obj))
 
-ulib_pre_objs := $(OBJS_DIR)/kern/runtime/crti.o $(crtbegin_o) 
-ulib_post_objs := $(ulib_obj) $(crtend_o) $(OBJS_DIR)/kern/runtime/crtn.o
+DEPFILES := $(DEPFILES) $(patsubst %.o, %.d, $(ulib_obj))
+
+ulib_pre_objs := $(OBJS_DIR)/user/lib/crti.o $(crtbegin_o) 
+ulib_post_objs := $(ulib_obj) $(crtend_o) $(OBJS_DIR)/user/lib/crtn.o
 
 uprogs_objs = $(patsubst user/%.c, $(OBJS_DIR)/user/bin/%.o, \
 			  $(wildcard user/*.c))
@@ -58,7 +60,15 @@ $(OBJS_DIR)/lib/%.d: lib/%.cc
 	$(CPP) $(CXXFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 # for userspace
-$(OBJS_DIR)/user/cxx_rt.d: kern/runtime/cxx_rt.cc
+$(OBJS_DIR)/user/lib/cxx_rt.d: kern/runtime/cxx_rt.cc
+	@mkdir -p $(@D)
+	$(CPP) $(USER_FLAGS) $< -MM -MT $(@:.d=.o) >$@
+
+$(OBJS_DIR)/user/lib/%.d: user/libc/%.c
+	@mkdir -p $(@D)
+	$(CPP) $(USER_FLAGS) $< -MM -MT $(@:.d=.o) >$@
+
+$(OBJS_DIR)/user/bin/%.d: user/%.c
 	@mkdir -p $(@D)
 	$(CPP) $(USER_FLAGS) $< -MM -MT $(@:.d=.o) >$@
 
@@ -100,21 +110,18 @@ $(OBJS_DIR)/lib/%.o: lib/%.cc
 ramfs_gen: tools/ramfs_gen.c
 	gcc -o $@ $^
 
-$(OBJS_DIR)/user/%.o: kern/runtime/%.cc
-	@mkdir -p $(@D)
-	$(CXX) $(USER_FLAGS) -c -o $@ $<
-
-$(OBJS_DIR)/user/%.o: kern/runtime/%.s
-	@mkdir -p $(@D)
-	nasm -f elf32 -o $@ $<
 
 #################################################################
 # user space 
 #################################################################
 
-$(OBJS_DIR)/user/cxx_rt.o: kern/runtime/cxx_rt.cc
+$(OBJS_DIR)/user/lib/cxx_rt.o: kern/runtime/cxx_rt.cc
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -c -o $@ $<
+
+$(OBJS_DIR)/user/lib/%.o: kern/runtime/%.s
+	@mkdir -p $(@D)
+	nasm -f elf32 -o $@ $<
 
 $(OBJS_DIR)/user/lib/%.o: lib/%.cc
 	@mkdir -p $(@D)
@@ -145,12 +152,14 @@ clean:
 	-rm $(OBJS_DIR)/kern/utils/*.o
 	-rm $(OBJS_DIR)/kern/drv/*.o
 	-rm $(OBJS_DIR)/user/lib/*.o
+	-rm $(OBJS_DIR)/user/bin/*.o
 	-rm $(OBJS_DIR)/kern/*.d
+	-rm $(OBJS_DIR)/lib/*.d
 	-rm $(OBJS_DIR)/kern/core/*.d
 	-rm $(OBJS_DIR)/kern/runtime/*.d
 	-rm $(OBJS_DIR)/kern/utils/*.d
 	-rm $(OBJS_DIR)/kern/drv/*.d
-	-rm $(OBJS_DIR)/lib/*.d
 	-rm $(OBJS_DIR)/user/lib/*.d
-	-rm echo init
+	-rm $(OBJS_DIR)/user/bin/*.d
+	-rm bin/*
 	-rm kernel

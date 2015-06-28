@@ -20,6 +20,7 @@ static bool str_caseequal(const char* s1, const char* s2)
         if (c1 != c2) return false;
         p1++, p2++;
     }
+    return *p1 == 0 && *p2 == 0;
 }
 
 #define MAX_NR_ARG 10
@@ -234,39 +235,41 @@ static token_t* peek(char* buf)
     return &tokens[nr_token-1];
 }
 
-static char* _p = NULL;
 static token_t* next(char* buf)
 {
-    if (nr_token == 0) _p = buf;
+    static char* p = NULL;
+    if (nr_token == 0) p = buf;
+
     else if (nr_token >= MAX_NR_TOKEN) return NULL;
-    while (*_p && isspace(*_p)) _p++;
+    while (*p && isspace(*p)) p++;
 
     token_t* tk = &tokens[nr_token++];
-    if (*_p == 0) {
+    if (*p == 0) {
         tk->type = T_EOF;
-    } else if (*_p == '>') {
+    } else if (*p == '>') {
         tk->type = T_REDIRECT_OUTPUT;
-        _p++;
-    } else if (*_p == '<') {
+        p++;
+    } else if (*p == '<') {
         tk->type = T_REDIRECT_INPUT;
-        _p++;
-    } else if (*_p == '|') {
+        p++;
+    } else if (*p == '|') {
         tk->type = T_PIPE;
-        _p++;
-    } else if (*_p == '"') {
+        p++;
+    } else if (*p == '"') {
         tk->type = T_STR_LITERAL;
         tk->val = &symbols[sym_mark];
-        _p++;
-        while (*_p && *_p != '"') {
-            symbols[sym_mark++] = *_p++;
+        p++;
+        while (*p && *p != '"') {
+            symbols[sym_mark++] = *p++;
         }
-        _p++; // eat right \"
+        p++; // eat right \"
         symbols[sym_mark++] = 0;
     } else {
         tk->type = T_SYMBOL;
         tk->val = &symbols[sym_mark];
-        while (*_p && !isspace(*_p)) {
-            symbols[sym_mark++] = *_p++;
+        while (*p && !isspace(*p)) {
+            if (*p == '|' || *p == '>' || *p == '<') break;
+            symbols[sym_mark++] = *p++;
         }
         symbols[sym_mark++] = 0;
     }
