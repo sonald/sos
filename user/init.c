@@ -1,9 +1,12 @@
 #include <unistd.h>
+#include <stdlib.h>
 #include <sprintf.h>
 #include <fcntl.h>
 #include <dirent.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdio.h>
+#include <lru.h>
 
 static const char* prompt = "sos # ";
 
@@ -55,6 +58,7 @@ static struct builtin_command {
     { 
         "kdump",
         [] (const cmd_args_t& args) -> int {
+            (void)args;
             kdump();
             return 0;
         },
@@ -73,12 +77,8 @@ static struct builtin_command {
                     }
                 }
             }
-            char buf[128];
-            snprintf(buf, sizeof buf - 1, "builtin commands: \n");
-            print(buf);
-
-            snprintf(buf, sizeof buf - 1, "kdump, help \n");
-            print(buf);
+            printf("builtin commands: \n"
+                    "\tkdump, help \n");
             return 0;
         },
         [] () {

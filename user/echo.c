@@ -1,5 +1,5 @@
 #include <unistd.h>
-#include <printf.h>
+#include <stdio.h>
 
 #define BUF_SZ 128
 char echobuf[128];

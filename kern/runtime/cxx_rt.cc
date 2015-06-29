@@ -8,6 +8,7 @@
 #include "vm.h"
 #else
 #include <unistd.h>
+#include <stdlib.h>
 #endif
 
 #define MAX_ATEXIT_ENTRIES 128
@@ -105,6 +106,24 @@ void* operator new[](size_t len)
 }
 
 #else 
-// no user space impl yet
+void operator delete(void *ptr)
+{
+    free(ptr);
+}
+
+void* operator new(size_t len)
+{
+    return malloc(len);
+}
+
+void operator delete[](void *ptr)
+{
+    ::operator delete(ptr);
+}
+
+void* operator new[](size_t len)
+{
+    return ::operator new(len);
+}
 #endif
 

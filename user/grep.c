@@ -3,7 +3,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <stdlib.h>
-#include <printf.h>
+#include <stdio.h>
  
 #define BUF_LEN 128
 #define LINE_LEN 1024

@@ -1,6 +1,6 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
-#include <printf.h>
 #include <string.h>
 
 BEGIN_CDECL
@@ -118,7 +118,7 @@ static bool aligned(void* ptr, int align)
 void* calloc(size_t count, size_t size)
 {
     size_t sz = count * size;
-    if (sz < 0) return NULL;
+    if (sz == 0 || count == 0) return NULL;
     void* ptr = malloc(sz);
     memset(ptr, 0, sz);
     return ptr;

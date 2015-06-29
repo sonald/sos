@@ -139,6 +139,7 @@ bin/%: $(ulib_pre_objs) $(OBJS_DIR)/user/bin/%.o $(ulib_post_objs) user/user.ld
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^
 
+
 initramfs.img: bin/echo ramfs_gen
 	./ramfs_gen README.md user/echo.c bin/echo
 

@@ -3,8 +3,39 @@
 #include <string.h>
 #include <fcntl.h>
 #include <dirent.h>
-#include <printf.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <lru.h>
+
+#define assert(cond) if (!(cond)) { \
+    printf("%s failed", #cond); \
+    for(;;); \
+}
+static void testlru()
+{
+    LRUCache<int, int> lru(10);
+    assert(lru.has(100) == false);
+    lru.set(100, 20);
+    /*dump(cout, lru);*/
+
+    assert(lru.has(100) != false);
+    assert(lru.get(100) == 20);
+    for (int i = 0; i < 10; i++) {
+        lru.set(i, i);
+    }
+    assert(lru.has(100) == false);
+    lru.set(9, 900); // promote key 9
+    lru.set(10, 10);
+    assert(lru.has(0) == false); // key 0 became the last
+    /*dump(cout, lru);*/
+
+    lru.set(1, 100);
+    lru.set(12, 120);
+    lru.set(5, 500);
+    assert(lru.first() == 500); 
+    /*assert(lru.first() == 600); */
+    /*dump(cout, lru);*/
+}
 
 void sbrktest(void)
 {
@@ -178,6 +209,7 @@ int main(int argc, char* const argv[])
     sbrktest();
     mem();
     testmalloc();
+    testlru();
     return 0;
 }
 

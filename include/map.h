@@ -10,7 +10,7 @@ constexpr int DEFAULT_TABLE_SIZE = 127; // prime
 template <class K>  
 struct KeyHash {  
     hash_t operator()(const K& key) const {
-        return reinterpret_cast<hash_t>(key) % DEFAULT_TABLE_SIZE;
+        return static_cast<hash_t>(key) % DEFAULT_TABLE_SIZE;
     }
 };
 
@@ -56,8 +56,10 @@ class HashMap
                     delete d;
                 }
             }
+            _sz = 0;
         }
 
+        int size() const { return _sz; }
         bool contains(const K& key) const {
             auto h = _hfn(key) % DEFAULT_TABLE_SIZE;
             auto* p = _buckets[h];
@@ -90,6 +92,7 @@ class HashMap
                     ret = d->v;
                     *p = d->next;
                     delete d;
+                    --_sz;
                 } else
                     p = &(*p)->next;
             }
@@ -104,6 +107,7 @@ class HashMap
             q->v = val;
             q->next = _buckets[h];
             _buckets[h] = q;
+            _sz++;
         }
 
     private:
@@ -113,6 +117,7 @@ class HashMap
             struct node_* next;
         } node_t;
 
+        int _sz {0};
         node_t* _buckets[DEFAULT_TABLE_SIZE];
         F _hfn;
         Eq _heq;
