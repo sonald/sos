@@ -109,7 +109,7 @@ void Fat32Fs::init(dev_t dev)
     _dev = DEVNO(MAJOR(dev), 0);
     _pdev = dev;
     int partid = MINOR(dev)-1;
-    kprintf("load fat32 at drive %d part %d\n", _dev, partid);
+    //kprintf("load fat32 at drive %d part %d\n", _dev, partid);
     hd->init(_dev);
     auto* part = hd->part(partid);
     kassert(part->part_type == PartType::Fat32L);
@@ -252,17 +252,19 @@ dentry_t* Fat32Fs::lookup(inode_t * dir, dentry_t *de)
     return de;
 }
 
-//FIXME: fat16 only!
 //TODO: cache whole FAT in memory
 uint32_t Fat32Fs::find_next_cluster(uint32_t cluster)
 {
-    int cps = _fat_bs.bytes_per_sector / sizeof (uint16_t);
+    int ord = _type == FatType::Fat32 ? 4: 2;
+    int cps = _fat_bs.bytes_per_sector / ord;
+
     uint32_t fat_start_sect = _fat_bs.reserved_sector_count + _lba_start + cluster / cps;
     auto* bufp = bio.read(_dev, fat_start_sect);
-    uint16_t* fat_data = (uint16_t*)&bufp->data;
-    uint32_t next = *(fat_data + cluster % cps);
+    char* fat_data = (char*)&bufp->data;
+    uint32_t next = 0;
+    memcpy(&next, fat_data + ord *(cluster % cps), ord);
     bio.release(bufp);
-    return next;
+    return next & 0x0fffffff;
 }
 
 int Fat32Fs::scan_dir(inode_t* dir, scan_dir_option_t* opt, inode_t** ip)

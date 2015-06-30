@@ -3,7 +3,7 @@ CXX = $(CROSS_PATH)/i686-elf-g++
 CPP = $(CROSS_PATH)/i686-elf-cpp
 CC = $(CROSS_PATH)/i686-elf-gcc
 CXXFLAGS = -std=c++11 -g -I./include -ffreestanding  \
-		 -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG -fno-strict-aliasing -D__sos__
+		 -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG -fno-strict-aliasing -D__sos__ -D_SOS_KERNEL_
 
 USER_FLAGS = -std=c++11 -I./include -I./user/libc -ffreestanding  \
 	   -O2 -Wall -Wextra -fno-exceptions -fno-rtti -DDEBUG
@@ -84,6 +84,7 @@ run: kernel hd.img initramfs.img
 
 hd.img: kernel $(uprogs) initramfs.img logo.ppm
 	hdiutil attach hd.img
+	cp grub.cfg /Volumes/SOS/boot/grub/
 	cp kernel /Volumes/SOS
 	cp logo.ppm /Volumes/SOS
 	cp bin/init /Volumes/SOS

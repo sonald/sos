@@ -1,7 +1,7 @@
 #ifndef _SOS_VECTOR_H
 #define _SOS_VECTOR_H 
 
-#ifdef __sos__
+#ifdef _SOS_KERNEL_
 #include <common.h>
 #endif
 

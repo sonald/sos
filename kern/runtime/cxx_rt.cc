@@ -3,7 +3,7 @@
  * http://wiki.osdev.org/C%2B%2B
  */
 
-#ifdef __sos__
+#ifdef _SOS_KERNEL_
 #include "common.h"
 #include "vm.h"
 #else
@@ -84,7 +84,7 @@ namespace __cxxabiv1
 }
 
 
-#ifdef __sos__
+#ifdef _SOS_KERNEL_
 void operator delete(void *ptr)
 {
     vmm.kfree(ptr);
