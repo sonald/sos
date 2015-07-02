@@ -17,6 +17,7 @@
 #include "graphics.h"
 #include "display.h"
 #include "fat32.h"
+#include "ext2.h"
 #include <sprintf.h>
 #include <dirent.h>
 #include <sys.h>
@@ -180,10 +181,12 @@ extern "C" int kernel_main(struct multiboot_info *mb)
     vfs.init();
 
     vfs.register_fs("fat32", create_fat32fs);
+    vfs.register_fs("ext2", create_ext2fs);
     vfs.register_fs("ramfs", create_ramfs);
     vfs.register_fs("devfs", create_devfs);
     vfs.init_root(DEVNO(IDE_MAJOR, 1));
     vfs.mount("devfs", "/dev", "devfs", 0, NULL);
+    vfs.mount("/dev/hda2", "/mnt", "ext2", 0, NULL);
     load_module(mb->mods_count, mb->mods_addr);
 
     picenable(IRQ_KBD);

@@ -76,11 +76,11 @@ $(OBJS_DIR)/user/bin/%.d: user/%.c
 print-%: ; @echo $* = $($*)
 
 debug: kernel
-	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 32 -s -monitor stdio \
+	qemu-system-i386 -kernel kernel -initrd initramfs.img -m 64 -s -monitor stdio \
 	-drive file=hd.img,format=raw -vga vmware
 
 run: kernel hd.img initramfs.img
-	qemu-system-i386 -m 32 -s -monitor stdio -drive file=hd.img,format=raw -vga vmware
+	qemu-system-i386 -m 64 -s -monitor stdio -drive file=hd.img,format=raw -vga vmware
 
 hd.img: kernel $(uprogs) initramfs.img logo.ppm
 	hdiutil attach hd.img

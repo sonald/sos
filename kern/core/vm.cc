@@ -552,10 +552,11 @@ VirtualMemoryManager::kheap_block_head* VirtualMemoryManager::merge_block(
     //kprintf("merge 0x%x with 0x%x\n", h, h->next);
     uint32_t real_gap = (char*)next - (char*)h->data;
     if (real_gap > h->size) {
-        panic("%s: find hole between %x and %x, real %x, size %x, gap %x\n", __func__,
+        kprintf("Warning: %s: find hole between %x and %x, real %x, size %x, gap %x\n", __func__,
             h, next, real_gap, h->size, real_gap - h->size);
-    }
-    h->size += KHEAD_SIZE + next->size;
+        h->size = real_gap + KHEAD_SIZE + next->size;
+    } else
+        h->size += KHEAD_SIZE + next->size;
     h->next = next->next;
     if (h->next) h->next->prev = h;
     return h;

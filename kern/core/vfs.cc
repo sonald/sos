@@ -366,9 +366,9 @@ void VFSManager::init_root(dev_t rootdev)
     hd->init(DEVNO(MAJOR(rootdev), 0));
     auto* part = hd->part(MINOR(rootdev)-1);
     if (part->part_type == PartType::Fat32L) {
-        // char devname[NAMELEN+1] = "rootfs";
-        // snprintf(devname, NAMELEN, "/dev/hd%c%d", 'a', MINOR(rootdev));
-        mount("rootfs", "/", "fat32", 0, 0);
+         char devname[NAMELEN+1];
+         snprintf(devname, NAMELEN, "/dev/hd%c%d", 'a', MINOR(rootdev));
+        mount(devname, "/", "fat32", 0, 0);
     }
     delete hd;
 }
@@ -377,7 +377,6 @@ int VFSManager::mount(const char *src, const char *target,
         const char *fstype, unsigned long flags, const void *data)
 {
     (void)flags;
-    (void)data;
 
     auto* fs = find_fs(fstype);
     if (!fs) { return -ENOSYS; }
@@ -400,8 +399,9 @@ int VFSManager::mount(const char *src, const char *target,
         mnt->fs = fs->spawn(data);
         kassert(get_mount(target) != NULL);
 
-    } else if (strcmp(src, "rootfs") == 0) {
-        dev_t devno = DEVNO(IDE_MAJOR, 1);
+    } else if (strncmp(src, "/dev/hda", 8) == 0) {
+        kprintf("mount %s\n", src);
+        dev_t devno = DEVNO(IDE_MAJOR, src[8]-'0');
         mnt->fs = fs->spawn((void*)devno);
     }
 
