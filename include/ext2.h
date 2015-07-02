@@ -2,6 +2,7 @@
 #define _SOS_EXT2_H
 
 #include <vfs.h>
+//Ref: http://www.nongnu.org/ext2-doc/ext2.html
 
 #define EXT2_SUPER_MAGIC 0xEF53
 
@@ -163,7 +164,6 @@ typedef struct ext2_group_desc_s {
 #define EXT2_S_IROTH	0x0004
 #define EXT2_S_IWOTH	0x0002
 #define EXT2_S_IXOTH	0x0001
-
 
 /*
  *  * Constants relative to the data blocks

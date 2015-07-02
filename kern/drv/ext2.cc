@@ -171,6 +171,9 @@ dentry_t * Ext2Fs::lookup(inode_t* dirp, dentry_t *de)
     if (dirp->type != FsNodeType::Dir) return NULL;
     
     ext2_inode_t* deip = (ext2_inode_t*)dirp->data;
+    if (deip->flags & EXT2_INDEX_FL) {
+        kprintf("WARN: indexed dir dont supported yet\n");
+    }
     
     char* buf = new char[sizeof(ext2_dirent_t)+255];
     uint32_t off = 0;
@@ -203,12 +206,43 @@ dentry_t * Ext2Fs::lookup(inode_t* dirp, dentry_t *de)
     return de;
 }
 
+static inline bool is_regular(ext2_inode_t* eip)
+{
+    return eip->mode & EXT2_S_IFREG;
+}
+
+static inline bool is_dir(ext2_inode_t* eip)
+{
+    return eip->mode & EXT2_S_IFDIR;
+}
+
 ssize_t Ext2Fs::read(File* filp, char * buf, size_t count, off_t * offset)
 {
+    auto* ip = filp->inode();
+    ext2_inode_t* eip = (ext2_inode_t*)ip->data;
+    if (is_regular(eip) && (eip->flags & EXT2_INDEX_FL)) {
+        kprintf("WARN: indexed dir dont supported yet\n");
+    }
+
+    off_t off = *offset;
+    if ((uint32_t)off >= eip->size) return 0;
+    if (count + off >= eip->size) {
+        count = eip->size - off;
+    }
+    
+    auto oflags = ext2lock.lock();
+    iread(eip, off, buf, count);
+    filp->set_off(off + count);
+    *offset = filp->off();
+    ext2lock.release(oflags);
+
+    return count;
 }
 
 ssize_t Ext2Fs::write(File* filp, const char * buf, size_t count, off_t *offset)
 {
+    panic("not implemented");
+    return 0;
 }
 
 int Ext2Fs::read_whole_block(uint32_t bid, char* buf)
@@ -277,9 +311,9 @@ int Ext2Fs::iread_block(ext2_inode_t* eip, uint32_t bid, off_t off, char* buf, s
 //FIXME: don't support 64bit size now
 int Ext2Fs::iread(ext2_inode_t* eip, off_t off, char* buf, size_t count)
 {
-    if (eip->mode & EXT2_S_IFREG) {
+    if (is_regular(eip)) {
         if (off + count >= eip->size) count = eip->size - off;
-    } else if (eip->mode & EXT2_S_IFDIR) {
+    } else if (is_dir(eip)) {
         uint32_t sz = eip->sectors * BYTES_PER_SECT;
         if (off + count >= sz) count = sz - off;
     }
@@ -309,6 +343,9 @@ int Ext2Fs::readdir(File* filp, dentry_t* de, filldir_t)
     
     ext2_inode_t* deip = (ext2_inode_t*)dir->data;
     if (off >= deip->size) return 0;
+    if (deip->flags & EXT2_INDEX_FL) {
+        kprintf("WARN: indexed dir dont supported yet\n");
+    }
     
     char* buf = new char[sizeof(ext2_dirent_t)+255];
 
