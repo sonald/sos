@@ -37,7 +37,7 @@ static void testlru()
     /*dump(cout, lru);*/
 }
 
-void sbrktest(void)
+void testsbrk(void)
 {
     int fds[2], pid, pids[10], ppid;
     char *a, *b, *c, *lastaddr, *oldbrk, *p, scratch;
@@ -133,7 +133,7 @@ void sbrktest(void)
 }
 
 //can not pass this test, do not has error checking in kernel
-void mem(void)
+void testmem(void)
 {
     void *m1, *m2;
     int pid, ppid;
@@ -204,12 +204,34 @@ void testmalloc()
     }
 }
 
+void testext2()
+{
+    int sz = 512;
+    char* buf = (char*)malloc(sz);
+    int fd = open("/mnt/moses-dev/moses-launcher/launchrc.c", O_RDONLY, 0);
+    int len = 0;
+    while ((len = read(fd, buf, sz)) > 0) {
+        write(STDOUT_FILENO, buf, sz);
+    }
+    close(fd);
+    free(buf);
+}
+
 int main(int argc, char* const argv[])
 {
-    sbrktest();
-    mem();
-    testmalloc();
-    testlru();
+    if (argc == 1) {
+        testsbrk();
+        testmem();
+        testmalloc();
+        testlru();
+        testext2();
+    } else {
+        if (strcmp(argv[1], "sbrk")) testsbrk();
+        else if (strcmp(argv[1], "mem")) testmem();
+        else if (strcmp(argv[1], "malloc")) testmalloc();
+        else if (strcmp(argv[1], "lru")) testlru();
+        else if (strcmp(argv[1], "ext2")) testext2();
+    }
     return 0;
 }
 

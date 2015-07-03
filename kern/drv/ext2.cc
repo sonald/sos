@@ -32,11 +32,26 @@ static int ispow(uint32_t id)
     return 0;
 }
 
+static inline bool is_regular(ext2_inode_t* eip)
+{
+    return eip->mode & EXT2_S_IFREG;
+}
+
+static inline bool is_dir(ext2_inode_t* eip)
+{
+    return eip->mode & EXT2_S_IFDIR;
+}
+
 static loff_t isize(ext2_inode_t* eip, ext2_superblock_t* sb)
 {
     loff_t sz = eip->size;
     if (sb->rev_level >= 1) sz = eip->size | ((loff_t)eip->dir_acl << 32);
     return sz;
+}
+
+uint32_t Ext2Fs::inode_occupied_blocks(ext2_inode_t* eip)
+{
+    return ROUNDUP(eip->sectors, _fs.sectors_per_block);
 }
 
 void Ext2Fs::init(dev_t dev)
@@ -206,16 +221,6 @@ dentry_t * Ext2Fs::lookup(inode_t* dirp, dentry_t *de)
     return de;
 }
 
-static inline bool is_regular(ext2_inode_t* eip)
-{
-    return eip->mode & EXT2_S_IFREG;
-}
-
-static inline bool is_dir(ext2_inode_t* eip)
-{
-    return eip->mode & EXT2_S_IFDIR;
-}
-
 ssize_t Ext2Fs::read(File* filp, char * buf, size_t count, off_t * offset)
 {
     auto* ip = filp->inode();
@@ -252,43 +257,56 @@ int Ext2Fs::read_whole_block(uint32_t bid, char* buf)
     uint32_t sz = 0;
     while (sect <= end_sect) {
         Buffer* bufp = bio.read(_dev, sect);
-        memcpy(buf + sz, &bufp->data, BYTES_PER_SECT);
+        memcpy(buf + sz, bufp->data, BYTES_PER_SECT);
+        bio.release(bufp);
         sz += BYTES_PER_SECT;
         sect++;
     }
     return 0; 
 }
 
+// bid is relative to eip
 uint32_t Ext2Fs::iget_indirect_block_no(ext2_inode_t* eip, uint32_t bid)
 {
     uint32_t ret = 0;
     uint32_t bids_in_blk = _fs.block_size / sizeof(uint32_t);
     uint32_t ind_block_max_bid = bids_in_blk + EXT2_NDIR_BLOCKS;;
-    if (bid >= EXT2_IND_BLOCK && bid < ind_block_max_bid) {
-        uint32_t blk = eip->block[bid];
-        if (blk == 0) { return 0; }
+    kassert(bid >= EXT2_IND_BLOCK);
+
+    if (bid < ind_block_max_bid) {
+        uint32_t ind_blk = eip->block[EXT2_IND_BLOCK];
+        kassert(ind_blk != 0);
+
         uint32_t* blk_buf = new uint32_t[_fs.block_size/sizeof(uint32_t)];
-        read_whole_block(blk, (char*)blk_buf);
-        memcpy(&ret, &blk_buf[bid-EXT2_IND_BLOCK], sizeof(uint32_t));
+        read_whole_block(ind_blk, (char*)blk_buf);
+        ret = blk_buf[bid-EXT2_IND_BLOCK];
         delete blk_buf;
-    } 
+
+    } else {
+        //TODO: implement
+    }
     return ret;
 }
 
 //bid is relative to inode
 int Ext2Fs::iread_block(ext2_inode_t* eip, uint32_t bid, off_t off, char* buf, size_t count)
 {
+    auto rel_id = bid;
+    kassert(bid <= inode_occupied_blocks(eip));
+
     if (bid < EXT2_NDIR_BLOCKS) bid = eip->block[bid];
-    else bid = iget_indirect_block_no(eip, bid);
-    if (bid == 0) return 0;
+    else { 
+        bid = iget_indirect_block_no(eip, bid);
+        kassert (bid != 0);
+    }
 
     uint32_t sect = BLK2SECT(bid) + off / BYTES_PER_SECT;
     uint32_t off_in_sect = off % BYTES_PER_SECT;
-    uint32_t end_sect = BLK2SECT(bid) + (off+count) / BYTES_PER_SECT;
+    uint32_t end_sect = BLK2SECT(bid) + (off+count-1) / BYTES_PER_SECT;
     uint32_t sz = 0;
 
-    //kprintf("%s: abs bid %d, off %d, count %d, sect %d-%d\n", 
-            //__func__, bid, off, count, sect, end_sect);
+    //kprintf("%s: rel %d, abs bid %d, off %d, count %d, sect %d-%d\n", 
+            //__func__, rel_id, bid, off, count, sect, end_sect);
     while (sect <= end_sect) {
         Buffer* bufp = bio.read(_dev, sect);
         size_t nr_read = min(count, BYTES_PER_SECT - off_in_sect);
@@ -319,14 +337,14 @@ int Ext2Fs::iread(ext2_inode_t* eip, off_t off, char* buf, size_t count)
     }
     off_t blk = off / _fs.block_size;
     off_t off_in_blk = off % _fs.block_size;
-    off_t end_blk = (off + count) / _fs.block_size;
-    //kprintf("%s: blk %d - %d, off %d, sz %d\n", __func__,
-            //blk, end_blk, off, count);
+    off_t end_blk = (off + count - 1) / _fs.block_size;
+    //kprintf("%s: blk %d - %d, off %d(in blk %d), sz %d\n", __func__,
+            //blk, end_blk, off, off_in_blk, count);
 
     uint32_t sz = 0;
     while (blk <= end_blk) {
         size_t nr_read = min(count, _fs.block_size-off_in_blk);
-        iread_block(eip, blk, off_in_blk, buf, nr_read); 
+        iread_block(eip, blk, off_in_blk, buf, nr_read);
         sz += nr_read;
         count -= nr_read;
         blk++;

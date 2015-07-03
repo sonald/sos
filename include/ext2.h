@@ -299,6 +299,8 @@ class Ext2Fs: public FileSystem {
         int iread_block(ext2_inode_t*, uint32_t bid, off_t off, char*, size_t);
         uint32_t iget_indirect_block_no(ext2_inode_t* eip, uint32_t bid);
         int read_whole_block(uint32_t bid, char*);
+
+        uint32_t inode_occupied_blocks(ext2_inode_t* eip);
 };
 
 FileSystem* create_ext2fs(const void*);

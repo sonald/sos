@@ -61,6 +61,11 @@ int main(int argc, char *argv[])
         }
     }
     
-    if (nofile) wc(0, "");
+    if (nofile) {
+        if (!flgs.line && !flgs.word && !flgs.chr) {
+            flgs = {1, 1, 1};
+        }
+        wc(0, "");
+    }
     return 0;
 }

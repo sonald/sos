@@ -4,7 +4,7 @@
 #include <fcntl.h>
 #include <dirent.h>
  
-#define BUF_LEN 128
+#define BUF_LEN 1024
 #define LINE_LEN 1024
 static char buf[BUF_LEN], buf2[20];
 static char line[LINE_LEN];
