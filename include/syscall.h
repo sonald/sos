@@ -32,7 +32,8 @@
 #define SYS_readdir    26
 #define SYS_dup2       27
 #define SYS_kdump      28
+#define SYS_lseek      29
 
-#define NR_SYSCALL     29
+#define NR_SYSCALL     30
 
 #endif

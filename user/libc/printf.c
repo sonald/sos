@@ -1,4 +1,3 @@
-#include "printf.h"
 #include "sprintf.h"
 #include <types.h>
 #include <unistd.h>

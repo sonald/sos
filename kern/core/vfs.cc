@@ -209,7 +209,7 @@ int sys_write(int fd, const void *buf, size_t nbyte)
 
 int sys_read(int fd, void *buf, size_t nbyte)
 {
-    if (fd >= MAX_NR_FILE) return -EINVAL; 
+    if (fd >= MAX_NR_FILE) return -EBADF; 
 
     auto* filp = current->files[fd];
     if (!filp->readable()) return -EPERM;
@@ -224,6 +224,40 @@ int sys_read(int fd, void *buf, size_t nbyte)
     auto ret = ip->fs->read(filp, (char*)buf, nbyte, &off);
     vfslock.release(eflags);
     return ret;
+}
+
+/*
+ * The lseek() function allows the file offset to be set beyond the
+ * end of the file (but this does not change the size of the file).  
+ * If data is later written at this point, subsequent reads of the 
+ * data in the gap (a "hole") return null bytes ('\0') until data
+ * is actually written into the gap.
+ * FIXME: handle that on sys_read
+ */
+off_t sys_lseek(int fd, off_t offset, int whence)
+{
+    if (fd >= MAX_NR_FILE) return -EBADF; 
+
+    auto* filp = current->files[fd];
+    if (!filp) return -EBADF;
+    if (!filp->readable()) return -EPERM;
+    switch(whence) {
+        case 0: // set
+            filp->set_off(offset); break;
+        case 1: // current
+            filp->set_off(filp->off() + offset); break;
+        case 2: //end
+            {
+                inode_t* ip = filp->inode();
+                if (!ip) {
+                    return -ESPIPE;
+                }
+                filp->set_off(ip->size + offset); break;
+            }
+        default:
+            return -EINVAL;
+    }
+    return filp->off();
 }
 
 // ignore count, should only be 1 by now

@@ -107,6 +107,7 @@ void init_syscall()
     syscalls[SYS_pipe] = { (void*)sys_pipe, 1 };
     syscalls[SYS_kdump] = { (void*)sys_kdump, 0 };
     syscalls[SYS_sbrk] = { (void*)sys_sbrk, 1 };
+    syscalls[SYS_lseek] = { (void*)sys_lseek, 3 };
 
     register_isr_handler(ISR_SYSCALL, syscall_handler);
 }

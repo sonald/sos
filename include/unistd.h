@@ -67,6 +67,10 @@ ret_t fn(t1 arg1, t2 arg2, t3 arg3, t4 arg4) \
 #define NULL    ((void*)0)
 #endif
 
+#define SEEK_SET    0
+#define SEEK_CUR    1
+#define SEEK_END    2
+
 extern int errno;
 
 #ifdef __cplusplus
@@ -88,6 +92,7 @@ int dup2(int fd, int fd2);
 int pipe(int fd[2]);
 int kdump();
 void* sbrk(int inc);
+off_t lseek(int, off_t, int);
 
 // return -1 if no child, or pid of any of children exited
 int wait();

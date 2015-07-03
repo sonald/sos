@@ -9,22 +9,20 @@ extern int sys_sleep(int);
 extern int sys_getpid();
 extern int sys_wait();
 extern int sys_exit();
-extern int sys_execve(const char *path, char *const argv[],
-        char *const envp[]);
+extern int sys_execve(const char *path, char *const argv[], char *const envp[]);
 extern int sys_open(const char *path, int flags, int mode);
 extern int sys_close(int);
 extern int sys_mmap(struct file *, struct vm_area_struct *);
 extern int sys_write(int fd, const void *buf, size_t nbyte);
 extern int sys_read(int fd, void *buf, size_t nbyte);
-extern int sys_readdir(unsigned int fd, struct dirent *dirp,
-        unsigned int count);
-extern int sys_mount(const char *, const char *,
-        const char *, unsigned long, const void *);
+extern int sys_readdir(unsigned int fd, struct dirent *dirp, unsigned int count);
+extern int sys_mount(const char *, const char *, const char *, unsigned long, const void *);
 extern int sys_unmount(const char *target);
 extern int sys_dup(int);
 extern int sys_dup2(int fd, int fd2);
 extern int sys_pipe(int fd[2]);
 extern int sys_kdump(); // for debug
 extern uint32_t sys_sbrk(int inc);
+extern off_t sys_lseek(int fd, off_t offset, int whence);
 
 #endif

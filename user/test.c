@@ -217,6 +217,20 @@ void testext2()
     free(buf);
 }
 
+void testseek()
+{
+    int sz = 512;
+    char* buf = (char*)malloc(sz);
+    int fd = open("/mnt/moses-dev/moses-launcher/launchrc.c", O_RDONLY, 0);
+    lseek(fd, 100000, SEEK_SET);
+    int len = 0;
+    while ((len = read(fd, buf, sz)) > 0) {
+        write(STDOUT_FILENO, buf, len);
+    }
+    close(fd);
+    free(buf);
+}
+
 int main(int argc, char* const argv[])
 {
     if (argc == 1) {
@@ -225,12 +239,14 @@ int main(int argc, char* const argv[])
         testmalloc();
         testlru();
         testext2();
+        testseek();
     } else {
         if (strcmp(argv[1], "sbrk") == 0) testsbrk();
         else if (strcmp(argv[1], "mem") == 0) testmem();
         else if (strcmp(argv[1], "malloc") == 0) testmalloc();
         else if (strcmp(argv[1], "lru") == 0) testlru();
         else if (strcmp(argv[1], "ext2") == 0) testext2();
+        else if (strcmp(argv[1], "seek") == 0) testseek();
     }
     return 0;
 }
