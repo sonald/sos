@@ -270,13 +270,22 @@ int Ext2Fs::read_whole_block(uint32_t bid, char* buf)
     return 0; 
 }
 
+uint32_t Ext2Fs::read_blk_no_in_block(uint32_t blk, uint32_t idx)
+{
+    uint32_t ret = 0;
+    uint32_t sect = BLK2SECT(blk) + (idx * 4) / BYTES_PER_SECT;
+
+    Buffer* bufp = bio.read(_dev, sect);
+    idx = idx % (BYTES_PER_SECT / 4);
+    ret = ((uint32_t*)&bufp->data)[idx];
+    bio.release(bufp);
+    return ret;
+}
+
 // bid is relative to eip
 uint32_t Ext2Fs::iget_indirect_block_no(ext2_inode_t* eip, uint32_t bid)
 {
-    uint32_t ret = 0;
     uint32_t blk_no = 0, scale = 0;
-
-    uint32_t* blk_buf = new uint32_t[_fs.bids_in_blk];
 
     if (bid >= _fs.dind_block_max_bid) {
         blk_no = eip->block[EXT2_TIND_BLOCK];
@@ -292,19 +301,13 @@ uint32_t Ext2Fs::iget_indirect_block_no(ext2_inode_t* eip, uint32_t bid)
         scale = 1;
     } else return eip->block[bid];
 
-    while (scale > 0) {
-        read_whole_block(blk_no, (char*)blk_buf);
-        if (scale == 1) {
-            ret = blk_buf[bid];
-            break;
-        }
-        blk_no = blk_buf[bid / scale];
+    while (scale > 1) {
+        blk_no = read_blk_no_in_block(blk_no, bid/scale);
         bid = bid % scale;
         scale /= _fs.bids_in_blk;
     }
 
-    delete blk_buf;
-    return ret;
+    return read_blk_no_in_block(blk_no, bid);
 }
 
 //bid is relative to inode

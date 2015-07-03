@@ -202,10 +202,8 @@ int sys_write(int fd, const void *buf, size_t nbyte)
         return -1;
     }
 
-    auto eflags = vfslock.lock();
     off_t off = filp->off();
     auto ret = ip->fs->write(filp, (char*)buf, nbyte, &off);
-    vfslock.release(eflags);
     return ret;
 }
 

@@ -4,7 +4,7 @@
 #include <fcntl.h>
 #include <dirent.h>
  
-#define BUF_LEN 1024
+#define BUF_LEN 512
 #define LINE_LEN 1024
 static char buf[BUF_LEN], buf2[20];
 static char line[LINE_LEN];
@@ -40,8 +40,7 @@ int main(int argc, char* argv[])
     if (fd >= 0) {
         int len = 0;
         int no = 1;
-        while ((len = read(fd, buf, sizeof buf - 1)) > 0) {
-            buf[len] = 0;
+        while ((len = read(fd, buf, BUF_LEN)) > 0) {
             if (f_lineno) {
                 int i = 0; 
                 while (i < len) {
