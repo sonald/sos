@@ -83,6 +83,11 @@ void Ext2Fs::init(dev_t dev)
     _fs.inodes_per_sector = BYTES_PER_SECT / EXT2_INODE_SIZE(_sb);
     _fs.start_sector = start_sector;
 
+    uint32_t scale = _fs.bids_in_blk = _fs.block_size / sizeof(uint32_t);
+    _fs.ind_block_max_bid = scale + EXT2_NDIR_BLOCKS;;
+    _fs.dind_block_max_bid = scale * scale + _fs.ind_block_max_bid;
+    _fs.tind_block_max_bid = scale * scale * scale + _fs.dind_block_max_bid;
+
     kprintf(""
         "Filesystem volume name:   %s\tLast mounted on:           %s\n"
         "Filesystem UUID:          %s\tFilesystem magic number:  0x%x\n"
@@ -269,22 +274,36 @@ int Ext2Fs::read_whole_block(uint32_t bid, char* buf)
 uint32_t Ext2Fs::iget_indirect_block_no(ext2_inode_t* eip, uint32_t bid)
 {
     uint32_t ret = 0;
-    uint32_t bids_in_blk = _fs.block_size / sizeof(uint32_t);
-    uint32_t ind_block_max_bid = bids_in_blk + EXT2_NDIR_BLOCKS;;
-    kassert(bid >= EXT2_IND_BLOCK);
+    uint32_t blk_no = 0, scale = 0;
 
-    if (bid < ind_block_max_bid) {
-        uint32_t ind_blk = eip->block[EXT2_IND_BLOCK];
-        kassert(ind_blk != 0);
+    uint32_t* blk_buf = new uint32_t[_fs.bids_in_blk];
 
-        uint32_t* blk_buf = new uint32_t[_fs.block_size/sizeof(uint32_t)];
-        read_whole_block(ind_blk, (char*)blk_buf);
-        ret = blk_buf[bid-EXT2_IND_BLOCK];
-        delete blk_buf;
+    if (bid >= _fs.dind_block_max_bid) {
+        blk_no = eip->block[EXT2_TIND_BLOCK];
+        bid -= _fs.dind_block_max_bid;
+        scale = _fs.bids_in_blk * _fs.bids_in_blk;
+    } else if (bid >= _fs.ind_block_max_bid) {
+        blk_no = eip->block[EXT2_DIND_BLOCK];
+        bid -= _fs.ind_block_max_bid;
+        scale = _fs.bids_in_blk;
+    } else if (bid >= EXT2_NDIR_BLOCKS) {
+        blk_no = eip->block[EXT2_IND_BLOCK];
+        bid -= EXT2_NDIR_BLOCKS;
+        scale = 1;
+    } else return eip->block[bid];
 
-    } else {
-        //TODO: implement
+    while (scale > 0) {
+        read_whole_block(blk_no, (char*)blk_buf);
+        if (scale == 1) {
+            ret = blk_buf[bid];
+            break;
+        }
+        blk_no = blk_buf[bid / scale];
+        bid = bid % scale;
+        scale /= _fs.bids_in_blk;
     }
+
+    delete blk_buf;
     return ret;
 }
 
@@ -294,11 +313,8 @@ int Ext2Fs::iread_block(ext2_inode_t* eip, uint32_t bid, off_t off, char* buf, s
     auto rel_id = bid;
     kassert(bid <= inode_occupied_blocks(eip));
 
-    if (bid < EXT2_NDIR_BLOCKS) bid = eip->block[bid];
-    else { 
-        bid = iget_indirect_block_no(eip, bid);
-        kassert (bid != 0);
-    }
+    bid = iget_indirect_block_no(eip, bid);
+    if (rel_id >= EXT2_NDIR_BLOCKS) kassert (bid != 0);
 
     uint32_t sect = BLK2SECT(bid) + off / BYTES_PER_SECT;
     uint32_t off_in_sect = off % BYTES_PER_SECT;

@@ -262,6 +262,11 @@ typedef struct ext2_fs_info_s {
     uint32_t sectors_per_block;
     uint32_t inodes_per_sector;
 	uint32_t frag_size; 
+
+    uint32_t bids_in_blk;
+    uint32_t ind_block_max_bid;;
+    uint32_t dind_block_max_bid;
+    uint32_t tind_block_max_bid;
 } ext2_fs_info_t;
 
 typedef struct ext2_group_info_s {
