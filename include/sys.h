@@ -2,6 +2,7 @@
 #define _SOS_SYS_H
 
 #include <types.h>
+#include <stat.h>
 
 extern int sys_getppid();
 extern int sys_fork();
@@ -24,5 +25,8 @@ extern int sys_pipe(int fd[2]);
 extern int sys_kdump(); // for debug
 extern uint32_t sys_sbrk(int inc);
 extern off_t sys_lseek(int fd, off_t offset, int whence);
+extern int sys_stat(const char *pathname, struct stat *buf);
+extern int sys_fstat(int fd, struct stat *buf);
+extern int sys_lstat(const char *pathname, struct stat *buf);
 
 #endif

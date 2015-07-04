@@ -41,12 +41,12 @@ typedef int8_t s8;
 
 typedef int pid_t;
 typedef unsigned short uid_t;
-typedef unsigned char gid_t;
+typedef unsigned short gid_t;
 typedef uint32_t dev_t;
 typedef unsigned short ino_t;
 typedef unsigned short mode_t;
 typedef unsigned short umode_t;
-typedef unsigned char nlink_t;
+typedef unsigned short nlink_t;
 typedef int daddr_t;
 typedef long off_t;
 typedef int64_t loff_t;

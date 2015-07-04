@@ -252,6 +252,10 @@ ssize_t Ext2Fs::read(File* filp, char * buf, size_t count, off_t * offset)
 ssize_t Ext2Fs::write(File* filp, const char * buf, size_t count, off_t *offset)
 {
     panic("not implemented");
+    (void)filp;
+    (void)buf;
+    (void)count;
+    (void)offset;
     return 0;
 }
 
@@ -324,8 +328,6 @@ int Ext2Fs::iread_block(ext2_inode_t* eip, uint32_t bid, off_t off, char* buf, s
     uint32_t end_sect = BLK2SECT(bid) + (off+count-1) / BYTES_PER_SECT;
     uint32_t sz = 0;
 
-    //kprintf("%s: rel %d, abs bid %d, off %d, count %d, sect %d-%d\n", 
-            //__func__, rel_id, bid, off, count, sect, end_sect);
     while (sect <= end_sect) {
         Buffer* bufp = bio.read(_dev, sect);
         size_t nr_read = min(count, BYTES_PER_SECT - off_in_sect);
@@ -357,8 +359,6 @@ int Ext2Fs::iread(ext2_inode_t* eip, off_t off, char* buf, size_t count)
     off_t blk = off / _fs.block_size;
     off_t off_in_blk = off % _fs.block_size;
     off_t end_blk = (off + count - 1) / _fs.block_size;
-    //kprintf("%s: blk %d - %d, off %d(in blk %d), sz %d\n", __func__,
-            //blk, end_blk, off, off_in_blk, count);
 
     uint32_t sz = 0;
     while (blk <= end_blk) {
@@ -416,6 +416,12 @@ int Ext2Fs::readdir(File* filp, dentry_t* de, filldir_t)
 void Ext2Fs::read_inode(inode_t* ip)
 {
     auto* eip = iget(ip->ino);
+    ip->uid = eip->uid;
+    ip->gid = eip->gid;
+    ip->atime = eip->atime;
+    ip->mtime = eip->mtime;
+    ip->ctime = eip->ctime;
+    ip->links = eip->links_count;
     ip->mode = eip->mode;
     ip->dev = _pdev;
     ip->type = FsNodeType::Dir;
@@ -436,9 +442,6 @@ ext2_inode_t* Ext2Fs::iget(uint32_t ino)
     ext2_inode_t* eip = new ext2_inode_t;
     uint32_t itbl_sector = BLK2SECT(_gdt[bg_id].desc.inode_table);
 
-    //kprintf("%s: bg %d, itbl %d(%d), sectoff %d, bytesoff %d\n",
-            //__func__, bg_id, _gdt[bg_id].desc.inode_table, 
-            //itbl_sector, sect_off, bytes_off);
     Buffer* bufp = bio.read(_dev, itbl_sector + sect_off);
     *eip = *(ext2_inode_t*)(bufp->data + bytes_off);
     //FIXME: why memcpy failed

@@ -25,6 +25,9 @@ _syscall1(int, pipe, int*, fds); // int fd[2]
 _syscall0(int, kdump); 
 _syscall1(void*, sbrk, int, inc);
 _syscall3(off_t, lseek, int, fd, off_t, offset, int, whence);
+_syscall2(int, stat, const char *, pathname, struct stat *, buf);
+_syscall2(int, fstat, int, fd, struct stat *, buf);
+_syscall2(int, lstat, const char *, pathname, struct stat *, buf);
 
 int execve(const char *path, char *const argv[], char *const envp[])
 {

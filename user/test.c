@@ -6,13 +6,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <lru.h>
+#include <stat.h>
 
 #define assert(cond) if (!(cond)) { \
     printf("%s failed", #cond); \
     for(;;); \
 }
-static void testlru()
+
+static void testlru(int argc, char* const argv[])
 {
+    (void)argc;
+    (void)argv;
+
     LRUCache<int, int> lru(10);
     assert(lru.has(100) == false);
     lru.set(100, 20);
@@ -37,8 +42,11 @@ static void testlru()
     /*dump(cout, lru);*/
 }
 
-void testsbrk(void)
+void testsbrk(int argc, char* const argv[])
 {
+    (void)argc;
+    (void)argv;
+
     int fds[2], pid, pids[10], ppid;
     char *a, *b, *c, *lastaddr, *oldbrk, *p, scratch;
     uint32_t amt;
@@ -133,8 +141,11 @@ void testsbrk(void)
 }
 
 //can not pass this test, do not has error checking in kernel
-void testmem(void)
+void testmem(int argc, char* const argv[])
 {
+    (void)argc;
+    (void)argv;
+
     void *m1, *m2;
     int pid, ppid;
 
@@ -173,8 +184,11 @@ void testmem(void)
     }
 }
 
-void testmalloc()
+void testmalloc(int argc, char* const argv[])
 {
+    (void)argc;
+    (void)argv;
+
     const int PGSIZE = 4096;
     void* p1 = malloc(0x80-3);
     void* p2 = malloc(0x100);
@@ -204,8 +218,11 @@ void testmalloc()
     }
 }
 
-void testext2()
+void testext2(int argc, char* const argv[])
 {
+    (void)argc;
+    (void)argv;
+
     int sz = 512;
     char* buf = (char*)malloc(sz);
     int fd = open("/mnt/moses-dev/moses-launcher/launchrc.c", O_RDONLY, 0);
@@ -217,8 +234,11 @@ void testext2()
     free(buf);
 }
 
-void testseek()
+void testseek(int argc, char* const argv[])
 {
+    (void)argc;
+    (void)argv;
+
     int sz = 512;
     char* buf = (char*)malloc(sz);
     int fd = open("/mnt/moses-dev/moses-launcher/launchrc.c", O_RDONLY, 0);
@@ -231,22 +251,59 @@ void testseek()
     free(buf);
 }
 
+char* mode_to_str(mode_t m, char* buf)
+{
+    if (S_ISDIR(m)) buf[0] = 'd';
+    if (m & S_IRUSR) buf[1] = 'r';
+    if (m & S_IWUSR) buf[2] = 'w';
+    if (m & S_IXUSR) buf[3] = 'x';
+    if (m & S_IRGRP) buf[4] = 'r';
+    if (m & S_IWGRP) buf[5] = 'w';
+    if (m & S_IXGRP) buf[6] = 'x';
+    if (m & S_IROTH) buf[7] = 'r';
+    if (m & S_IWOTH) buf[8] = 'w';
+    if (m & S_IXOTH) buf[9] = 'x';
+    return buf;
+}
+
+void teststat(int argc, char* const argv[])
+{
+    if (argc <= 2) return; // no filename
+    char modes[] = "----------";
+    const char* name = argv[2];
+
+    struct stat stbuf;
+    if (lstat(name, &stbuf) == 0) {
+        printf("mode %s, mtime: %d, uid: %d, gid: %d, sz: %d, "
+                "ino: 0x%d\n",
+                mode_to_str(stbuf.st_mode, modes), stbuf.st_mtime,
+                stbuf.st_uid, stbuf.st_gid,
+                stbuf.st_size, stbuf.st_ino);
+    }
+}
+
+struct testcase {
+    const char* name;
+    void (*fn)(int, char*const []);
+} tcs[] = {
+    {"sbrk", testsbrk},
+    {"mem", testmem},
+    {"malloc", testmalloc},
+    {"lru", testlru},
+    {"ext2", testext2},
+    {"seek", testseek},
+    {"stat", teststat},
+};
+
+
 int main(int argc, char* const argv[])
 {
-    if (argc == 1) {
-        testsbrk();
-        testmem();
-        testmalloc();
-        testlru();
-        testext2();
-        testseek();
-    } else {
-        if (strcmp(argv[1], "sbrk") == 0) testsbrk();
-        else if (strcmp(argv[1], "mem") == 0) testmem();
-        else if (strcmp(argv[1], "malloc") == 0) testmalloc();
-        else if (strcmp(argv[1], "lru") == 0) testlru();
-        else if (strcmp(argv[1], "ext2") == 0) testext2();
-        else if (strcmp(argv[1], "seek") == 0) testseek();
+    int N = sizeof(tcs)/sizeof(tcs[0]);
+
+    for (int i = 0; i < N; i++) {
+        if (argc == 1 || strcmp(tcs[i].name, argv[1]) == 0) {
+            tcs[i].fn(argc,argv);
+        }
     }
     return 0;
 }

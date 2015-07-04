@@ -33,7 +33,9 @@
 #define SYS_dup2       27
 #define SYS_kdump      28
 #define SYS_lseek      29
+#define SYS_stat       30
+#define SYS_lstat      31
 
-#define NR_SYSCALL     30
+#define NR_SYSCALL     32
 
 #endif

@@ -93,6 +93,9 @@ int pipe(int fd[2]);
 int kdump();
 void* sbrk(int inc);
 off_t lseek(int, off_t, int);
+int stat(const char *pathname, struct stat *buf);
+int fstat(int fd, struct stat *buf);
+int lstat(const char *pathname, struct stat *buf);
 
 // return -1 if no child, or pid of any of children exited
 int wait();

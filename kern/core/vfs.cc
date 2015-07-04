@@ -5,10 +5,10 @@
 #include "errno.h"
 #include "spinlock.h"
 #include "disk.h"
-#include "ramfs.h"
 #include <dirent.h>
 #include <sos/limits.h>
 #include <sprintf.h>
+#include <stat.h>
 
 File cached_files[MAX_NR_FILE];
 inode_t cached_inodes[MAX_NR_INODE];
@@ -178,6 +178,56 @@ _bad:
 
     vfslock.release(eflags);
     return ret;
+}
+
+static void copy_stat(inode_t* ip, struct stat *buf)
+{
+    struct stat stbuf;
+    stbuf.st_dev = ip->dev;
+    stbuf.st_mode = ip->mode;
+    stbuf.st_uid = ip->uid;
+    stbuf.st_ino = ip->ino;
+    stbuf.st_nlink = ip->links;
+    stbuf.st_rdev = 0; // FIXME: do it later
+    stbuf.st_size = ip->size;
+
+    stbuf.st_atime = ip->atime;
+    stbuf.st_mtime = ip->mtime;
+    stbuf.st_ctime = ip->ctime;
+
+    memcpy(buf, &stbuf, sizeof stbuf);
+}
+
+int sys_stat(const char *pathname, struct stat *buf)
+{
+    return -1;
+}
+
+int sys_fstat(int fd, struct stat *buf)
+{
+    if (fd >= MAX_NR_FILE) return -EBADF; 
+
+    auto* filp = current->files[fd];
+    if (!filp->readable()) return -EPERM;
+
+    if (filp->type() != File::Type::Inode) {
+        return -EBADF;
+    }
+    
+    auto* ip = filp->inode();
+    kassert(ip != NULL);
+    copy_stat(ip, buf);
+
+    return 0;
+}
+
+int sys_lstat(const char *pathname, struct stat *buf)
+{
+    auto* ip = vfs.namei(pathname);
+    if (!ip) return -ENOENT;
+
+    copy_stat(ip, buf); 
+    return 0;
 }
 
 int sys_mmap(struct file *, struct vm_area_struct *)

@@ -6,6 +6,7 @@
 #include <vm.h>
 #include <ctype.h>
 #include <spinlock.h>
+#include <stat.h>
 
 Spinlock fatlock {"fatlock"};
 
@@ -196,6 +197,10 @@ uint32_t Fat32Fs::cluster2sector(uint32_t cluster)
 //how ino map to fat file: right now use dynamical map
 void Fat32Fs::read_inode(inode_t *ip, fat_inode_t* fat_ip)
 {
+    ip->uid = ip->gid = 0;
+    ip->mode = S_IRWXU | S_IRWXO | S_IRWXG;
+    ip->links = 1;
+
     if (ip->ino == 1) {
         ip->dev = _pdev;
         ip->type = FsNodeType::Dir;
@@ -203,6 +208,7 @@ void Fat32Fs::read_inode(inode_t *ip, fat_inode_t* fat_ip)
         ip->blksize = _blksize;
         ip->blocks = (ip->size + _blksize - 1) / _blksize;
         ip->fs = this;
+        ip->mode |= S_IFDIR;
 
         if (!fat_ip) {
             fat_ip = (fat_inode_t*)vmm.kmalloc(sizeof(fat_inode_t), 1);
@@ -214,6 +220,9 @@ void Fat32Fs::read_inode(inode_t *ip, fat_inode_t* fat_ip)
     } else {
         ip->dev = _pdev;
         ip->type = (fat_ip->attr & DIRECTORY) ? FsNodeType::Dir : FsNodeType::File;
+        if (ip->type == FsNodeType::Dir) {
+            ip->mode |= S_IFDIR;
+        } else ip->mode |= S_IFREG;
         ip->size = fat_ip->size; //FIXME: if dir, need traverse to do it !!
         ip->blksize = _blksize;
         ip->blocks = (ip->size + _blksize - 1) / _blksize;
@@ -221,6 +230,7 @@ void Fat32Fs::read_inode(inode_t *ip, fat_inode_t* fat_ip)
 
         ip->data = (void*)fat_ip;
     }
+
 }
 
 static bool str_caseequal(const char* s1, const char* s2)

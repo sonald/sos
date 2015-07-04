@@ -24,7 +24,11 @@ typedef struct inode_s {
     dev_t dev;  // major and minor
     u32 ino;
     loff_t size;  // size in bytes
+    nlink_t links; // hard links
     loff_t blocks;
+    uint16_t uid;
+    uint16_t gid;
+
     size_t blksize;
     time_t mtime;
     time_t atime;

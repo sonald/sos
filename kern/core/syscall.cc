@@ -108,6 +108,9 @@ void init_syscall()
     syscalls[SYS_kdump] = { (void*)sys_kdump, 0 };
     syscalls[SYS_sbrk] = { (void*)sys_sbrk, 1 };
     syscalls[SYS_lseek] = { (void*)sys_lseek, 3 };
+    syscalls[SYS_fstat] = { (void*)sys_fstat, 2 };
+    syscalls[SYS_stat] = { (void*)sys_stat, 2 };
+    syscalls[SYS_lstat] = { (void*)sys_lstat, 2 };
 
     register_isr_handler(ISR_SYSCALL, syscall_handler);
 }
