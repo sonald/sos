@@ -5,7 +5,7 @@
 #include <string.h>
 
 #define MAXFILES 64
-#define NAMELEN  64
+#define NAMELEN  255
 struct initrd_entry_header 
 {
    unsigned char magic; // The magic number is there to check for consistency.

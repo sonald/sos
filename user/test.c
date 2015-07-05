@@ -47,8 +47,8 @@ void testsbrk(int argc, char* const argv[])
     (void)argc;
     (void)argv;
 
-    int fds[2], pid, pids[10], ppid;
-    char *a, *b, *c, *lastaddr, *oldbrk, *p, scratch;
+    int fds[2], pid;
+    char *a, *b, *c, *lastaddr, *oldbrk, *p;
     uint32_t amt;
 
     printf("sbrk test\n");

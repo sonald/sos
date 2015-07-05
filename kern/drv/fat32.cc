@@ -33,19 +33,6 @@ _out:
     return j;
 }
 
-// need to handle other invalid chars
-static int sanity_name(const char* name, char* res)
-{
-    int n = strlen(name), i = 0;
-    for (i = 0; i < n; i++) {
-        if (name[i] >= 'a' && name[i] <= 'z') {
-            res[i] = name[i] - 32;
-        } else res[i] = name[i];
-    }
-    res[i] = 0;
-    return 0;
-}
-
 fat_inode_t* Fat32Fs::build_fat_inode(union fat_dirent* dp, int dp_len)
 {
     auto* ip = (fat_inode_t*)vmm.kmalloc(sizeof(fat_inode_t), 1);
@@ -501,6 +488,7 @@ int Fat32Fs::readdir(File *filp, dentry_t *de, filldir_t)
         push_cache(fat_ip);
         if (fat_ip->long_name[0]) {
             strncpy(de->name, fat_ip->long_name, NAMELEN);
+            de->name[NAMELEN] = 0;
         } else {
             strcpy(de->name, fat_ip->std_name);
         }

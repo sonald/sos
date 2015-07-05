@@ -88,37 +88,37 @@ void Ext2Fs::init(dev_t dev)
     _fs.dind_block_max_bid = scale * scale + _fs.ind_block_max_bid;
     _fs.tind_block_max_bid = scale * scale * scale + _fs.dind_block_max_bid;
 
-    kprintf(""
-        "Filesystem volume name:   %s\tLast mounted on:           %s\n"
-        "Filesystem UUID:          %s\tFilesystem magic number:  0x%x\n"
-        "Filesystem revision #:    %d\tFilesystem features:      ()\n"
-        "Filesystem flags:           \tDefault mount options:    \n"
-        "Filesystem state:         %s\tErrors behavior:          %d\n"
-        "Filesystem OS type:       %d\tInode count:              %d\n"
-        "Block count:              %d\tReserved block count:     %d\n"
-        "Free blocks:              %d\tFree inodes:              %d\n"
-        "First block               %d\tBlock size:               %d\n"
-        "Fragment size:            %d\tReserved GDT blocks:      %d\n"
-        "Blocks per group:         %d\tFragments per group:      %d\n"
-        "Inodes per group:         %d\tInode blocks per group:   %d\n"
-        "Filesystem created:       %d\tLast mount time:          %d\n"
-        "Last write time:          %d\tMount count               %d\n"
-        "Maximum mount count:      %d\tLast checked:             %d\n"
-        "Check interval:           %d\tReserved blocks uid:      %d\n"
-        "Reserved blocks gid:      %d\tFirst inode:              %d\n"
-        "Inode size:               %d\tgroup count:              %d\n",
-        _sb.volume_name, _sb.last_mounted,  _sb.uuid, _sb.magic,
-        _sb.rev_level, (_sb.state == EXT2_VALID_FS ?"clean":"error"),
-        _sb.errors, _sb.creator_os, _sb.inodes_count, _sb.blocks_count,
-        _sb.r_blocks_count, _sb.free_blocks_count, _sb.free_inodes_count,
-        _sb.first_data_block, _fs.block_size, _fs.frag_size,
-        _fs.groups_count * sizeof(ext2_group_desc_t), 
-        _sb.blocks_per_group, _sb.frags_per_group, _sb.inodes_per_group,
-        -1, /* calculated from gdt */
-        _sb.mtime, _sb.mtime, _sb.wtime, 
-        _sb.mnt_count, _sb.max_mnt_count, _sb.lastcheck, _sb.checkinterval,
-        _sb.def_resuid, _sb.def_resgid, EXT2_FIRST_INO(_sb),
-        EXT2_INODE_SIZE(_sb), _fs.groups_count);
+    //kprintf(""
+        //"Filesystem volume name:   %s\tLast mounted on:           %s\n"
+        //"Filesystem UUID:          %s\tFilesystem magic number:  0x%x\n"
+        //"Filesystem revision #:    %d\tFilesystem features:      ()\n"
+        //"Filesystem flags:           \tDefault mount options:    \n"
+        //"Filesystem state:         %s\tErrors behavior:          %d\n"
+        //"Filesystem OS type:       %d\tInode count:              %d\n"
+        //"Block count:              %d\tReserved block count:     %d\n"
+        //"Free blocks:              %d\tFree inodes:              %d\n"
+        //"First block               %d\tBlock size:               %d\n"
+        //"Fragment size:            %d\tReserved GDT blocks:      %d\n"
+        //"Blocks per group:         %d\tFragments per group:      %d\n"
+        //"Inodes per group:         %d\tInode blocks per group:   %d\n"
+        //"Filesystem created:       %d\tLast mount time:          %d\n"
+        //"Last write time:          %d\tMount count               %d\n"
+        //"Maximum mount count:      %d\tLast checked:             %d\n"
+        //"Check interval:           %d\tReserved blocks uid:      %d\n"
+        //"Reserved blocks gid:      %d\tFirst inode:              %d\n"
+        //"Inode size:               %d\tgroup count:              %d\n",
+        //_sb.volume_name, _sb.last_mounted,  _sb.uuid, _sb.magic,
+        //_sb.rev_level, (_sb.state == EXT2_VALID_FS ?"clean":"error"),
+        //_sb.errors, _sb.creator_os, _sb.inodes_count, _sb.blocks_count,
+        //_sb.r_blocks_count, _sb.free_blocks_count, _sb.free_inodes_count,
+        //_sb.first_data_block, _fs.block_size, _fs.frag_size,
+        //_fs.groups_count * sizeof(ext2_group_desc_t), 
+        //_sb.blocks_per_group, _sb.frags_per_group, _sb.inodes_per_group,
+        //-1, [> calculated from gdt <]
+        //_sb.mtime, _sb.mtime, _sb.wtime, 
+        //_sb.mnt_count, _sb.max_mnt_count, _sb.lastcheck, _sb.checkinterval,
+        //_sb.def_resuid, _sb.def_resgid, EXT2_FIRST_INO(_sb),
+        //EXT2_INODE_SIZE(_sb), _fs.groups_count);
 
 
     int id = 0;
@@ -379,7 +379,7 @@ int Ext2Fs::readdir(File* filp, dentry_t* de, filldir_t)
     if (dir->type != FsNodeType::Dir) return -EINVAL;
     
     ext2_inode_t* deip = (ext2_inode_t*)dir->data;
-    if (off >= deip->size) return 0;
+    if ((uint32_t)off >= deip->size) return 0;
     if (deip->flags & EXT2_INDEX_FL) {
         kprintf("WARN: indexed dir dont supported yet\n");
     }

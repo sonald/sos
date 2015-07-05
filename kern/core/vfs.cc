@@ -331,6 +331,7 @@ int sys_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
         dirp->d_off = off;
         dirp->d_reclen = sizeof *dirp;
         strncpy(dirp->d_name, de->name, NAMELEN);
+        dirp->d_name[NAMELEN] = 0;
     }
     vfs.dealloc_entry(de);
     return ret;
