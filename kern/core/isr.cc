@@ -91,6 +91,7 @@ void isr_handler(trapframe_t* regs)
     }
 }
 
+extern void check_pending_signal(trapframe_t* regs);
 void irq_handler(trapframe_t* regs)
 {
     if (regs->isrno >= 32 && regs->isrno <= 47) {
@@ -107,6 +108,12 @@ void irq_handler(trapframe_t* regs)
     if (isr_handlers[regs->isrno]) {
         interrupt_handler cb = isr_handlers[regs->isrno];
         cb(regs);
+    }
+
+    //NOTE: dirty hack, I can not handle situation when preempting happens
+    //in kernel space. only check signal during returning to the userspace.
+    if (regs->cs == 0x1b) {
+        check_pending_signal(regs);
     }
 
     if (regs->isrno == IRQ_TIMER || current->need_resched) {

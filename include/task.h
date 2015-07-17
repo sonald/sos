@@ -1,10 +1,11 @@
 #ifndef _TASK_H
 #define _TASK_H
 
-#include "isr.h"
-#include "vm.h"
-#include "vfs.h"
-#include "spinlock.h"
+#include <isr.h>
+#include <vm.h>
+#include <vfs.h>
+#include <spinlock.h>
+#include <sos/signal.h>
 #include <sos/limits.h>
 
 #define PROC_NAME_LEN 31
@@ -36,7 +37,7 @@ typedef struct proc_s {
 
     u32 kern_esp;
     u32 user_esp;
-    address_mapping_t mmap[3]; // for code, text, stack
+    address_mapping_t mmap[3]; // for code(text), data, stack
     u32 data_end;
 
     u32 heap_end; // current heap brk, intially = end of data
@@ -53,6 +54,12 @@ typedef struct proc_s {
     void* channel; // sleep on
     struct proc_s* next;
     struct proc_s* parent;
+
+    struct {
+        u32 blocked; // block mask
+        u32 signal;  // pending mask
+        struct sigaction action[32];
+    } sig;
 } proc_t;
 
 extern proc_t* current;
@@ -62,6 +69,7 @@ void tasks_init();
 
 void sleep(Spinlock* lk, void* chan);
 void wakeup(void* chan);
+void do_exit(int sig);
 
 proc_t* prepare_userinit(void* prog);
 proc_t* create_proc(void* entry, void* proc, size_t size, const char* name);

@@ -28,6 +28,11 @@ _syscall3(off_t, lseek, int, fd, off_t, offset, int, whence);
 _syscall2(int, stat, const char *, pathname, struct stat *, buf);
 _syscall2(int, fstat, int, fd, struct stat *, buf);
 _syscall2(int, lstat, const char *, pathname, struct stat *, buf);
+_syscall2(int, kill, pid_t, pid, int, sig);
+_syscall2(int, signal, int, signum, unsigned long, handler);
+_syscall1(int, sigpending, sigset_t *, set);
+_syscall3(int, sigprocmask, int, how, sigset_t*, set, sigset_t*, oldset);
+_syscall1(int, sigsuspend, sigset_t*, sigmask);
 
 int execve(const char *path, char *const argv[], char *const envp[])
 {

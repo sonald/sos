@@ -3,6 +3,7 @@
 
 #include <types.h>
 #include <stat.h>
+#include <sos/signal.h>
 
 extern int sys_getppid();
 extern int sys_fork();
@@ -28,5 +29,15 @@ extern off_t sys_lseek(int fd, off_t offset, int whence);
 extern int sys_stat(const char *pathname, struct stat *buf);
 extern int sys_fstat(int fd, struct stat *buf);
 extern int sys_lstat(const char *pathname, struct stat *buf);
+extern int sys_kill(pid_t pid, int sig);
+extern int sys_signal(int signum, unsigned long handler);
+extern int sys_sigaction(int signum, const struct sigaction * act,
+        struct sigaction * oldact);
+extern int sys_sigpending(sigset_t *set);
+extern int sys_sigprocmask(int how, sigset_t *set, sigset_t *oldset);
+extern int sys_sigsuspend(sigset_t *sigmask);
+//right now, I should take care of it specially cause there is 
+//no way I can pass a trap frame to a syscall easily.
+extern int sys_sigreturn(uint32_t);
 
 #endif

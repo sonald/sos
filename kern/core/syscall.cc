@@ -25,6 +25,7 @@ static struct syscall_info_s {
 
 Spinlock syscallock {"syscall"};
 
+
 static void syscall_handler(trapframe_t* regs)
 {
     auto oflags = syscallock.lock();
@@ -53,7 +54,10 @@ static void syscall_handler(trapframe_t* regs)
         case 1:
             {
                 syscall1_t fn = (syscall1_t)info.call;
-                regs->eax = do_syscall1(fn, regs->ebx);
+                if (regs->eax == SYS_sigreturn) {
+                    regs->eax = do_syscall1(fn, (uint32_t)regs);
+                } else 
+                    regs->eax = do_syscall1(fn, regs->ebx);
                 break;
             }
 
@@ -111,6 +115,13 @@ void init_syscall()
     syscalls[SYS_fstat] = { (void*)sys_fstat, 2 };
     syscalls[SYS_stat] = { (void*)sys_stat, 2 };
     syscalls[SYS_lstat] = { (void*)sys_lstat, 2 };
+    syscalls[SYS_kill] = { (void*)sys_kill, 2 };
+    syscalls[SYS_signal] = { (void*)sys_signal, 2 };
+    syscalls[SYS_sigaction] = { (void*)sys_sigaction, 3 };
+    syscalls[SYS_sigpending] = { (void*)sys_sigpending, 1 };
+    syscalls[SYS_sigprocmask] = { (void*)sys_sigprocmask, 3 };
+    syscalls[SYS_sigsuspend] = { (void*)sys_sigsuspend, 1 };
+    syscalls[SYS_sigreturn] = { (void*)sys_sigreturn, 1 };
 
     register_isr_handler(ISR_SYSCALL, syscall_handler);
 }

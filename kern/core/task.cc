@@ -125,6 +125,11 @@ int sys_sleep(int millisecs)
     return 0;
 }
 
+void do_exit(int sig)
+{
+    sys_exit();
+}
+
 int sys_exit()
 {
     kassert(current != task_init);

@@ -74,7 +74,7 @@ int sys_open(const char *path, int flags, int mode)
         goto _out;
     }
     // kprintf("%s:fd %d\n", __func__, fd);
-    
+
     ip = vfs.namei(path);
     if (!ip) {
         fd = -ENOENT;
@@ -133,7 +133,7 @@ int sys_dup(int fd)
         newfd = -ENOMEM;
         goto _out;
     }
-    
+
     current->files[fd]->dup();
     current->files[newfd] = current->files[fd];
 
@@ -205,7 +205,7 @@ int sys_stat(const char *pathname, struct stat *buf)
 
 int sys_fstat(int fd, struct stat *buf)
 {
-    if (fd >= MAX_NR_FILE) return -EBADF; 
+    if (fd >= MAX_NR_FILE) return -EBADF;
 
     auto* filp = current->files[fd];
     if (!filp->readable()) return -EPERM;
@@ -213,7 +213,7 @@ int sys_fstat(int fd, struct stat *buf)
     if (filp->type() != File::Type::Inode) {
         return -EBADF;
     }
-    
+
     auto* ip = filp->inode();
     kassert(ip != NULL);
     copy_stat(ip, buf);
@@ -226,7 +226,7 @@ int sys_lstat(const char *pathname, struct stat *buf)
     auto* ip = vfs.namei(pathname);
     if (!ip) return -ENOENT;
 
-    copy_stat(ip, buf); 
+    copy_stat(ip, buf);
     return 0;
 }
 
@@ -237,7 +237,7 @@ int sys_mmap(struct file *, struct vm_area_struct *)
 
 int sys_write(int fd, const void *buf, size_t nbyte)
 {
-    if (fd >= MAX_NR_FILE) return -EINVAL; 
+    if (fd >= MAX_NR_FILE) return -EINVAL;
 
     auto* filp = current->files[fd];
     if (!filp->writable()) return -EPERM;
@@ -259,7 +259,7 @@ int sys_write(int fd, const void *buf, size_t nbyte)
 
 int sys_read(int fd, void *buf, size_t nbyte)
 {
-    if (fd >= MAX_NR_FILE) return -EBADF; 
+    if (fd >= MAX_NR_FILE) return -EBADF;
 
     auto* filp = current->files[fd];
     if (!filp->readable()) return -EPERM;
@@ -278,15 +278,15 @@ int sys_read(int fd, void *buf, size_t nbyte)
 
 /*
  * The lseek() function allows the file offset to be set beyond the
- * end of the file (but this does not change the size of the file).  
- * If data is later written at this point, subsequent reads of the 
+ * end of the file (but this does not change the size of the file).
+ * If data is later written at this point, subsequent reads of the
  * data in the gap (a "hole") return null bytes ('\0') until data
  * is actually written into the gap.
  * FIXME: handle that on sys_read
  */
 off_t sys_lseek(int fd, off_t offset, int whence)
 {
-    if (fd >= MAX_NR_FILE) return -EBADF; 
+    if (fd >= MAX_NR_FILE) return -EBADF;
 
     auto* filp = current->files[fd];
     if (!filp) return -EBADF;
@@ -386,7 +386,7 @@ int Pipe::read(void *buf, size_t nbyte)
 }
 
 File::File(Type ty)
-    : _ip(NULL), _off(0), _ref(0), _type(ty), _pipe(NULL) 
+    : _ip(NULL), _off(0), _ref(0), _type(ty), _pipe(NULL)
 {
 }
 
@@ -406,7 +406,7 @@ void File::set_inode(inode_t* ip) {
 }
 
 //TODO: update disk if dirty
-void File::put() 
+void File::put()
 {
     kassert(_ref > 0);
     if (--_ref > 0) {
@@ -714,7 +714,7 @@ inode_t* VFSManager::alloc_inode(dev_t dev, uint32_t ino)
         }
         if (p->ref == 0 && p->ino == 0) {
             newp = p;
-        } 
+        }
     }
     if (!newp) panic("no mem for inode");
     vfslock.release(eflags);
@@ -731,7 +731,7 @@ void VFSManager::dealloc_inode(inode_t* ip)
             ip->data = 0;
         }
         memset(ip, 0, sizeof *ip);
-    } 
+    }
     vfslock.release(eflags);
 }
 

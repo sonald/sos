@@ -3,6 +3,7 @@
 
 #include <syscall.h>
 #include <types.h>
+#include <sos/signal.h>
 
 #define _syscall0(ret_t, fn) \
 ret_t fn() \
@@ -96,6 +97,11 @@ off_t lseek(int, off_t, int);
 int stat(const char *pathname, struct stat *buf);
 int fstat(int fd, struct stat *buf);
 int lstat(const char *pathname, struct stat *buf);
+int kill(pid_t pid, int sig);
+int signal(int signum, unsigned long handler);
+int sigpending(sigset_t *set);
+int sigprocmask(int how, sigset_t *set, sigset_t *oldset);
+int sigsuspend(sigset_t *sigmask);
 
 // return -1 if no child, or pid of any of children exited
 int wait();
