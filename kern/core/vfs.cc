@@ -344,11 +344,13 @@ int Pipe::write(const void *buf, size_t nbyte)
     int nr_written = nbyte;
 
     while (nr_written > 0) {
+        if (readf == NULL) {
+            pbuf.clear();
+            current->sig.signal |= S_MASK(SIGPIPE);
+            break;
+        }
+
         if (pbuf.full()) {
-            if (readf == NULL) {
-                //TODO: send signal PIPE
-                break;
-            }
             wakeup(this);
             auto oflags = vfslock.lock();
             sleep(&vfslock, this);

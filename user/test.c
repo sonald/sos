@@ -282,6 +282,33 @@ void teststat(int argc, char* const argv[])
     }
 }
 
+void testpipe(int argc, char* const argv[])
+{
+    char msg[] = "hello from pipe\n";
+    int pfd[2];
+    pipe(pfd);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pfd[1]);
+
+        sleep(1000);
+        close(pfd[0]); // close read, will case SIGPIPE
+        printf("child quit\n");
+        
+    } else if (pid > 0) {
+        close(pfd[0]);
+        while (1) {
+            write(pfd[1], msg, strlen(msg));
+            sleep(100);
+        }
+
+        // SIGPIPE sent, this won't be called.
+        wait();
+        printf("parent quit\n");
+    }
+}
+
 struct testcase {
     const char* name;
     void (*fn)(int, char*const []);
@@ -293,6 +320,7 @@ struct testcase {
     {"ext2", testext2},
     {"seek", testseek},
     {"stat", teststat},
+    {"pipe", testpipe},
 };
 
 
