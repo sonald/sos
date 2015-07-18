@@ -1,8 +1,8 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
-#include "types.h"
-#include "stdarg.h"
+#include <types.h>
+#include <stdarg.h>
 
 #if !defined __i386__
 #error "target error, need a cross-compiler with ix86-elf as target"
@@ -44,5 +44,4 @@ void kputs(const char* msg);
 void kputchar(char c);
 
 #endif
-
 

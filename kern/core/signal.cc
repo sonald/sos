@@ -5,6 +5,13 @@
 #include <string.h>
 #include <syscall.h>
 
+#ifdef DEBUG
+#define signal_dbg(fmt,...) kprintf(fmt, ## __VA_ARGS__)
+#else
+#define signal_dbg(fmt,...)
+#endif
+
+
 #define BLOCKABLE (~(S_MASK(SIGKILL) | S_MASK(SIGSTOP)))
 
 Spinlock siglock {"signal"};
@@ -72,7 +79,7 @@ int sys_kill(pid_t pid, int sig)
                     // INTERRUPTALE_SLEEP
                     || tsk->state == TASK_SLEEP) {
                 tsk->sig.signal |= S_MASK(sig);
-                kprintf("%s: sigmask 0x%x\n", __func__, tsk->sig.signal);
+                signal_dbg("%s: sigmask 0x%x\n", __func__, tsk->sig.signal);
                 break;    
             } 
             tsk = tsk->next;
@@ -102,7 +109,7 @@ int sys_signal(int sig, unsigned long handler)
         return (int)SIG_ERR;
     }
 
-    kprintf("%s: register sig %d \n", __func__, sig);
+    signal_dbg("%s: register sig %d \n", __func__, sig);
     int oldhand = (int)current->sig.action[sig].sa_handler;
     struct sigaction act;
     act.sa_mask = 0;
@@ -168,7 +175,7 @@ int sys_sigsuspend(sigset_t *sigmask)
 //TODO: Will this reentrant?
 int sys_sigreturn(uint32_t pad)
 {
-    kprintf("%s: (proc %d(%s))\n", __func__,
+    signal_dbg("%s: (proc %d(%s))\n", __func__,
             current->pid, current->name);
     trapframe_t* regs = (trapframe_t*)pad;
     // 8 is trampoline code size
@@ -183,19 +190,17 @@ int sys_sigreturn(uint32_t pad)
     regs->ebp = ctx->ebp;
     regs->useresp = ctx->uesp;
     regs->eip = ctx->eip;
-    kprintf("REST(0x%x): ds: 0x%x, edi: 0x%x, esi: 0x%x, ebp: 0x%x, esp: 0x%x\n"
-            "ebx: 0x%x, edx: 0x%x, ecx: 0x%x, eax: 0x%x, isr: %d, errno: %d\n"
+    signal_dbg("REST(0x%x): ds: 0x%x, eax: 0x%x, isr: %d, errno: %d\n"
             "eip: 0x%x, cs: 0x%x, eflags: 0b%b, useresp: 0x%x, ss: 0x%x\n",
             ctx,
-            regs->ds, regs->edi, regs->esi, regs->ebp, regs->esp, 
-            regs->ebx, regs->edx, regs->ecx, regs->eax, regs->isrno, regs->errcode,
+            regs->ds, regs->eax, regs->isrno, regs->errcode,
             regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
     return 0;
 }
 
 int handle_signal(int sig, trapframe_t* regs)
 {
-    kprintf("%s: (proc %d(%s)) sig %d\n", __func__,
+    signal_dbg("%s: (proc %d(%s)) sig %d\n", __func__,
             current->pid, current->name, sig);
     auto& act = current->sig.action[sig];
     _signal_handler_t handler = act.sa_handler;
@@ -237,7 +242,7 @@ int handle_signal(int sig, trapframe_t* regs)
         code--;
         *code = 0xb8;
 
-        kprintf("save at 0x%x, code at 0x%x, new eip 0x%x\n",
+        signal_dbg("save at 0x%x, code at 0x%x, new eip 0x%x\n",
                 ustack, code, handler);
         ustack = (uint32_t*)code - 2;
         ustack[0] = (uint32_t)code;
@@ -255,7 +260,7 @@ void check_pending_signal(trapframe_t* regs)
     auto oldflags = siglock.lock();
     uint32_t mask = current->sig.signal & ~current->sig.blocked;
     if (mask && current->state != TASK_SLEEP) {
-        kprintf("%s: \n", __func__);
+        signal_dbg("%s: during isr #%d\n", __func__, regs->isrno);
         for (int i = 1; i < NSIG; i++) {
             if (mask & S_MASK(i)) {
                 handle_signal(i, regs);

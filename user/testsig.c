@@ -25,17 +25,12 @@ int main(int argc, char *argv[])
         printf("child(%d): busy loop\n", getpid());
         int count = 0;
         while (!quit) {
-            int r = 0;
-            for (int i = 0; i < 100000; i++) {
-                for (int j = 0; j < 65000; j++) {
-                    r += i*j;
-                }
-            }
-            /*sleep(10);*/
-            printf("loop %d %d\n", r, count++);
+            sleep(100);
+            printf("loop %d\n", count++);
         }
 
     } else if (pid > 0) {
+        sleep(1000);
         kill(pid, SIGUSR1);
         wait();
         printf("parent(%d) quit\n", getpid());

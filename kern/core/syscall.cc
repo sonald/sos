@@ -26,6 +26,7 @@ static struct syscall_info_s {
 Spinlock syscallock {"syscall"};
 
 
+extern void check_pending_signal(trapframe_t* regs);
 static void syscall_handler(trapframe_t* regs)
 {
     auto oflags = syscallock.lock();
@@ -86,6 +87,8 @@ static void syscall_handler(trapframe_t* regs)
 
         default: panic("SYSCALL crash\n");
     }
+
+    if (regs->cs == 0x1b) check_pending_signal(regs);
 }
 
 void init_syscall()
