@@ -17,6 +17,7 @@ class RingBuffer
         int sz() const { return _sz; }
         int remain() const { return _sz - _used; }
 
+        void clear();
         T peek();
         T last();
         T drop(); // remove last input if any
@@ -74,7 +75,6 @@ void RingBuffer<T, N>::write(const T& v)
     _lock.release(eflags);
 }
 
-
 template <typename T, size_t N>
 T RingBuffer<T, N>::drop()
 {
@@ -87,6 +87,16 @@ T RingBuffer<T, N>::drop()
     _used--;
     _lock.release(eflags);
     return v;
+}
+
+template <typename T, size_t N>
+void RingBuffer<T, N>::clear()
+{
+    auto eflags = _lock.lock();
+    _h = _t = 0;
+    _sz = N;
+    _used = 0;
+    _lock.release(eflags);
 }
 #endif
 

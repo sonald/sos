@@ -5,6 +5,7 @@
 #include <spinlock.h>
 #include <display.h>
 #include <ctype.h>
+#include <sos/signal.h>
 
 Spinlock ttylock {"tty"};
 static TtyDevice* tty1 = nullptr;
@@ -22,23 +23,23 @@ static TtyDevice* tty1 = nullptr;
 #define _O_FLAG(tty,f)	((tty)->termios.c_oflag & f)
 
 #define L_CANON(tty)	_L_FLAG((tty),ICANON)
-#define L_ISIG(tty)	_L_FLAG((tty),ISIG)
-#define L_ECHO(tty)	_L_FLAG((tty),ECHO)
+#define L_ISIG(tty)	    _L_FLAG((tty),ISIG)
+#define L_ECHO(tty)	    _L_FLAG((tty),ECHO)
 #define L_ECHOE(tty)	_L_FLAG((tty),ECHOE)
 #define L_ECHOK(tty)	_L_FLAG((tty),ECHOK)
 #define L_ECHOCTL(tty)	_L_FLAG((tty),ECHOCTL)
 #define L_ECHOKE(tty)	_L_FLAG((tty),ECHOKE)
 
-#define I_UCLC(tty)	_I_FLAG((tty),IUCLC)
-#define I_NLCR(tty)	_I_FLAG((tty),INLCR)
-#define I_CRNL(tty)	_I_FLAG((tty),ICRNL)
-#define I_NOCR(tty)	_I_FLAG((tty),IGNCR)
+#define I_UCLC(tty)	    _I_FLAG((tty),IUCLC)
+#define I_NLCR(tty)	    _I_FLAG((tty),INLCR)
+#define I_CRNL(tty)	    _I_FLAG((tty),ICRNL)
+#define I_NOCR(tty)	    _I_FLAG((tty),IGNCR)
 
-#define O_POST(tty)	_O_FLAG((tty),OPOST)
-#define O_NLCR(tty)	_O_FLAG((tty),ONLCR)
-#define O_CRNL(tty)	_O_FLAG((tty),OCRNL)
+#define O_POST(tty)	    _O_FLAG((tty),OPOST)
+#define O_NLCR(tty)	    _O_FLAG((tty),ONLCR)
+#define O_CRNL(tty)	    _O_FLAG((tty),OCRNL)
 #define O_NLRET(tty)	_O_FLAG((tty),ONLRET)
-#define O_LCUC(tty)	_O_FLAG((tty),OLCUC)
+#define O_LCUC(tty)	    _O_FLAG((tty),OLCUC)
 
 // blocking read or non-blocking?
 char TtyDevice::read()
@@ -46,22 +47,28 @@ char TtyDevice::read()
     //TODO: honor vmin & vtime
     char ch;
     if (L_CANON(tty1)) {
-        while (secondaryq.empty() || !has_full_line) {
+        while (!signaled && (secondaryq.empty() || !full_line)) {
             auto oflags = ttylock.lock();
             sleep(&ttylock, &readq);
             ttylock.release(oflags);
         }
 
         ch = secondaryq.read();
-        if (ch == '\n') has_full_line = false;
+        if (ch == '\n') full_line = false;
     } else {
-        while (readq.empty()) {
+        while (!signaled && readq.empty()) {
             auto oflags = ttylock.lock();
             sleep(&ttylock, &readq);
             ttylock.release(oflags);
         }
         ch = readq.read();
     } 
+
+    if (signaled) {
+        signaled = 0;
+        full_line = 0;
+        return -1;
+    }
     return ch;
 }
 
@@ -69,6 +76,13 @@ bool TtyDevice::write(char ch)
 {
 	kputchar(ch);
 	return true;
+}
+
+void TtyDevice::flush()
+{
+    secondaryq.clear();
+    readq.clear();
+    wakeup(&tty1->readq);
 }
 
 void tty_thread()
@@ -144,11 +158,17 @@ void tty_enqueue()
     }
 
     if (L_ISIG(tty1)) {
+        //FIXME: need to send to foreground process group
         if (ch == INTR_CHAR(tty1)) {
-            //TODO: send signal
+            current->sig.signal |= S_MASK(SIGINT);
+            tty1->signaled = 1;
+            tty1->flush();
             return;
         } else if (ch == QUIT_CHAR(tty1)) {
             // kill proc
+            current->sig.signal |= S_MASK(SIGQUIT);
+            tty1->signaled = 1;
+            tty1->flush();
             return;
         }
     }
@@ -198,10 +218,10 @@ void tty_enqueue()
     }
 
     if (L_CANON(tty1)) {
-        if (ch == '\n') tty1->has_full_line = true;
+        if (ch == '\n') tty1->full_line = true;
         tty1->secondaryq.write(ch);
 
-        if (tty1->has_full_line) {
+        if (tty1->full_line) {
             wakeup(&tty1->readq);
         }
     }
@@ -218,7 +238,7 @@ void tty_init()
         0,		/* console termio */
         INIT_C_CC
     };
-    tty1->has_full_line = false;
+    tty1->full_line = false;
     tty1->dev = DEVNO(TTY_MAJOR, 1);
     chr_device_register(tty1->dev, tty1);
 }

@@ -24,8 +24,12 @@ public:
     char read() override;
     bool write(char ch) override;
 
+    void flush();
+
     struct termios termios;
-    bool has_full_line;
+    int signaled: 1;
+    int full_line: 1;
+
     pid_t pgrp; // foreground process group
     TtyBuffer readq;
     TtyBuffer writeq;
