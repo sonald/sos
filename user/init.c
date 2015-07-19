@@ -133,7 +133,8 @@ struct BaseCommand: public Command {
         int pid = 0;
         if (!dofork || (pid = fork()) >= 0) {
             if (pid > 0) {
-                wait();
+                int status = 0;
+                waitpid(pid, &status, 0);
             } else if (pid == 0) {
                 //TODO: io redirection
                 int argc = args.argc;
@@ -168,7 +169,8 @@ struct PipeCommand: public Command {
         int pid = 0;
         if (!dofork || (pid = fork()) >= 0) {
             if (pid > 0) {
-                wait();
+                int status = 0;
+                waitpid(pid, &status, 0);
 
             } else if (pid == 0) {
                 int fd[2];
@@ -413,7 +415,7 @@ int main()
         }
 
     } else {
-        for(;;) { wait(); }
+        for(;;) { wait(NULL); }
     }
 
     return 0;

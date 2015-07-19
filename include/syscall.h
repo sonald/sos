@@ -41,7 +41,8 @@
 #define SYS_sigprocmask     35
 #define SYS_sigsuspend      36
 #define SYS_sigreturn       37
+#define SYS_waitpid         38
 
-#define NR_SYSCALL          38
+#define NR_SYSCALL          39
 
 #endif

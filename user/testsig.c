@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
         sigsuspend(&mask);
         printf("wake up from suspend\n");
         kill(pid, SIGUSR2);
-        wait();
+        wait(NULL);
         printf("parent(%d) quit\n", getpid());
     }
 

@@ -10,6 +10,7 @@
 #include <vfs.h>
 #include <sys.h>
 #include <sos/limits.h>
+#include <sys/wait.h>
 
 extern "C" void trap_return();
 
@@ -127,6 +128,7 @@ int sys_sleep(int millisecs)
 
 void do_exit(int sig)
 {
+    current->exit_signal = sig;
     sys_exit();
 }
 
@@ -166,11 +168,10 @@ int sys_exit()
     return 0;
 }
 
-// > 0 pid of exited child, < 0 no child
-int sys_wait()
+int sys_waitpid(pid_t pid, int *status, int options)
 {
+    int ret = 0;
     while (1) {
-        pid_t pid = -1;
         bool has_child = false;
         proc_t** pp = &task_init;
 
@@ -179,24 +180,42 @@ int sys_wait()
             auto* p = *pp;
             if (p->parent == current) {
                 has_child = true;
-                if (p->state == TASK_ZOMBIE) {
-                    pid = p->pid;
+                if (pid == -1 || pid == p->pid) {
+                    if (p->state == TASK_ZOMBIE) {
+                        ret = p->pid;
 
-                    // reclaim p now
-                    p->ppid = 0;
-                    p->pid = 0;
-                    p->parent = NULL;
-                    // remove from list
-                    *pp = p->next;
-                    p->next = NULL;
-                    p->state = TASK_UNUSED;
+                        // reclaim p now
+                        p->ppid = 0;
+                        p->pid = 0;
+                        p->parent = NULL;
+                        // remove from list
+                        *pp = p->next;
+                        p->next = NULL;
+                        p->state = TASK_UNUSED;
 
-                    vmm.free_page((char*)(p->kern_esp - PGSIZE));
+                        vmm.free_page((char*)(p->kern_esp - PGSIZE));
+                        vmm.release_address_space(p, p->pgdir);
+                        p->pgdir = NULL;
 
-                    vmm.release_address_space(p, p->pgdir);
-                    p->pgdir = NULL;
-                    tasklock.release(oldflags);
-                    return pid;
+                        if (status) {
+                            int val = 0;
+                            if (p->exit_signal) {
+                                val = p->exit_signal;
+                            } else {
+                                val = p->exit_status << 8;
+                            }
+                            *status = val;
+                        }
+                        p->exit_signal = 0;
+                        p->exit_status = 0;
+                        tasklock.release(oldflags);
+                        return ret;
+                    }
+
+                    if (options & WNOHANG) {
+                        tasklock.release(oldflags);
+                        return 0;
+                    }
                 }
             }
             pp = &(*pp)->next;
@@ -207,7 +226,14 @@ int sys_wait()
 
         sleep(&tasklock, (void*)current);
     }
-    return -1;
+
+    return ret;
+}
+
+// > 0 pid of exited child, < 0 no child
+int sys_wait(int* status)
+{
+    return sys_waitpid(-1, status, 0);
 }
 
 uint32_t sys_sbrk(int inc)
@@ -311,6 +337,8 @@ static int load_proc(void* code, elf_prog_header_t* ph)
 static char store[MAX_NR_ARG][128];
 int sys_execve(const char *path, char *const argv[], char *const envp[])
 {
+    (void)envp;
+
     int argc = 0;
     char* kargv[MAX_NR_ARG+1];
 

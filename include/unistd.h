@@ -105,7 +105,8 @@ int sigprocmask(int how, sigset_t *set, sigset_t *oldset);
 int sigsuspend(sigset_t *sigmask);
 
 // return -1 if no child, or pid of any of children exited
-int wait();
+pid_t wait(int *status);
+pid_t waitpid(pid_t pid, int *status, int options);
 
 #ifdef __cplusplus
 }

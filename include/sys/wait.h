@@ -1,23 +1,31 @@
-#ifndef _SYS_WAIT_H
-#define _SYS_WAIT_H
+#ifndef _SOS_SYS_WAIT_H
+#define _SOS_SYS_WAIT_H
 
-#include <sys/types.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#define _LOW(v)		( (v) & 0377)
-#define _HIGH(v)	( ((v) >> 8) & 0377)
+#include <types.h>
 
-/* options for waitpid, WUNTRACED not supported */
-#define WNOHANG		1
-#define WUNTRACED	2
+#define WNOHANG     1
+#define WUNTRACED   2
 
-#define WIFEXITED(s)	(!((s)&0xFF)
-#define WIFSTOPPED(s)	(((s)&0xFF)==0x7F)
-#define WEXITSTATUS(s)	(((s)>>8)&0xFF)
-#define WTERMSIG(s)	((s)&0x7F)
-#define WSTOPSIG(s)	(((s)>>8)&0xFF)
-#define WIFSIGNALED(s)	(((unsigned int)(s)-1 & 0xFFFF) < 0xFF)
+/* A status looks like:
+      <code> == 0, child has exited, info is the exit value
+      <code> == 1..7e, child has exited, info is the signal number.
+      <code> == 7f, child has stopped, info was the signal number.
+      <code> == 80, there was a core dump.
+*/
+   
+#define WIFEXITED(w)	(((w) & 0xff) == 0)
+#define WIFSIGNALED(w)	(((w) & 0x7f) > 0 && (((w) & 0x7f) < 0x7f))
+#define WIFSTOPPED(w)	(((w) & 0xff) == 0x7f)
+#define WEXITSTATUS(w)	(((w) >> 8) & 0xff)
+#define WTERMSIG(w)	((w) & 0x7f)
+#define WSTOPSIG	WEXITSTATUS
 
-pid_t wait(int *stat_loc);
-pid_t waitpid(pid_t pid, int *stat_loc, int options);
+#ifdef __cplusplus
+};
+#endif
 
 #endif

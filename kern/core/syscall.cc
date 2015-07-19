@@ -105,7 +105,8 @@ void init_syscall()
     syscalls[SYS_getpid] = { (void*)sys_getpid, 0 };
     syscalls[SYS_getppid] = { (void*)sys_getppid, 0 };
     syscalls[SYS_exec] = { (void*)sys_execve, 3 };
-    syscalls[SYS_wait] = { (void*)sys_wait, 0 };
+    syscalls[SYS_wait] = { (void*)sys_wait, 1 };
+    syscalls[SYS_waitpid] = { (void*)sys_waitpid, 3 };
     syscalls[SYS_exit] = { (void*)sys_exit, 0 };
     syscalls[SYS_mount] = { (void*)sys_mount, 5 };
     syscalls[SYS_umount] = { (void*)sys_unmount, 1 };

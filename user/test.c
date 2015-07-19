@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <lru.h>
 #include <stat.h>
+#include <sys/wait.h>
 
 #define assert(cond) if (!(cond)) { \
     printf("%s failed", #cond); \
@@ -47,7 +48,7 @@ void testsbrk(int argc, char* const argv[])
     (void)argc;
     (void)argv;
 
-    int fds[2], pid;
+    int pid;
     char *a, *b, *c, *lastaddr, *oldbrk, *p;
     uint32_t amt;
 
@@ -81,7 +82,7 @@ void testsbrk(int argc, char* const argv[])
     }
     if(pid == 0)
         exit();
-    wait();
+    wait(NULL);
 
     printf("go big test\n");
     // can one grow address space to something big?
@@ -180,7 +181,7 @@ void testmem(int argc, char* const argv[])
         printf("mem ok\n");
         exit();
     } else {
-        wait();
+        wait(NULL);
     }
 }
 
@@ -304,9 +305,68 @@ void testpipe(int argc, char* const argv[])
         }
 
         // SIGPIPE sent, this won't be called.
-        wait();
+        wait(NULL);
         printf("parent quit\n");
     }
+}
+
+static void wait1()
+{
+    pid_t pid = fork();
+    if (pid == 0) {
+        sleep(2000);
+        printf("child %d quit\n", getpid());
+        
+    } else if (pid > 0) {
+        pid_t pid2 = fork();
+        if (pid2 == 0) {
+            printf("child %d quit\n", getpid());
+
+        } else if (pid2 > 0) {
+            int status = 0;
+            waitpid(pid, &status, 0);
+            printf("wait %d done: %d\n", pid, status);
+            sleep(1000);
+            waitpid(pid2, &status, 0);
+            printf("wait %d done: %d\n", pid2, status);
+            printf("parent quit\n");
+        }
+    }
+}
+
+static void wait2()
+{
+    pid_t pid = fork();
+    if (pid == 0) {
+        sleep(500);
+        printf("child %d quit\n", getpid());
+        
+    } else if (pid > 0) {
+        pid_t pid2 = fork();
+        if (pid2 == 0) {
+            printf("child %d quit\n", getpid());
+
+        } else if (pid2 > 0) {
+            int status = 0;
+            while(waitpid(pid, &status, WNOHANG) <= 0) {
+                printf("check if %d done\n", pid);
+            }
+            printf("wait %d done: %d\n", pid, status);
+            sleep(100);
+            waitpid(pid2, &status, 0);
+            printf("wait %d done: %d\n", pid2, status);
+            printf("parent quit\n");
+        }
+    }
+}
+
+void testwait(int argc, char* const argv[])
+{
+    if (argc > 2 && argv[2][0] == '2') {
+        wait2();
+        return;
+    }
+    wait1();
 }
 
 struct testcase {
@@ -321,6 +381,7 @@ struct testcase {
     {"seek", testseek},
     {"stat", teststat},
     {"pipe", testpipe},
+    {"wait", testwait},
 };
 
 

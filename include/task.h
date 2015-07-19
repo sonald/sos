@@ -60,6 +60,8 @@ typedef struct proc_s {
         u32 signal;  // pending mask
         struct sigaction action[32];
     } sig;
+
+    int exit_status, exit_signal;
 } proc_t;
 
 extern proc_t* current;
