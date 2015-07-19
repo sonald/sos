@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 _syscall0(pid_t, getpid);
+_syscall0(pid_t, getppid);
 _syscall0(pid_t, fork);
 _syscall3(int, write, int, fd, const void*, buf, size_t, nbyte);
 /*_syscall2(int, creat, const char*, filename, mode_t, mode)*/

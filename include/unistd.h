@@ -85,6 +85,7 @@ int fork();
 int exec(const char *path, char *const argv[], char *const envp[]);
 int execve(const char *path, char *const argv[], char *const envp[]);
 int getpid();
+int getppid();
 int sleep(int);
 int exit();
 int readdir(unsigned int fd, struct dirent *dirp, unsigned int count);

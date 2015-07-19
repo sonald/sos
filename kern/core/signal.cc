@@ -4,6 +4,7 @@
 #include <task.h>
 #include <string.h>
 #include <syscall.h>
+#include <sched.h>
 
 #ifdef DEBUG
 #define signal_dbg(fmt,...) kprintf(fmt, ## __VA_ARGS__)
@@ -74,16 +75,20 @@ int sys_kill(pid_t pid, int sig)
                 continue;
             }
 
-            if (tsk->state == TASK_READY || tsk->state == TASK_RUNNING 
-                    // sleep but interruptable, maybe use linux style state     
-                    // INTERRUPTALE_SLEEP
-                    || tsk->state == TASK_SLEEP) {
-                tsk->sig.signal |= S_MASK(sig);
-                signal_dbg("%s: sigmask 0x%x\n", __func__, tsk->sig.signal);
-                break;    
-            } 
-            tsk = tsk->next;
+            if (tsk->state == TASK_SLEEP) {
+                //NOTE: this is not good. we need to tell interruptable 
+                //from uninterruptable
+                if (tsk->channel) {
+                    wakeup(tsk->channel);
+                } else {
+                    tsk->state = TASK_READY;
+                }
+            }
+            tsk->sig.signal |= S_MASK(sig);
+            signal_dbg("%s: sigmask 0x%x\n", __func__, tsk->sig.signal);
+            break; 
         }
+
         siglock.release(oldflags);
 
     } else if (pid == 0) {
@@ -150,16 +155,19 @@ int sys_sigprocmask(int how, sigset_t *set, sigset_t *oldset)
     if (!set) return -EINVAL;
 
     sigset_t old = current->sig.blocked;
-    sigset_t newset = *set & BLOCKABLE;
 
-    switch(how) {
-        case SIG_BLOCK:
-            current->sig.blocked |= newset; break;
-        case SIG_UNBLOCK:
-            current->sig.blocked &= newset; break;
-        case SIG_SETMASK:
-            current->sig.blocked = newset; break;
-        default: return -EINVAL;
+    if (set) {
+        sigset_t newset = *set & BLOCKABLE;
+
+        switch(how) {
+            case SIG_BLOCK:
+                current->sig.blocked |= newset; break;
+            case SIG_UNBLOCK:
+                current->sig.blocked &= newset; break;
+            case SIG_SETMASK:
+                current->sig.blocked = newset; break;
+            default: return -EINVAL;
+        }
     }
 
     if (oldset) *oldset = old;
@@ -168,8 +176,15 @@ int sys_sigprocmask(int how, sigset_t *set, sigset_t *oldset)
 
 int sys_sigsuspend(sigset_t *sigmask)
 {
-    (void)sigmask;
-    return 0;
+    sigset_t mask = 0;
+    if (sigmask) mask = *sigmask & BLOCKABLE;
+
+    auto oldset = current->sig.blocked;
+    current->sig.blocked = mask;
+    current->state = TASK_SLEEP;
+    scheduler();
+    current->sig.blocked = oldset;
+    return -EINTR;
 }
 
 //TODO: Will this reentrant?
@@ -178,7 +193,7 @@ int sys_sigreturn(uint32_t pad)
     signal_dbg("%s: (proc %d(%s))\n", __func__,
             current->pid, current->name);
     trapframe_t* regs = (trapframe_t*)pad;
-    // 8 is trampoline code size
+    // 8 is trampoline code size and 4 is for handler arg
     sigcontext_t* ctx = (sigcontext_t*)(regs->useresp + 12);
 
     regs->eax = ctx->eax;
@@ -190,11 +205,11 @@ int sys_sigreturn(uint32_t pad)
     regs->ebp = ctx->ebp;
     regs->useresp = ctx->uesp;
     regs->eip = ctx->eip;
-    signal_dbg("REST(0x%x): ds: 0x%x, eax: 0x%x, isr: %d, errno: %d\n"
-            "eip: 0x%x, cs: 0x%x, eflags: 0b%b, useresp: 0x%x, ss: 0x%x\n",
-            ctx,
-            regs->ds, regs->eax, regs->isrno, regs->errcode,
-            regs->eip, regs->cs, regs->eflags, regs->useresp, regs->ss);
+    current->sig.blocked = ctx->sig_mask;
+    //signal_dbg("REST(0x%x): ds: 0x%x, eax: 0x%x, isr: %d, errno: %d\n"
+            //"eip: 0x%x, cs: 0x%x, useresp: 0x%x, ss: 0x%x\n",
+            //ctx, regs->ds, regs->eax, regs->isrno, regs->errcode,
+            //regs->eip, regs->cs, regs->useresp, regs->ss);
     return 0;
 }
 
@@ -202,16 +217,22 @@ int handle_signal(int sig, trapframe_t* regs)
 {
     signal_dbg("%s: (proc %d(%s)) sig %d\n", __func__,
             current->pid, current->name, sig);
+
+    current->sig.signal &= ~S_MASK(sig);
+
     auto& act = current->sig.action[sig];
     _signal_handler_t handler = act.sa_handler;
-    if (handler == SIG_IGN) return 0;
-    if (handler == SIG_DFL) {
+    if (handler == SIG_IGN) {
+        if (sig == SIGCHLD) {
+            //TODO: 
+        }
+        return 0;
+    } else if (handler == SIG_DFL) {
         switch(dfl_action[sig]) {
-            case DFL_TERM:
-            case DFL_STOP: do_exit(sig);
-            case DFL_IGNORE:
             case DFL_COREDUMP:
-                break;
+            case DFL_TERM:
+            case DFL_STOP: do_exit(sig); break;
+            case DFL_IGNORE: break;
         }
         return 0;
     } else {
@@ -227,6 +248,7 @@ int handle_signal(int sig, trapframe_t* regs)
         ctx.ebp = regs->ebp;
         ctx.uesp = regs->useresp;
         ctx.eip = regs->eip;
+        ctx.sig_mask = current->sig.blocked;
         memcpy(ustack, &ctx, sizeof(sigcontext_t));
 
         // trampoline code
@@ -250,14 +272,13 @@ int handle_signal(int sig, trapframe_t* regs)
         regs->eip = (uint32_t)handler;
         regs->useresp = (uint32_t)ustack;
 
-        current->sig.signal &= ~S_MASK(sig);
+        current->sig.blocked |= S_MASK(sig) & BLOCKABLE;
     }
     return 0;
 }
 
 void check_pending_signal(trapframe_t* regs)
 {
-    auto oldflags = siglock.lock();
     uint32_t mask = current->sig.signal & ~current->sig.blocked;
     if (mask && current->state != TASK_SLEEP) {
         signal_dbg("%s: during isr #%d\n", __func__, regs->isrno);
@@ -268,5 +289,4 @@ void check_pending_signal(trapframe_t* regs)
             }
         }
     }
-    siglock.release(oldflags);
 }
