@@ -129,10 +129,10 @@ int sys_sleep(int millisecs)
 void do_exit(int sig)
 {
     current->exit_signal = sig;
-    sys_exit();
+    sys_exit(0);
 }
 
-int sys_exit()
+int sys_exit(int status)
 {
     kassert(current != task_init);
 
@@ -162,12 +162,14 @@ int sys_exit()
     tasklock.release(oldflags);
 
     current->state = TASK_ZOMBIE;
+    current->exit_status = status;
 
     scheduler();
     panic("sys_exit never return");
     return 0;
 }
 
+//TODO: handl pid < -1, pid == 0
 int sys_waitpid(pid_t pid, int *status, int options)
 {
     int ret = 0;

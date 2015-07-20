@@ -17,7 +17,7 @@ _syscall1(int, close, int, fd);
 _syscall3(int, read, int, fildes, void*, buf, size_t, nbyte);
 _syscall3(int, exec, const char*, path, char *const*, argv, char *const*, envp);
 _syscall1(int, sleep, int, millisecs);
-_syscall0(int, exit);
+_syscall1(int, exit, int, status);
 _syscall1(pid_t, wait, int *, status);
 _syscall3(pid_t, waitpid, pid_t, pid, int *, status, int, options);
 _syscall3(int, readdir, unsigned int, fd, struct dirent *, dirp, unsigned int, count);
@@ -50,10 +50,10 @@ extern void __cxa_finalize(void * d);
 void _start(int argc, char* argv[])
 {
     _init();
-    main(argc, argv);
+    int ret = main(argc, argv);
     _fini();
     __cxa_finalize(NULL);
-    exit();
+    exit(ret);
 }
 
 #ifdef __cplusplus

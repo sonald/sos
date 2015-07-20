@@ -11,7 +11,7 @@ extern int sys_sleep(int);
 extern int sys_getpid();
 extern int sys_wait(int*);
 extern int sys_waitpid(pid_t pid, int *status, int options);
-extern int sys_exit();
+extern int sys_exit(int);
 extern int sys_execve(const char *path, char *const argv[], char *const envp[]);
 extern int sys_open(const char *path, int flags, int mode);
 extern int sys_close(int);
