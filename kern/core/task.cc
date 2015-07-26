@@ -301,9 +301,12 @@ int sys_fork()
             proc->files[fd]->dup();
         }
     }
+    proc->pwd = current->pwd;
+    current->pwd->ref++;
+    memcpy(proc->wdname, current->wdname, PATHLEN+1);
 
     //kprintf("fork %d -> %d\n", current->pid, next_pid);
-    kassert(proc->regs->useresp == current->regs->useresp);
+    //kassert(proc->regs->useresp == current->regs->useresp);
     proc->state = TASK_READY;
     tasklock.release(oldflags);
     return proc->pid;
@@ -527,6 +530,8 @@ proc_t* prepare_userinit(void* prog)
     memset(proc->kctx, 0, sizeof(*proc->kctx));
     proc->kctx->eip = A2I(trap_return);
 
+    strcpy(proc->wdname, "/");
+    proc->pwd = vfs.namei(proc->wdname);
     proc->ppid = 0;
     proc->pid = next_pid;
     proc->state = TASK_READY;

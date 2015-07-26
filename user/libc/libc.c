@@ -11,6 +11,8 @@ _syscall0(pid_t, fork);
 _syscall3(int, write, int, fd, const void*, buf, size_t, nbyte);
 /*_syscall2(int, creat, const char*, filename, mode_t, mode)*/
 /*_syscall2(int, fcntl, int, fildes, int, cmd);*/
+_syscall1(int, chdir, const char *, path);
+_syscall1(int, fchdir, int, fd);
 
 _syscall3(int, open, const char*, path, int, flags, int, mode);
 _syscall1(int, close, int, fd);
@@ -35,6 +37,7 @@ _syscall2(int, signal, int, signum, unsigned long, handler);
 _syscall1(int, sigpending, sigset_t *, set);
 _syscall3(int, sigprocmask, int, how, sigset_t*, set, sigset_t*, oldset);
 _syscall1(int, sigsuspend, sigset_t*, sigmask);
+_syscall2(char*, getcwd, char *, buf, size_t, size);
 
 int execve(const char *path, char *const argv[], char *const envp[])
 {

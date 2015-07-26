@@ -126,6 +126,9 @@ void init_syscall()
     syscalls[SYS_sigprocmask] = { (void*)sys_sigprocmask, 3 };
     syscalls[SYS_sigsuspend] = { (void*)sys_sigsuspend, 1 };
     syscalls[SYS_sigreturn] = { (void*)sys_sigreturn, 1 };
+    syscalls[SYS_chdir] = { (void*)sys_chdir, 1 };
+    syscalls[SYS_fchdir] = { (void*)sys_fchdir, 1 };
+    syscalls[SYS_getcwd] = { (void*)sys_getcwd, 2 };
 
     register_isr_handler(ISR_SYSCALL, syscall_handler);
 }

@@ -42,7 +42,6 @@ typedef struct inode_s {
 
 typedef struct dentry_s {
     char name[NAMELEN+1];
-    struct dentry_s *parent;
     inode_t *ip;
 } dentry_t;
 
@@ -98,10 +97,6 @@ class File {
         int _mode;
 };
 
-typedef struct fs_super_s {
-    uint8_t mount_count;
-} fs_super_t;
-
 typedef void* filldir_t;
 class FileSystem {
     public:
@@ -137,7 +132,6 @@ class FileSystem {
 
     protected:
         inode_t* _iroot;
-        fs_super_t* _sb;
 
         FileSystem* _prev, *_next;
 };
@@ -151,6 +145,7 @@ class FileSystem {
 typedef struct mount_info_s {
     char* mnt_point;
     FileSystem* fs;
+    inode_t* mnt_over; // inode on which this fs mounted.
     struct mount_info_s *next;
 } mount_info_t;
 
@@ -174,8 +169,11 @@ class VFSManager {
         mount_info_t* get_mount(const char* target);
         // find mount point for path, and return new_path by stripping mount prefix
         mount_info_t* find_mount(const char* path, char**new_path);
+        // find if there is a fs mount on ip
+        mount_info_t* find_mount_over(inode_t* ip);
 
         inode_t* namei(const char* path);
+
         // wrapper for fs::lookup
         inode_t* dir_lookup(inode_t* ip, const char* name);
 

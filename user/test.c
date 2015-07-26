@@ -62,7 +62,7 @@ void testsbrk(int argc, char* const argv[])
         b = (char*)sbrk(1);
         if(b != a){
             printf("(char*)sbrk test failed %d %x %x\n", i, a, b);
-            exit();
+            exit(0);
         }
         *b = 1;
         a = b + 1;
@@ -72,16 +72,16 @@ void testsbrk(int argc, char* const argv[])
     pid = fork();
     if(pid < 0){
         printf("(char*)sbrk test fork failed\n");
-        exit();
+        exit(0);
     }
     c = (char*)sbrk(1);
     c = (char*)sbrk(1);
     if(c != a + 1){
         printf("(char*)sbrk test failed post-fork\n");
-        exit();
+        exit(0);
     }
     if(pid == 0)
-        exit();
+        exit(0);
     wait(NULL);
 
     printf("go big test\n");
@@ -93,7 +93,7 @@ void testsbrk(int argc, char* const argv[])
     if (p != a) { 
         printf("sbrk test failed to grow big address space (p %x, a %x); "
                 "enough phys mem?\n", p, a);
-        exit();
+        exit(0);
     }
     lastaddr = (char*) (a+BIG-1);
     *lastaddr = 99;
@@ -104,12 +104,12 @@ void testsbrk(int argc, char* const argv[])
     c = (char*)sbrk(-4096);
     if(c == (char*)0xffffffff){
         printf("(char*)sbrk could not deallocate\n");
-        exit();
+        exit(0);
     }
     c = (char*)sbrk(0);
     if(c != a - 4096){
         printf("(char*)sbrk deallocation produced wrong address, a %x c %x\n", a, c);
-        exit();
+        exit(0);
     }
 
     printf("go realloc test\n");
@@ -118,24 +118,24 @@ void testsbrk(int argc, char* const argv[])
     c = (char*)sbrk(4096);
     if(c != a || (char*)sbrk(0) != a + 4096){
         printf("(char*)sbrk re-allocation failed, a %x c %x\n", a, c);
-        exit();
+        exit(0);
     }
     /*if(*lastaddr == 99){*/
         /*// should be zero*/
         /*printf("(char*)sbrk de-allocation didn't really deallocate\n");*/
-        /*exit();*/
+        /*exit(0);*/
     /*}*/
 
     a = (char*)sbrk(0);
     c = (char*)sbrk(-((char*)sbrk(0) - oldbrk));
     if(c != a){
         printf("(char*)sbrk downsize failed, a %x c %x\n", a, c);
-        exit();
+        exit(0);
     }
 
     if(c == (char*)0xffffffff){
         printf("failed sbrk leaked memory\n");
-        exit();
+        exit(0);
     }
 
     printf("sbrk test OK\n");
@@ -175,11 +175,11 @@ void testmem(int argc, char* const argv[])
         if(m1 == 0){
             printf("couldn't allocate mem?!!\n");
             /*kill(ppid);*/
-            exit();
+            exit(0);
         }
         free(m1);
         printf("mem ok\n");
-        exit();
+        exit(0);
     } else {
         wait(NULL);
     }

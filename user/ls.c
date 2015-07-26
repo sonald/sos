@@ -66,6 +66,7 @@ static void do_normal(int fd)
         maxcol = max(maxcol, strlen(de.d_name));
     }
     maxcol = min(maxcol, 80);
+    if (maxcol == 0) return;
 
     int ln_max = 80 / maxcol;
     char* buf = (char*)malloc(maxcol+1);
@@ -101,7 +102,8 @@ static void do_long_mode(int fd)
 
 int main(int argc, char* const argv[])
 {
-    base = "/";
+    char* nm = (char*)malloc(PATHLEN);
+    base = getcwd(nm, PATHLEN);
     if (argc > 1) {
         argc--;
         argv++;
@@ -126,6 +128,7 @@ int main(int argc, char* const argv[])
         else do_normal(fd); 
         close(fd);
     }
+    free(nm);
     return 0;
 }
 

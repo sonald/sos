@@ -230,6 +230,54 @@ int sys_lstat(const char *pathname, struct stat *buf)
     return 0;
 }
 
+char* sys_getcwd(char *buf, size_t size)
+{
+    memcpy(buf, current->wdname, min(size, PATHLEN+1));
+    return buf;
+}
+
+int sys_chdir(const char *path)
+{
+    if (!path) return -ENOENT;
+    auto* ip = vfs.namei(path);
+    if (!ip) return -ENOENT;
+    if (ip->type != FsNodeType::Dir) {
+        return -ENOTDIR;
+    }
+    
+    //FIXME: handle .. .
+    if (path[0] == '/') {
+        strncpy(current->wdname, path, PATHLEN);
+    } else {
+        snprintf(current->wdname, PATHLEN, "%s/%s", current->wdname, path);
+    }
+
+    if (current->pwd) {
+        vfs.dealloc_inode(current->pwd);
+    }
+    current->pwd = ip;
+    return 0;
+}
+
+int sys_fchdir(int fd)
+{
+    if (fd >= MAX_NR_FILE) return -EINVAL;
+
+    auto* filp = current->files[fd];
+
+    if (filp->type() != File::Type::Inode) {
+        return -ENOTDIR;
+    }
+
+    //FIXME: how to trace current->wdname, may be by sys_open?
+    auto* ip = filp->inode();
+    if (current->pwd) {
+        vfs.dealloc_inode(current->pwd);
+    }
+    current->pwd = ip;
+    return 0;
+}
+
 int sys_mmap(struct file *, struct vm_area_struct *)
 {
     return 0;
@@ -473,16 +521,27 @@ int VFSManager::mount(const char *src, const char *target,
     auto* mnt = new mount_info_t;
     auto len = strlen(target);
     mnt->mnt_point = new char[len+1];
-    strncpy(mnt->mnt_point, target, len);
+    mnt->mnt_over = NULL;
+    strncpy(mnt->mnt_point, target, len+1);
+
+    auto oflags = vfslock.lock();
     mnt->next = _mounts;
     _mounts = mnt;
+    vfslock.release(oflags);
+
+    if (strcmp(target, "/") != 0) {
+        mnt->mnt_over = namei(target);
+        if (mnt->mnt_over == NULL) {
+            return -ENOENT;
+        }
+    } 
 
     if (strcmp(src, "devfs") == 0) {
         mnt->fs = fs->spawn(data);
 
     } else if (strcmp(fstype, "ramfs") == 0) {
         mnt->fs = fs->spawn(data);
-        kassert(get_mount(target) != NULL);
+        //kassert(get_mount(target) != NULL);
 
     } else if (strncmp(src, "/dev/hda", 8) == 0) {
         kprintf("mount %s\n", src);
@@ -594,6 +653,21 @@ static char* path_part(char* path, char* part)
     return p;
 }
 
+mount_info_t* VFSManager::find_mount_over(inode_t* ip)
+{
+    auto* p = _mounts;
+    auto oflags = vfslock.lock();
+    while (p) {
+        if (p->mnt_over == ip) {
+            vfslock.release(oflags);
+            return p;
+        }
+        p = p->next;
+    }
+    vfslock.release(oflags);
+    return NULL;
+}
+
 mount_info_t* VFSManager::find_mount(const char* path, char**new_path)
 {
     char* pth = new char[strlen(path)+1];
@@ -620,49 +694,54 @@ mount_info_t* VFSManager::find_mount(const char* path, char**new_path)
 
 inode_t* VFSManager::namei(const char* path)
 {
-    auto eflags = vfslock.lock();
+    if (!path || path[0] == '\0') return NULL;
 
-    //TODO: need to impl cwd for proc
-    int len = strlen(path)+1;
-    char* full_path = new char[len+1];
-    if (path && path[0] != '/') {
-        snprintf(full_path, len, "/%s", path);
+    inode_t* ibase = NULL;
+    if (*path == '/') {
+        ibase = _rootfs->root();
+        path++;
     } else {
-        strcpy(full_path, path);
+        ibase = current->pwd;
+    }
+    kassert(ibase != NULL);
+
+    if (*path == '\0') {
+        ibase->ref++;
+        return ibase;
     }
 
-    //TODO: recursively lookup
-    char* new_path = nullptr;
-    auto* mnt = find_mount(full_path, &new_path);
-    //delete full_path;
-
-    if (strcmp(new_path, "/") == 0) {
-        vfslock.release(eflags);
-        auto* dup = mnt->fs->root();
-        dup->ref++;
-        return dup;
-    }
-
-    auto* old = new_path;
-    char part[NAMELEN+1];
-    auto* ip = mnt->fs->root();
-    while ((new_path = path_part(new_path, part)) != NULL) {
-        if ((ip = dir_lookup(ip, part)) == NULL) {
+    char* opath = new char[strlen(path)+1];
+    strcpy(opath, path);
+    char* old = opath;
+    char *part = new char[NAMELEN+1];
+    while ((opath = path_part(opath, part)) != NULL) {
+        if ((ibase = dir_lookup(ibase, part)) == NULL) {
             break;
         }
     }
-    delete old;
 
-    vfslock.release(eflags);
-    return ip;
+    mount_info_t* mnt = NULL;
+    if ((mnt = find_mount_over(ibase)) != NULL) {
+        ibase = mnt->fs->root();
+        ibase->ref++;
+    }
+
+    delete old;
+    delete part;
+    return ibase;
 }
 
 inode_t* VFSManager::dir_lookup(inode_t* dir, const char* name)
 {
+    //kprintf("%s dir(%d) name %s\n", __func__, dir->ino, name);
+    mount_info_t* mnt = NULL;
+    if ((mnt = find_mount_over(dir)) != NULL) {
+        dir = mnt->fs->root();
+    }
+
     auto* fs = dir->fs;
     dentry_t* de = alloc_entry();
 
-    auto eflags = vfslock.lock();
     inode_t* ip = NULL;
     strncpy(de->name, name, NAMELEN);
     de->name[NAMELEN] = 0;
@@ -672,7 +751,6 @@ inode_t* VFSManager::dir_lookup(inode_t* dir, const char* name)
     }
 
     dealloc_entry(de);
-    vfslock.release(eflags);
     return ip;
 }
 

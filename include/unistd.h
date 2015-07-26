@@ -103,6 +103,9 @@ int signal(int signum, unsigned long handler);
 int sigpending(sigset_t *set);
 int sigprocmask(int how, sigset_t *set, sigset_t *oldset);
 int sigsuspend(sigset_t *sigmask);
+int chdir(const char *path);
+int fchdir(int fd);
+char* getcwd(char *buf, size_t size);
 
 // return -1 if no child, or pid of any of children exited
 pid_t wait(int *status);

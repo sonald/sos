@@ -50,6 +50,8 @@ typedef struct proc_s {
     page_directory_t* pgdir;
 
     File* files[FILES_PER_PROC];
+    inode_t* pwd;
+    char wdname[PATHLEN+1]; // traced string for current working dir
 
     void* channel; // sleep on
     struct proc_s* next;

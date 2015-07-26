@@ -42,7 +42,9 @@
 #define SYS_sigsuspend      36
 #define SYS_sigreturn       37
 #define SYS_waitpid         38
+#define SYS_fchdir          39
+#define SYS_getcwd          40
 
-#define NR_SYSCALL          39
+#define NR_SYSCALL          41
 
 #endif

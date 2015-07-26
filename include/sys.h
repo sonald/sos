@@ -40,5 +40,8 @@ extern int sys_sigsuspend(sigset_t *sigmask);
 //right now, I should take care of it specially cause there is 
 //no way I can pass a trap frame to a syscall easily.
 extern int sys_sigreturn(uint32_t);
+extern int sys_chdir(const char *path);
+extern int sys_fchdir(int fd);
+extern char* sys_getcwd(char *buf, size_t size);
 
 #endif

@@ -55,7 +55,7 @@ static struct builtin_command {
     command_runner_t fn; 
     command_descriptor_t desc_fn;
 } builtins[] = {
-    { 
+    {
         "kdump",
         [] (const cmd_args_t& args) -> int {
             (void)args;
@@ -64,6 +64,31 @@ static struct builtin_command {
         },
         [] () {
             print("display basic information for all tasks.\n");
+        }
+    },
+    {
+        "cd",
+        [] (const cmd_args_t& args) -> int {
+            if (args.argc == 1) {
+                //cd to HOME
+            } else {
+                return chdir(args.argv[1]);
+            } 
+        },
+        [] () {
+            print("change the current directory.\n");
+        }
+    },
+    {
+        "pwd",
+        [] (const cmd_args_t& args) -> int {
+            (void)args;
+            char buf[PATH_LEN];
+            printf("%s\n", getcwd(buf, PATH_LEN-1));
+            return 0;
+        },
+        [] () {
+            print("return working directory name.\n");
         }
     },
     { 
@@ -78,7 +103,7 @@ static struct builtin_command {
                 }
             }
             printf("builtin commands: \n"
-                    "\tkdump, help \n");
+                    "\tkdump, help, cd, pwd \n");
             return 0;
         },
         [] () {
@@ -216,7 +241,6 @@ typedef struct token_s {
     char* val; // for symbol or literal
 } token_t;
 
-//static storages, cause no malloc provided yet
 static PipeCommand s_pipes[10];
 static int s_nr_pipe = 0;
 static BaseCommand s_basecmds[MAX_NR_SYM];
