@@ -264,6 +264,7 @@ int sys_fchdir(int fd)
     if (fd >= MAX_NR_FILE) return -EINVAL;
 
     auto* filp = current->files[fd];
+    if (!filp) return ENOENT;
 
     if (filp->type() != File::Type::Inode) {
         return -ENOTDIR;

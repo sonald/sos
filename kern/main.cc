@@ -25,6 +25,7 @@
 #include <devfs.h>
 #include <tty.h>
 #include <ppm.h>
+#include <mp.h>
 
 extern "C" void switch_to_usermode(void* ring3_esp, void* ring3_eip);
 extern "C" void flush_tss();
@@ -172,6 +173,9 @@ extern "C" int kernel_main(struct multiboot_info *mb)
         //apply_mmap(mb->mmap_length, mb->mmap_addr);
     //}
     current_display->set_text_color(LIGHT_MAGENTA);
+
+    init_mp();
+    //for (;;) { asm volatile ("hlt"); }
 
     tasks_init();
     kbd.init(); // both kb & mouse

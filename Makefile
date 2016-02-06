@@ -10,8 +10,8 @@ USER_FLAGS = -std=c++11 -I./include -I./user/libc -ffreestanding  \
 
 OBJS_DIR = objs
 
-crtbegin_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtbegin.o)
-crtend_o=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtend.o)
+crtbegin_o := $(shell $(CXX) $(CXXFLAGS) -print-file-name=crtbegin.o)
+crtend_o := $(shell $(CXX) $(CXXFLAGS) -print-file-name=crtend.o)
 
 kernel_srcs = kern/boot.s kern/core/irq_stubs.s kern/core/context.s \
 	$(wildcard kern/*.cc) \
@@ -40,16 +40,14 @@ DEPFILES := $(DEPFILES) $(patsubst %.o, %.d, $(ulib_obj))
 ulib_pre_objs := $(OBJS_DIR)/user/lib/crti.o $(crtbegin_o) 
 ulib_post_objs := $(ulib_obj) $(crtend_o) $(OBJS_DIR)/user/lib/crtn.o
 
-uprogs_objs = $(patsubst user/%.c, $(OBJS_DIR)/user/bin/%.o, \
+uprogs_objs := $(patsubst user/%.c, $(OBJS_DIR)/user/bin/%.o, \
 			  $(wildcard user/*.c))
-uprogs = $(patsubst $(OBJS_DIR)/user/bin/%.o, bin/%, $(uprogs_objs))
+uprogs := $(patsubst $(OBJS_DIR)/user/bin/%.o, bin/%, $(uprogs_objs))
 
 all: run ramfs_gen
 
 # for debugging
 print-%: ; @echo $* = $($*)
-
--include $(DEPFILES)
 
 $(OBJS_DIR)/kern/%.d: kern/%.cc
 	@mkdir -p $(@D)
@@ -80,7 +78,7 @@ debug: kernel
 	-drive file=hd.img,format=raw -vga vmware
 
 run: kernel hd.img initramfs.img
-	qemu-system-i386 -m 64 -s -monitor stdio -drive file=hd.img,format=raw -vga vmware
+	qemu-system-i386 -m 64 -s -monitor stdio -drive file=hd.img,format=raw -vga vmware -smp cpus=2
 
 hd.img: kernel $(uprogs) initramfs.img logo.ppm
 	hdiutil attach hd.img
@@ -116,6 +114,11 @@ ramfs_gen: tools/ramfs_gen.c
 # user space 
 #################################################################
 
+bin/%: $(ulib_pre_objs) $(OBJS_DIR)/user/bin/%.o $(ulib_post_objs) user/user.ld
+	@mkdir -p $(@D)
+	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^
+
+
 $(OBJS_DIR)/user/lib/cxx_rt.o: kern/runtime/cxx_rt.cc
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -c -o $@ $<
@@ -136,13 +139,11 @@ $(OBJS_DIR)/user/bin/%.o: user/%.c
 	@mkdir -p $(@D)
 	$(CXX) $(USER_FLAGS) -c -o $@ $<
 
-bin/%: $(ulib_pre_objs) $(OBJS_DIR)/user/bin/%.o $(ulib_post_objs) user/user.ld
-	@mkdir -p $(@D)
-	$(CXX) $(USER_FLAGS) -T user/user.ld -nostdlib -o $@ $^
-
 
 initramfs.img: bin/echo ramfs_gen
 	./ramfs_gen README.md user/echo.c bin/echo
+
+-include $(DEPFILES)
 
 .PHONY: clean
 

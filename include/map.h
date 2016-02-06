@@ -1,5 +1,5 @@
 #ifndef _SOS_MAP_H
-#define _SOS_MAP_H 
+#define _SOS_MAP_H
 
 #include <types.h>
 #include <string.h>
@@ -7,15 +7,15 @@
 using hash_t = uint32_t;
 constexpr int DEFAULT_TABLE_SIZE = 127; // prime
 
-template <class K>  
-struct KeyHash {  
+template <class K>
+struct KeyHash {
     hash_t operator()(const K& key) const {
         return static_cast<hash_t>(key) % DEFAULT_TABLE_SIZE;
     }
 };
 
-template <class K>  
-struct KeyEqual {  
+template <class K>
+struct KeyEqual {
     bool operator()(const K& k1, const K& k2) const {
         return k1 == k2;
     }
@@ -33,14 +33,14 @@ struct CStringHash {
     }
 };
 
-struct CStringEqual {  
+struct CStringEqual {
     bool operator()(const char* s1, const char* s2) const {
         return strcmp(s1, s2) == 0;
     }
 };
 
 template <class K, class V, class F = KeyHash<K>, class Eq = KeyEqual<K>>
-class HashMap 
+class HashMap
 {
     public:
         HashMap() {

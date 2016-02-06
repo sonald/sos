@@ -76,8 +76,10 @@ int sys_kill(pid_t pid, int sig)
             }
 
             if (tsk->state == TASK_SLEEP) {
-                //NOTE: this is not good. we need to tell interruptable 
-                //from uninterruptable
+                //NOTE: this is not good. we need to tell interruptable
+                //from uninterruptable.
+                //FIXME: this also means we break some condition, make
+                //some syscall failed.
                 if (tsk->channel) {
                     wakeup(tsk->channel);
                 } else {
@@ -86,7 +88,7 @@ int sys_kill(pid_t pid, int sig)
             }
             tsk->sig.signal |= S_MASK(sig);
             signal_dbg("%s: sigmask 0x%x\n", __func__, tsk->sig.signal);
-            break; 
+            break;
         }
 
         siglock.release(oldflags);
@@ -224,7 +226,7 @@ int handle_signal(int sig, trapframe_t* regs)
     _signal_handler_t handler = act.sa_handler;
     if (handler == SIG_IGN) {
         if (sig == SIGCHLD) {
-            //TODO: 
+            //TODO:
         }
         return 0;
     } else if (handler == SIG_DFL) {
@@ -257,7 +259,7 @@ int handle_signal(int sig, trapframe_t* regs)
         // ret
         char* code = (char*)ustack - 1;
         *code-- = 0xc3; // ret
-        *code-- = 0x80; 
+        *code-- = 0x80;
         *code = 0xcd; // int $0x80
         code -= 4;
         *(uint32_t*)code = SYS_sigreturn;
