@@ -12,7 +12,7 @@ Like `makefile` indicated, this is a x86 kernel, and you need a i686 gcc cross c
 
 Refs
 ===
-[xv6][] is a great reference implementation of a unix style kernel. [linux 0.11][linux] is also worth reading, and I learned a lot from these projects. You can find a lot of info about writing an small os kernel [here](wiki.osdev.org).
+[xv6][] is a great reference implementation of a unix style kernel. [linux 0.11][linux] is also worth reading, and I learned a lot from these projects. You can find a lot of info about writing an small os kernel [here](http://wiki.osdev.org).
 
 Notes
 ===
@@ -29,9 +29,9 @@ TODOs
 + tty and io partially works
 + enough syscalls for sh
 + write support of vfs & block io layers
-+ signal handling
-+ pipe support
-+ simple GUI
++ signal handling (partially)
++ simple GUI and software renderer (may port mesa if possible)
++ port newlib as userland libc
 
 ISSUSE
 ====
@@ -46,4 +46,4 @@ ISSUSE
 
 
 [xv6]: http://pdos.csail.mit.edu/6.828/2014/xv6.html
-[linux]: oldlinux.org
+[linux]: http://oldlinux.org
