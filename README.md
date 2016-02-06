@@ -23,6 +23,27 @@ Another thing is task switch. There are many ways to do this,
 
 When design other parts of the kernel, you can stick to the unix tradition or just go bold and invent your own.
 
+How to make a hd.img
+===
+This works under modern GNU/Linux (tested on Deepin 15).
+make disk image, then use parted (or fdisk to format as msdos)
+```
+dd if=/dev/zero of=hd.img bs=1M count=500
+sudo parted hd.img mklabel msdos
+sudo parted hd.img mkpart primary fat32 0% 100%
+```
+
+bind loop device (fat32 partition will be /dev/loop0p1) and mkfs
+```
+sudo losetup -f -P -v hd.img
+sudo mkfs.vfat -F 32 /dev/loop0p1
+```
+
+then mount fat32 partition and install grub2:
+```
+sudo mount /dev/loop0p1 /mnt
+sudo grub-install --modules="fat biosdisk normal part_msdos ext2 multiboot" --root-directory=/mnt /dev/loop0
+```
 
 TODOs
 ====
